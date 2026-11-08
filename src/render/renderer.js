@@ -5,6 +5,7 @@ import { isActive, members, centroid } from '../sim/util.js';
 import { toScreen } from './camera.js';
 import { sideColours, drawSmoke, drawEffects } from './effects.js';
 import { getSprite, dirIndex, SPRITE_SIZE } from './sprites.js';
+import { getSprite25, W25, H25, ANCHOR_X, ANCHOR_Y } from './sprites25d.js';
 
 export const OWNER = { 0: '#7fb6ff', 1: '#ff6a2a', null: '#d8d2c0' };
 const ownerColour = (o) => OWNER[o === null || o === undefined ? 'null' : o];
@@ -32,7 +33,7 @@ export function drawFrame(g, r, state, cam, opts) {
   g.drawImage(terrain.canvas, 0, 0);
   drawWire(g, r, state, cam);
   drawSitesWorld(g, state, now, px, fxs);
-  drawBodies(g, r, state, fxs, now, px);
+  drawBodies(g, r, state, fxs, now, px, opts.view);
   drawTanks(g, state, now);
   drawOrderLine(g, state, opts, px);
   drawSoldiers(g, r, state, opts, px);
@@ -184,15 +185,18 @@ function drawOrderLine(g, state, opts, px) {
 const spriteScale = (px) => Math.max(1.1, 0.7 * px);
 const WALK = ['walk1', 'stand', 'walk2', 'stand'];
 
-function drawSoldiers(g, r, state, opts, px) {
-  const ps = spriteScale(px);
-  const size = SPRITE_SIZE * ps;
-  const sel = opts.selected;
+const WALK25 = ['walk1', 'walk2', 'walk3', 'walk4'];
+// 2.5D sprites are taller, so they use a slightly smaller pixel size.
+const spriteScale25 = (px) => Math.max(1, 0.7 * px);
+
+// Work out each soldier's facing and animation frame. Bookkeeping runs for
+// everyone (seen or not) so animation stays in step when they come into view.
+function animate(r, state, opts) {
+  const out = [];
   const lastShot = opts.fxs.lastShot;
-  g.imageSmoothingEnabled = false;
+  const top = opts.view === 'top';
   for (const s of state.soldiers) {
     if (!isActive(s)) continue;
-    // Animation bookkeeping happens for everyone, seen or not.
     const moved = r.lastX[s.id] === undefined ? 0 : Math.hypot(s.x - r.lastX[s.id], s.y - r.lastY[s.id]);
     r.lastX[s.id] = s.x;
     r.lastY[s.id] = s.y;
@@ -206,36 +210,74 @@ function drawSoldiers(g, r, state, opts, px) {
     if (ang === undefined) ang = s.side === 0 ? 0 : Math.PI;
     r.facing[s.id] = ang;
     if (!visible(state, s, opts)) continue;
-
     const sq = state.squads[s.squad];
     const stride = r.stride[s.id];
     let frame = 'stand';
     if (sq.pinned && sq.mode !== 'rout') frame = sq.mode === 'crawl' && moved > 0.01 && Math.floor(stride / 3) % 2 ? 'prone2' : 'prone1';
     else if (opts.now - (lastShot.get(s.id) ?? -9) < 0.09) frame = 'fire';
-    else if (moved > 0.01) frame = WALK[Math.floor(stride / 3.5) % 4];
+    else if (moved > 0.01) frame = top ? WALK[Math.floor(stride / 3.5) % 4] : WALK25[Math.floor(stride / 3) % 4];
+    out.push({ s, sq, frame, dir: dirIndex(ang) });
+  }
+  return out;
+}
 
-    g.globalAlpha = sq.mode === 'rout' ? 0.6 : 1;
+function drawSoldiers(g, r, state, opts, px) {
+  const list = animate(r, state, opts);
+  const sel = opts.selected;
+  g.imageSmoothingEnabled = false;
+  if (opts.view === 'top') {
+    const size = SPRITE_SIZE * spriteScale(px);
+    for (const { s, sq, frame, dir } of list) {
+      g.globalAlpha = sq.mode === 'rout' ? 0.6 : 1;
+      if (sel === sq.platoon) {
+        g.strokeStyle = 'rgba(255,240,170,0.9)';
+        g.lineWidth = 1.6 * px;
+        g.beginPath();
+        g.arc(s.x, s.y, size * 0.42, 0, Math.PI * 2);
+        g.stroke();
+      }
+      g.drawImage(getSprite(s.side, s.role, frame, dir), s.x - size / 2, s.y - size / 2, size, size);
+    }
+    g.globalAlpha = 1;
+    return;
+  }
+  // 2.5D: soldiers stand up off the ground, so draw the ones further up the
+  // screen first and let nearer ones overlap them. Feet sit on the position.
+  const ps = spriteScale25(px);
+  list.sort((a, b) => a.s.y - b.s.y || a.s.id - b.s.id);
+  for (const { s, sq } of list) {
+    g.fillStyle = 'rgba(15,12,8,0.35)';
+    g.beginPath();
+    g.ellipse(s.x, s.y + 0.5 * ps, 6 * ps, 2.6 * ps, 0, 0, Math.PI * 2);
+    g.fill();
     if (sel === sq.platoon) {
       g.strokeStyle = 'rgba(255,240,170,0.9)';
       g.lineWidth = 1.6 * px;
       g.beginPath();
-      g.arc(s.x, s.y, size * 0.42, 0, Math.PI * 2);
+      g.ellipse(s.x, s.y + 0.5 * ps, 8 * ps, 3.6 * ps, 0, 0, Math.PI * 2);
       g.stroke();
     }
-    g.drawImage(getSprite(s.side, s.role, frame, dirIndex(ang)), s.x - size / 2, s.y - size / 2, size, size);
+  }
+  for (const { s, sq, frame, dir } of list) {
+    g.globalAlpha = sq.mode === 'rout' ? 0.6 : 1;
+    g.drawImage(getSprite25(s.side, s.role, frame, dir), s.x - ANCHOR_X * ps, s.y - ANCHOR_Y * ps, W25 * ps, H25 * ps);
   }
   g.globalAlpha = 1;
 }
 
 // The fallen: a quick topple, then they stay where they dropped.
-function drawBodies(g, r, state, fxs, now, px) {
+function drawBodies(g, r, state, fxs, now, px, view) {
+  const top = view === 'top';
   const size = SPRITE_SIZE * spriteScale(px);
+  const ps = spriteScale25(px);
   g.imageSmoothingEnabled = false;
   for (const b of fxs.bodies) {
     if (b.dir === null) b.dir = dirIndex(r.facing[b.id] ?? (b.side === 0 ? 0 : Math.PI));
     const t = now - b.t0;
     const frame = t < 0.12 ? 'fall1' : t < 0.26 ? 'fall2' : 'dead';
-    g.drawImage(getSprite(b.side, state.soldiers[b.id].role, frame, b.dir), b.x - size / 2, b.y - size / 2, size, size);
+    const role = state.soldiers[b.id].role;
+    if (top) g.drawImage(getSprite(b.side, role, frame, b.dir), b.x - size / 2, b.y - size / 2, size, size);
+    else g.drawImage(getSprite25(b.side, role, frame, b.dir), b.x - ANCHOR_X * ps, b.y - ANCHOR_Y * ps, W25 * ps, H25 * ps);
   }
 }
 

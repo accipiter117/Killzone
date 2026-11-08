@@ -31,7 +31,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), labelsAll: store.get('labels', false), lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), labelsAll: store.get('labels', false), view: store.get('view', '25d'), lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, armed: null, marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -147,6 +147,11 @@ function focusPlatoon(pl) {
   if (sx < 30 || sy < 30 || sx > cam.vw - 30 || sy > cam.vh - 30) centreOn(cam, x, y);
 }
 
+// In 2.5D a soldier's body is drawn above their feet, so aim taps at the chest.
+function bodyLift() {
+  return game.view === 'top' ? 0 : 9 * Math.max(1, 0.7 / game.cam.z);
+}
+
 function siteAt(state, w) {
   const px = 1 / game.cam.z;
   let best = null, bd = Infinity;
@@ -172,9 +177,10 @@ function onTap(sx, sy) {
     const badge = game.renderer.badges.find((b) => b.side === PLAYER && Math.hypot(b.x - sx, b.y - sy) < 20);
     if (badge) { game.selected = badge.platoon; return; }
     let near = null, nd = 18 * px;
+    const lift = bodyLift();
     for (const s of st.soldiers) {
       if (s.side !== PLAYER || !isActive(s)) continue;
-      const d = Math.hypot(s.x - w.x, s.y - w.y);
+      const d = Math.hypot(s.x - w.x, s.y - lift - w.y);
       if (d < nd) { nd = d; near = s; }
     }
     if (near) {
@@ -199,9 +205,10 @@ function inspect(sx, sy) {
   const px = 1 / game.cam.z;
   const reveal = game.watch || game.replay;
   let sol = null, sd = 16 * px;
+  const lift = bodyLift();
   for (const s of st.soldiers) {
     if (!isActive(s) || (s.side !== PLAYER && !reveal && !st.sides[PLAYER].spotted[s.id])) continue;
-    const d = Math.hypot(s.x - w.x, s.y - w.y);
+    const d = Math.hypot(s.x - w.x, s.y - lift - w.y);
     if (d < sd) { sd = d; sol = s; }
   }
   if (sol) {
@@ -242,6 +249,7 @@ function openMenu() {
   document.getElementById('length-select').value = String(game.lengthSec);
   document.getElementById('watch-toggle').checked = game.watch;
   document.getElementById('labels-toggle').checked = game.labelsAll;
+  document.getElementById('view-select').value = game.view;
   openOverlay('overlay-menu');
 }
 document.getElementById('overlay-menu').addEventListener('click', (e) => {
@@ -260,6 +268,10 @@ document.getElementById('watch-toggle').addEventListener('change', (e) => {
   if (!game.replay) game.match.controllers = controllersFor(game.watch);
   game.selected = null;
   game.armed = null;
+});
+document.getElementById('view-select').addEventListener('change', (e) => {
+  game.view = e.target.value;
+  store.set('view', game.view);
 });
 document.getElementById('labels-toggle').addEventListener('change', (e) => {
   game.labelsAll = e.target.checked;
@@ -340,7 +352,7 @@ function frame(t) {
   prune(game.fxs, now);
   const shake = shakeOffset(game.fxs, dt);
   const reveal = game.watch || game.replay;
-  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll };
+  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view };
   drawFrame(g, game.renderer, st, game.cam, view);
   drawMinimap(mg, game.renderer, st, game.cam, view);
   updateUI(ui, st, {
