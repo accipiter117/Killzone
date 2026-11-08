@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Trooper Style Check</title>
+  <style>
+    /* Field manual plate: mud swatches on a parchment page, stencilled labels. */
+    :root {
+      --page: #ece6d6; --ink: #221e17; --muted: #6d6656; --rule: #cbc2ac; --mud: #4d4836; --mud-2: #3f3b2d;
+      --isa: #3f7fd0; --hgh: #d9531c;
+      --display: "Black Ops One", "Impact", "Arial Narrow", sans-serif;
+      --body: "IBM Plex Sans", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+    }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #15130f; --ink: #ece6d6; --muted: #a39b88; --rule: #36312a; --isa: #7fb6ff; --hgh: #ff7a3a; color-scheme: dark; } }
+    :root[data-theme="dark"] { --page: #15130f; --ink: #ece6d6; --muted: #a39b88; --rule: #36312a; --isa: #7fb6ff; --hgh: #ff7a3a; color-scheme: dark; }
+    body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.5 var(--body); padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+    main { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+    h1 { font: 400 30px/1.1 var(--display); letter-spacing: 0.04em; margin: 0; text-wrap: balance; }
+    h2 { font: 400 20px/1.2 var(--display); letter-spacing: 0.05em; margin: 0 0 4px; }
+    .lede { color: var(--muted); max-width: 62ch; margin: 6px 0 0; }
+    .factions { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+    .plate { border-top: 3px solid var(--isa); padding-top: 10px; min-width: 0; }
+    .plate.hgh { border-top-color: var(--hgh); }
+    .plate p { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+    .hero { background: #8a8a8a; border-radius: 6px; display: grid; place-items: center; padding: 8px 0; }
+    canvas { image-rendering: pixelated; display: block; max-width: 100%; height: auto; }
+    .strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    figure canvas { background: var(--mud); border-radius: 4px; flex-shrink: 0; }
+    figcaption { font: 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .field { background: var(--mud-2); border-radius: 6px; overflow: hidden; }
+    .field canvas { width: 100%; height: auto; }
+    .note { font-size: 14px; color: var(--muted); max-width: 62ch; }
+    a { color: inherit; }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Trooper style check</h1>
+      <p class="lede">Third pass. Each trooper is now about 70 pixels tall and built from dozens of shaped pieces of kit, each shaded in its own material and outlined, so the equipment reads clearly. Original art drawn in code; the references guided the kit, nothing is traced.</p>
+    </header>
+
+    <section class="factions">
+      <div class="plate">
+        <h2>ISA rifleman</h2>
+        <p>Rounded helmet with a wide blue visor, ear piece, chin guard and crest; big pauldrons; chest plate with a centre ridge and unit marking; olive webbing pouches, belt and grenade; hip, thigh, knee and shin armour over a dark undersuit; forearm guards; bullpup rifle with a scope.</p>
+        <div class="hero"><canvas id="hero0"></canvas></div>
+        <div class="strip" id="strip0"></div>
+      </div>
+      <div class="plate hgh">
+        <h2>Helghast rifleman</h2>
+        <p>Rounded helmet with a thick band, lip, ear cups and rivets; gas mask with slanted glowing goggles in raised pale rims, a framed breathing cone running down to a brass chin connector, a round cheek filter, and a ribbed hose hanging from the chin; armoured vest with crossed straps and pouches; shoulder armour and red armband; long greatcoat; strapped boots; long rifle with a slotted body and glowing orange windows, carry handle, skeleton stock, magazine ahead of the grip and a ringed front shroud.</p>
+        <div class="hero"><canvas id="hero1"></canvas></div>
+        <div class="strip" id="strip1"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Face to face</h2>
+      <div class="field"><canvas id="duel"></canvas></div>
+    </section>
+
+    <section>
+      <h2>At game size</h2>
+      <p class="note">A squad of each on the mud at roughly the size you would see them on a phone at the normal zoom. Pinching in shows the full detail.</p>
+      <div class="field"><canvas id="field"></canvas></div>
+    </section>
+
+    <p class="note">Once the look is approved: the Heavy, Assault, Engineer and Recon in the same style, then into the battle. <a href="./">Back to the battle</a></p>
+  </main>
+
+  <script type="module">
+    import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './src/render/pixel-troopers.js';
+    const SIDES = ['isa', 'hgh'];
+    const WALK = ['walk1', 'walk2', 'walk3', 'walk4'];
+    const ctx = (c) => { const g = c.getContext('2d'); g.imageSmoothingEnabled = false; return g; };
+    const sprite = (side, frame, facing = 1) => getPixelTrooper(side, frame, facing);
+    // Standing figures sit inside this part of the sprite.
+    const STAND = { x: 14, y: 6, w: 70, h: 80 };
+
+    const HERO = 5;
+    const heroes = SIDES.map((side, i) => {
+      const c = document.getElementById('hero' + i);
+      c.width = STAND.w * HERO; c.height = STAND.h * HERO;
+      return { side, c, g: ctx(c) };
+    });
+
+    const SMALL = 2;
+    const tiles = [];
+    const TILES = [['walk', WALK, 1, STAND], ['fire', ['stand', 'fire'], 1, STAND], ['facing left', WALK, -1, { ...STAND, x: PT_W - STAND.x - STAND.w }],
+      ['pinned', ['prone1', 'prone1', 'prone2', 'prone2'], 1, { x: 0, y: 50, w: PT_W, h: 40 }], ['hit', ['stand', 'fall1', 'fall2', 'dead', 'dead', 'dead', 'dead'], 1, { x: 0, y: 6, w: PT_W, h: 84 }]];
+    SIDES.forEach((side, i) => {
+      for (const [label, frames, facing, crop] of TILES) {
+        const fig = document.createElement('figure');
+        const c = document.createElement('canvas');
+        c.width = crop.w * SMALL; c.height = crop.h * SMALL;
+        const cap = document.createElement('figcaption'); cap.textContent = label;
+        fig.append(c, cap); document.getElementById('strip' + i).append(fig);
+        tiles.push({ side, c, g: ctx(c), frames, facing, crop });
+      }
+    });
+
+    const duel = document.getElementById('duel');
+    const DW = 240, DH = 90, DS = 3;
+    duel.width = DW * DS; duel.height = DH * DS;
+    const dg = ctx(duel);
+
+    const field = document.getElementById('field');
+    const FW = 420, FH = 160;
+    field.width = FW * 2; field.height = FH * 2;
+    const fg = ctx(field);
+    const mud = document.createElement('canvas'); mud.width = FW; mud.height = FH;
+    { const m = mud.getContext('2d'); m.fillStyle = '#4d4836'; m.fillRect(0, 0, FW, FH);
+      for (let i = 0; i < 260; i++) { m.globalAlpha = 0.3; m.fillStyle = i % 2 ? '#5a5442' : '#3f3b2d'; m.beginPath(); m.ellipse((i * 97) % FW, (i * 53) % FH, 4 + (i % 7) * 3, 3 + (i % 5) * 2, 0, 0, 7); m.fill(); } }
+    const squad = (side, x0) => Array.from({ length: 5 }, (_, i) => ({ side, x: x0 + (i % 2) * 16, y: 40 + i * 24, ph: i * 3 }));
+    const troops = [...squad('isa', 80), ...squad('hgh', 320)];
+    const SCALE = 0.36; // about 25 pixels tall, as at the normal battle zoom
+    const footX = (facing) => (facing === 1 ? PT_FOOT[0] : PT_W - 1 - PT_FOOT[0]);
+
+    let n = 0;
+    function draw() {
+      n++;
+      for (const h of heroes) {
+        const k = n % 16;
+        const frame = k < 8 ? WALK[k % 4] : k % 2 ? 'fire' : 'stand';
+        h.g.clearRect(0, 0, h.c.width, h.c.height);
+        h.g.drawImage(sprite(h.side, frame), STAND.x, STAND.y, STAND.w, STAND.h, 0, 0, h.c.width, h.c.height);
+      }
+      for (const t of tiles) {
+        t.g.clearRect(0, 0, t.c.width, t.c.height);
+        const { x, y, w, h } = t.crop;
+        t.g.drawImage(sprite(t.side, t.frames[n % t.frames.length], t.facing), x, y, w, h, 0, 0, t.c.width, t.c.height);
+      }
+      dg.fillStyle = '#8a8a8a'; dg.fillRect(0, 0, duel.width, duel.height);
+      dg.fillStyle = 'rgba(0,0,0,0.16)';
+      dg.fillRect(26 * DS, 84 * DS, 34 * DS, 2 * DS); dg.fillRect((DW - 60) * DS, 84 * DS, 34 * DS, 2 * DS);
+      const a = sprite('isa', n % 6 === 0 ? 'fire' : 'stand', 1), b = sprite('hgh', n % 6 === 3 ? 'fire' : 'stand', -1);
+      dg.drawImage(a, (40 - footX(1)) * DS, 0, PT_W * DS, PT_H * DS);
+      dg.drawImage(b, (DW - 40 - footX(-1)) * DS, 0, PT_W * DS, PT_H * DS);
+
+      fg.setTransform(2, 0, 0, 2, 0, 0);
+      fg.drawImage(mud, 0, 0);
+      const sorted = troops.slice().sort((p, q) => p.y - q.y);
+      for (const t of sorted) { fg.fillStyle = 'rgba(15,12,8,0.35)'; fg.beginPath(); fg.ellipse(t.x, t.y, 7, 2.5, 0, 0, 7); fg.fill(); }
+      for (const t of sorted) {
+        const cyc = (n + t.ph) % 12;
+        const frame = cyc < 8 ? WALK[cyc % 4] : cyc % 2 ? 'fire' : 'stand';
+        const facing = t.side === 'isa' ? 1 : -1;
+        fg.drawImage(sprite(t.side, frame, facing), t.x - footX(facing) * SCALE, t.y - PT_FOOT[1] * SCALE, PT_W * SCALE, PT_H * SCALE);
+      }
+    }
+    draw();
+    setInterval(draw, 170);
+  </script>
+</body>
+</html>

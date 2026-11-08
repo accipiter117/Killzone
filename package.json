@@ -1,0 +1,11 @@
+{
+  "name": "killzone-front-line",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fan-made, non-commercial battle prototype (ISA vs Helghast). Static site, no build step.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "balance": "node tools/balance.mjs"
+  }
+}

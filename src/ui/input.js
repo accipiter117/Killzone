@@ -1,0 +1,105 @@
+// Touch and mouse on the battlefield: one finger drags to pan, two fingers
+// pinch to zoom, a short touch is a tap (allowing ~12px of finger drift), and
+// a long press inspects whatever is under the finger.
+
+import { zoomAt, clampCamera, centreOn } from '../render/camera.js';
+
+const TAP_SLOP = 12;
+const LONG_PRESS_MS = 550;
+
+export function attachMapInput(el, cam, { onTap, onLongPress }) {
+  const pts = new Map();
+  let mode = 'none';
+  let start = null;
+  let last = null;
+  let pinch = null;
+  let longTimer = 0;
+  const local = (e) => {
+    const r = el.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  const cancelLong = () => { clearTimeout(longTimer); longTimer = 0; };
+
+  el.addEventListener('pointerdown', (e) => {
+    el.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, local(e));
+    if (pts.size === 1) {
+      mode = 'pending';
+      start = local(e);
+      last = start;
+      cancelLong();
+      longTimer = setTimeout(() => {
+        if (mode === 'pending') { mode = 'done'; onLongPress(start.x, start.y); }
+      }, LONG_PRESS_MS);
+    } else if (pts.size === 2) {
+      cancelLong();
+      const [a, b] = [...pts.values()];
+      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: cam.z, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+      mode = 'pinch';
+    }
+  });
+
+  el.addEventListener('pointermove', (e) => {
+    if (!pts.has(e.pointerId)) return;
+    const p = local(e);
+    pts.set(e.pointerId, p);
+    if (mode === 'pending' && Math.hypot(p.x - start.x, p.y - start.y) > TAP_SLOP) {
+      mode = 'pan';
+      cancelLong();
+    }
+    if (mode === 'pan') {
+      cam.x -= (p.x - last.x) / cam.z;
+      cam.y -= (p.y - last.y) / cam.z;
+      clampCamera(cam);
+      last = p;
+    } else if (mode === 'pinch' && pts.size >= 2) {
+      const [a, b] = [...pts.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      // Pan with the midpoint, then zoom about it.
+      cam.x -= (mid.x - pinch.mid.x) / cam.z;
+      cam.y -= (mid.y - pinch.mid.y) / cam.z;
+      pinch.mid = mid;
+      zoomAt(cam, mid.x, mid.y, pinch.z * (d / pinch.d));
+    }
+  });
+
+  const end = (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.delete(e.pointerId);
+    if (mode === 'pending' && pts.size === 0) {
+      cancelLong();
+      mode = 'none';
+      onTap(start.x, start.y);
+      return;
+    }
+    if (mode === 'pinch' && pts.size === 1) {
+      // One finger left after a pinch: carry on panning, never a tap.
+      mode = 'pan';
+      last = [...pts.values()][0];
+    }
+    if (pts.size === 0) { mode = 'none'; cancelLong(); }
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', (e) => { mode = 'done'; end(e); });
+
+  el.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const p = local(e);
+    zoomAt(cam, p.x, p.y, cam.z * Math.exp(-e.deltaY * 0.0015));
+  }, { passive: false });
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
+// Tap or drag on the minimap to jump the view there.
+export function attachMinimapInput(el, cam, worldW, worldH) {
+  let down = false;
+  const jump = (e) => {
+    const r = el.getBoundingClientRect();
+    centreOn(cam, ((e.clientX - r.left) / r.width) * worldW, ((e.clientY - r.top) / r.height) * worldH);
+  };
+  el.addEventListener('pointerdown', (e) => { e.stopPropagation(); down = true; el.setPointerCapture(e.pointerId); jump(e); });
+  el.addEventListener('pointermove', (e) => { if (down) jump(e); });
+  el.addEventListener('pointerup', () => { down = false; });
+  el.addEventListener('pointercancel', () => { down = false; });
+}
