@@ -141,3 +141,42 @@ function hitChanceFrom(s, target, shooter) {
   const d = Math.hypot(target.x - shooter.x, target.y - shooter.y);
   return hitChance(s, 0.5, d, 400, target, false, shooter);
 }
+
+// A solid wire belt across open flat ground at x 500 to 530.
+function wireBelt(s) {
+  const m = s.map;
+  for (let i = 0; i < m.wire.length; i++) m.wire[i] = 0;
+  for (let y = 5; y < m.height; y += 10) for (let x = 505; x <= 525; x += 10) {
+    const i = Math.floor(y / 10) * m.cols + Math.floor(x / 10);
+    m.wire[i] = 1; m.grid[i] = T.open; m.elev[i] = 0;
+  }
+}
+
+function crossingTime(crush) {
+  const s = quietBattle(7);
+  wireBelt(s);
+  const v = s.vehicles[0];
+  if (crush) {
+    v.x = 435; v.y = 300;
+    cmd(s, 0, 'vmove', { x: 600, y: 300 });
+    for (let i = 0; i < 30 * 8; i++) { holdFire(s); step(s); }
+  } else { v.x = 100; v.y = 100; }
+  const pl = s.platoons[0];
+  for (const id of pl.squads) place(s, id, 445, s.squads[id].role === 'rifle' ? 300 : 700);
+  const sq = s.squads[pl.squads.find((id) => s.squads[id].role === 'rifle')];
+  cmd(s, 0, 'move', { platoon: pl.id, x: 615, y: 300 });
+  const t0 = s.tick;
+  for (let i = 0; i < 30 * 40; i++) {
+    holdFire(s);
+    step(s);
+    if (sq.soldiers.every((id) => s.soldiers[id].x > 540)) return { s, sec: (s.tick - t0) / 30 };
+  }
+  return { s, sec: Infinity };
+}
+
+test('a tank rolls barbed wire flat, opening a lane infantry walk straight through', () => {
+  const crushed = crossingTime(true);
+  for (let dy = -30; dy <= 30; dy += 10) assert.equal(crushed.s.map.wire[cellIndex(crushed.s.map, 515, 300 + dy)], 0, `lane open at ${dy}`);
+  const blocked = crossingTime(false);
+  assert.ok(crushed.sec < blocked.sec / 2, `through the lane ${crushed.sec}s, through wire ${blocked.sec}s`);
+});

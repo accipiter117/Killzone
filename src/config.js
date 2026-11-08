@@ -171,7 +171,7 @@ export const CONFIG = {
     overwatch: { label: 'Overwatch', cooldownSec: 20, vsTank: 280, blastDamage: 110 },
     coverRadius: 55, // infantry this close to their own tank, with it between them and the shooter, are covered
     coverHit: 0.5,
-    crushRadius: 22, // wire this close under the tank is flattened
+    crushRadius: 36, // wire this close under the tank is flattened (a lane a squad can walk through)
     wreckRadius: 26, // the burnt-out wreck becomes cover
   },
   // Engineers' ability becomes a breaching charge when an enemy tank is close.
@@ -221,7 +221,7 @@ export const RULES = {
   rubble: ['Rubble', 'Cover: fewer hits and less suppression, slightly slower going.'],
   crater: ['Shell crater', 'Light cover. Artillery leaves new ones behind.'],
   building: ['Ruined building', 'Longer range and good cover, but artillery does double damage inside.'],
-  wire: ['Barbed wire', 'Slows infantry to a crawl until an engineer squad cuts it.'],
+  wire: ['Barbed wire', 'Slows infantry to a crawl until an engineer squad cuts it or a tank rolls it flat.'],
   objective: ['Objective', 'Score points while you hold it. The bar fills while only your troops are inside and stalls when contested.'],
   mg: ['MG nest', 'Capture it and it fires on any enemy in range, pinning them down.'],
   arc: ['Arc tower', 'Capture it and it zaps nearby enemies every few seconds.'],
