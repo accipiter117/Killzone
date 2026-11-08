@@ -42,19 +42,19 @@
   <main>
     <header>
       <h1>Trooper style check</h1>
-      <p class="lede">Second pass, redrawn by hand pixel by pixel for much more definition, following the look of the references (proportions, muted palettes, strong shading) without copying them. Each is about 40 pixels tall in a three quarter view and faces left or right.</p>
+      <p class="lede">Third pass. Each trooper is now about 70 pixels tall and built from dozens of shaped pieces of kit, each shaded in its own material and outlined, so the equipment reads clearly. Original art drawn in code; the references guided the kit, nothing is traced.</p>
     </header>
 
     <section class="factions">
       <div class="plate">
         <h2>ISA rifleman</h2>
-        <p>Rounded combat helmet with a blue visor, layered steel grey armour plates over a dark undersuit, webbing and pouches, thigh plates and knee pads, rifle across the chest with bare hands on the grips.</p>
+        <p>Rounded helmet with a wide blue visor, ear piece, chin guard and crest; big pauldrons; chest plate with a centre ridge and unit marking; olive webbing pouches, belt and grenade; hip, thigh, knee and shin armour over a dark undersuit; forearm guards; bullpup rifle with a scope.</p>
         <div class="hero"><canvas id="hero0"></canvas></div>
         <div class="strip" id="strip0"></div>
       </div>
       <div class="plate hgh">
         <h2>Helghast rifleman</h2>
-        <p>Peaked helmet over a gas mask with two glowing eyes, respirator and hose, shoulder armour with a red armband, long greatcoat split at the front, heavy boots.</p>
+        <p>Peaked helmet with rim band, crest and neck guard; gas mask with ringed glowing lenses, respirator, filter and hose; armoured vest with crossed straps and three pouches; shoulder armour and red armband; belt, buckle and pouches; long greatcoat split at the front; knee pads and strapped boots; rifle with a curved magazine, vented handguard, muzzle brake and glowing sight.</p>
         <div class="hero"><canvas id="hero1"></canvas></div>
         <div class="strip" id="strip1"></div>
       </div>
@@ -67,51 +67,49 @@
 
     <section>
       <h2>At game size</h2>
-      <p class="note">A squad of each on the mud at roughly the size you would see them on a phone at the normal zoom (pinching in shows the full detail).</p>
+      <p class="note">A squad of each on the mud at roughly the size you would see them on a phone at the normal zoom. Pinching in shows the full detail.</p>
       <div class="field"><canvas id="field"></canvas></div>
     </section>
 
-    <p class="note">Still to draw once the look is approved: lying down when pinned, falling when hit, and the Heavy, Assault, Engineer and Recon versions. <a href="./">Back to the battle</a></p>
+    <p class="note">Once the look is approved: the Heavy, Assault, Engineer and Recon in the same style, then into the battle. <a href="./">Back to the battle</a></p>
   </main>
 
   <script type="module">
-    import { getPixelTrooper } from './src/render/pixel-troopers.js';
+    import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './src/render/pixel-troopers.js';
     const SIDES = ['isa', 'hgh'];
     const WALK = ['walk1', 'walk2', 'walk3', 'walk4'];
     const ctx = (c) => { const g = c.getContext('2d'); g.imageSmoothingEnabled = false; return g; };
-    const sprite = (side, frame, facing) => getPixelTrooper(side, frame, facing);
-    const ref = sprite('isa', 'stand', 1);
+    const sprite = (side, frame, facing = 1) => getPixelTrooper(side, frame, facing);
+    // Standing figures sit inside this part of the sprite.
+    const STAND = { x: 14, y: 6, w: 70, h: 80 };
 
-    // Big figures, one each, cycling stand, walk and fire.
-    const HERO = 8;
+    const HERO = 5;
     const heroes = SIDES.map((side, i) => {
       const c = document.getElementById('hero' + i);
-      const s = sprite(side, 'stand', 1);
-      c.width = s.width * HERO; c.height = s.height * HERO;
+      c.width = STAND.w * HERO; c.height = STAND.h * HERO;
       return { side, c, g: ctx(c) };
     });
 
-    // Small animated tiles.
-    const SMALL = 3;
+    const SMALL = 2;
     const tiles = [];
+    const TILES = [['walk', WALK, 1, STAND], ['fire', ['stand', 'fire'], 1, STAND], ['facing left', WALK, -1, { ...STAND, x: PT_W - STAND.x - STAND.w }],
+      ['pinned', ['prone1', 'prone1', 'prone2', 'prone2'], 1, { x: 0, y: 50, w: PT_W, h: 40 }], ['hit', ['stand', 'fall1', 'fall2', 'dead', 'dead', 'dead', 'dead'], 1, { x: 0, y: 6, w: PT_W, h: 84 }]];
     SIDES.forEach((side, i) => {
-      for (const [label, frames] of [['stand', ['stand']], ['walk', WALK], ['fire', ['stand', 'fire']], ['facing left', WALK]]) {
+      for (const [label, frames, facing, crop] of TILES) {
         const fig = document.createElement('figure');
         const c = document.createElement('canvas');
-        const s = sprite(side, 'stand', 1);
-        c.width = s.width * SMALL; c.height = s.height * SMALL;
+        c.width = crop.w * SMALL; c.height = crop.h * SMALL;
         const cap = document.createElement('figcaption'); cap.textContent = label;
         fig.append(c, cap); document.getElementById('strip' + i).append(fig);
-        tiles.push({ side, c, g: ctx(c), frames, facing: label === 'facing left' ? -1 : 1 });
+        tiles.push({ side, c, g: ctx(c), frames, facing, crop });
       }
     });
 
-    // Face to face on grey, like a character sheet.
     const duel = document.getElementById('duel');
-    duel.width = 140 * 4; duel.height = 52 * 4;
+    const DW = 240, DH = 90, DS = 3;
+    duel.width = DW * DS; duel.height = DH * DS;
     const dg = ctx(duel);
 
-    // Two squads skirmishing on mud, near game size.
     const field = document.getElementById('field');
     const FW = 420, FH = 160;
     field.width = FW * 2; field.height = FH * 2;
@@ -120,8 +118,9 @@
     { const m = mud.getContext('2d'); m.fillStyle = '#4d4836'; m.fillRect(0, 0, FW, FH);
       for (let i = 0; i < 260; i++) { m.globalAlpha = 0.3; m.fillStyle = i % 2 ? '#5a5442' : '#3f3b2d'; m.beginPath(); m.ellipse((i * 97) % FW, (i * 53) % FH, 4 + (i % 7) * 3, 3 + (i % 5) * 2, 0, 0, 7); m.fill(); } }
     const squad = (side, x0) => Array.from({ length: 5 }, (_, i) => ({ side, x: x0 + (i % 2) * 16, y: 40 + i * 24, ph: i * 3 }));
-    const troops = [...squad('isa', 70), ...squad('hgh', 320)];
-    const SCALE = 0.6;
+    const troops = [...squad('isa', 80), ...squad('hgh', 320)];
+    const SCALE = 0.36; // about 25 pixels tall, as at the normal battle zoom
+    const footX = (facing) => (facing === 1 ? PT_FOOT[0] : PT_W - 1 - PT_FOOT[0]);
 
     let n = 0;
     function draw() {
@@ -130,18 +129,19 @@
         const k = n % 16;
         const frame = k < 8 ? WALK[k % 4] : k % 2 ? 'fire' : 'stand';
         h.g.clearRect(0, 0, h.c.width, h.c.height);
-        h.g.drawImage(sprite(h.side, frame, 1), 0, 0, h.c.width, h.c.height);
+        h.g.drawImage(sprite(h.side, frame), STAND.x, STAND.y, STAND.w, STAND.h, 0, 0, h.c.width, h.c.height);
       }
       for (const t of tiles) {
         t.g.clearRect(0, 0, t.c.width, t.c.height);
-        t.g.drawImage(sprite(t.side, t.frames[n % t.frames.length], t.facing), 0, 0, t.c.width, t.c.height);
+        const { x, y, w, h } = t.crop;
+        t.g.drawImage(sprite(t.side, t.frames[n % t.frames.length], t.facing), x, y, w, h, 0, 0, t.c.width, t.c.height);
       }
       dg.fillStyle = '#8a8a8a'; dg.fillRect(0, 0, duel.width, duel.height);
+      dg.fillStyle = 'rgba(0,0,0,0.16)';
+      dg.fillRect(26 * DS, 84 * DS, 34 * DS, 2 * DS); dg.fillRect((DW - 60) * DS, 84 * DS, 34 * DS, 2 * DS);
       const a = sprite('isa', n % 6 === 0 ? 'fire' : 'stand', 1), b = sprite('hgh', n % 6 === 3 ? 'fire' : 'stand', -1);
-      dg.fillStyle = 'rgba(0,0,0,0.18)';
-      dg.fillRect(14 * 4, 47 * 4, 26 * 4, 2 * 4); dg.fillRect(96 * 4, 47 * 4, 26 * 4, 2 * 4);
-      dg.drawImage(a, 10 * 4, 9 * 4, a.width * 4, a.height * 4);
-      dg.drawImage(b, (130 - b.width) * 4, 9 * 4, b.width * 4, b.height * 4);
+      dg.drawImage(a, (40 - footX(1)) * DS, 0, PT_W * DS, PT_H * DS);
+      dg.drawImage(b, (DW - 40 - footX(-1)) * DS, 0, PT_W * DS, PT_H * DS);
 
       fg.setTransform(2, 0, 0, 2, 0, 0);
       fg.drawImage(mud, 0, 0);
@@ -150,9 +150,8 @@
       for (const t of sorted) {
         const cyc = (n + t.ph) % 12;
         const frame = cyc < 8 ? WALK[cyc % 4] : cyc % 2 ? 'fire' : 'stand';
-        const s = sprite(t.side, frame, t.side === 'isa' ? 1 : -1);
-        const fx = t.side === 'isa' ? 10 : s.width - 10; // feet column
-        fg.drawImage(s, t.x - fx * SCALE, t.y - (s.height - 1) * SCALE, s.width * SCALE, s.height * SCALE);
+        const facing = t.side === 'isa' ? 1 : -1;
+        fg.drawImage(sprite(t.side, frame, facing), t.x - footX(facing) * SCALE, t.y - PT_FOOT[1] * SCALE, PT_W * SCALE, PT_H * SCALE);
       }
     }
     draw();
