@@ -5,8 +5,9 @@
 import { T, cellIndex, forCells, heightAt } from './map.js';
 import { members, centroid, dist, isActive, sideDir, feed } from './util.js';
 import { blast } from './features.js';
+import { damageSoldier, suppress } from './combat.js';
 
-export const ABILITY_OF = { rifle: 'grenade', heavy: 'barrage', assault: 'charge', engineer: 'sandbags', recon: 'mark' };
+export const ABILITY_OF = { rifle: 'grenade', heavy: 'barrage', assault: 'charge', engineer: 'sandbags', recon: 'mark', jump: 'dive', infiltrator: 'vanish' };
 
 const fail = (reason) => ({ ok: false, reason });
 
@@ -92,6 +93,24 @@ export function useAbility(state, sq) {
       feed(state, `${sq.side === 0 ? 'ISA' : 'Helghast'} recon marked ${n} enemies`, sq.side);
       break;
     }
+    case 'dive': {
+      // Leap onto the nearest enemy group; the landing is resolved when the
+      // flight ends (see updateDives).
+      const t = nearestSeenEnemy(state, sq.side, c, a.range);
+      if (!t) return fail('No enemy within jumping range');
+      sq.diveUntil = state.tick + ticks(a.flightSec);
+      sq.diveTarget = { x: t.x, y: t.y };
+      sq.supp = 0;
+      sq.pinned = false;
+      state.events.push({ type: 'dive', side: sq.side, x: t.x, y: t.y });
+      break;
+    }
+    case 'vanish': {
+      sq.vanishUntil = state.tick + ticks(a.durationSec);
+      for (const s of list) s.lastShotTick = -9999; // no longer given away by their last shots
+      state.events.push({ type: 'vanish', side: sq.side, x: c.x, y: c.y });
+      break;
+    }
     default:
       return fail('Unknown ability');
   }
@@ -110,8 +129,29 @@ export function abilityHasTarget(state, sq) {
   if (!list.length) return false;
   const c = centroid(list);
   const lift = 1 + state.cfg.height.rangePerLevel * heightAt(state.map, c.x, c.y);
-  const reach = { grenade: state.cfg.abilities.grenade.range, charge: state.cfg.abilities.charge.range, barrage: state.cfg.roles.heavy.range * lift, mark: state.cfg.roles.recon.sight * lift }[key];
+  const reach = { grenade: state.cfg.abilities.grenade.range, charge: state.cfg.abilities.charge.range, barrage: state.cfg.roles.heavy.range * lift, mark: state.cfg.roles.recon.sight * lift, dive: state.cfg.abilities.dive.range, vanish: 400 }[key];
   return !!nearestSeenEnemy(state, sq.side, c, reach);
+}
+
+// Jetpack squads land at the end of a dive: a stomp that hurts and pins
+// enemies close to the landing (not their own side).
+export function updateDives(state) {
+  const a = state.cfg.abilities.dive;
+  for (const sq of state.squads) {
+    if (!sq.diveTarget || state.tick < sq.diveUntil) continue;
+    const { x, y } = sq.diveTarget;
+    sq.diveTarget = null;
+    state.events.push({ type: 'landing', side: sq.side, x, y });
+    const hit = new Set();
+    for (const s of state.soldiers) {
+      if (s.side === sq.side || !isActive(s)) continue;
+      const d = Math.hypot(s.x - x, s.y - y);
+      if (d > a.radius * 1.6) continue;
+      hit.add(s.squad);
+      if (d <= a.radius) damageSoldier(state, s, a.damage * (1 - (0.5 * d) / a.radius));
+    }
+    for (const id of [...hit].sort((p, q) => p - q)) suppress(state, state.squads[id], a.suppress, 'blast');
+  }
 }
 
 // Grenades in flight land after their fuse.

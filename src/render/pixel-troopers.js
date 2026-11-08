@@ -21,6 +21,8 @@ const MATS = {
     leather: '#40382d', trousers: '#3d3f3c', boot: '#28282a', glove: '#303032', red: '#922c1d',
     gun: '#2d2f32', gunLight: '#4f5358',
     flash: { glow: true, ramp: [0, 0, 0, [255, 150, 60], [255, 150, 60]], core: [255, 244, 200] },
+    nozzle: { glow: true, ramp: [0, 0, [150, 50, 15], [255, 120, 40], [255, 120, 40]], core: [255, 200, 120] },
+    jetFlame: { glow: true, ramp: [0, 0, [200, 60, 15], [255, 140, 50], [255, 140, 50]], core: [255, 230, 160] },
   }),
   isa: materials({
     armour: '#566b80', armourDark: '#39475a', under: '#2f353c', visor: { base: '#3d9bd8', gloss: true },
@@ -28,6 +30,8 @@ const MATS = {
     gun: '#2b2d31', gunLight: '#4c5158', glass: { base: '#5fb8e8', gloss: true }, yellow: '#d8c35a',
     brass: '#a8873c', leather: '#4a4232', gunDark: '#18191b',
     flash: { glow: true, ramp: [0, 0, 0, [190, 225, 255], [190, 225, 255]], core: [255, 255, 255] },
+    nozzle: { glow: true, ramp: [0, 0, [40, 90, 170], [110, 180, 255], [110, 180, 255]], core: [220, 240, 255] },
+    jetFlame: { glow: true, ramp: [0, 0, [50, 110, 200], [120, 190, 255], [120, 190, 255]], core: [235, 248, 255] },
   }),
 };
 
@@ -43,6 +47,8 @@ const legFrom = (hip, thigh, shin, l1 = 11, l2 = 11) => {
 
 // Leg angles (thigh from vertical, then shin relative to thigh), forward +.
 const LEG_POSES = {
+  fly1: { back: [-14, 22], front: [12, 20], bob: 0, fly: 1 }, // legs dangling, jets firing
+  fly2: { back: [-10, 26], front: [16, 16], bob: 0, fly: 2 },
   stand: { back: [-5, 2], front: [7, -2], bob: 0 },
   walk1: { back: [-20, 28], front: [22, -6], bob: 0 },
   walk2: { back: [-4, 24], front: [3, 0], bob: -1 },
@@ -162,9 +168,15 @@ function isaSniper(z) {
   ], len: 60 };
 }
 
+// Infiltrators carry their side's rifle with a long suppressor on the end.
+const suppressed = (weapon) => (z) => {
+  const w = weapon(z);
+  return { P: [...w.P, cap([w.len - 1, 0], [w.len + 9, 0], 1.9, 1.9, 'gun', z + 2), cap([w.len + 1, -1.2], [w.len + 8, -1.2], 0.4, 0.4, 'gunLight', z + 2.1)], len: w.len + 9 };
+};
+
 const WEAPONS = {
-  hgh: { rifle: hghRifle, heavy: hghLMG, assault: hghAssault, engineer: hghRifle, recon: hghSniper },
-  isa: { rifle: isaRifle, heavy: isaLMG, assault: isaShotgun, engineer: isaRifle, recon: isaSniper },
+  hgh: { rifle: hghRifle, heavy: hghLMG, assault: hghAssault, engineer: hghRifle, recon: hghSniper, jump: hghAssault, infiltrator: suppressed(hghRifle) },
+  isa: { rifle: isaRifle, heavy: isaLMG, assault: isaShotgun, engineer: isaRifle, recon: isaSniper, jump: isaShotgun, infiltrator: suppressed(isaRifle) },
 };
 
 // Put a weapon in the hands and, when firing, a flash at its muzzle.
@@ -184,6 +196,16 @@ function pack(P, kind, mats) {
     P.push(box(16.5, 36, 26, 56, mats.pack, 9), box(16.5, 40, 26, 41.5, 'metal', 9.2), box(16.5, 50, 26, 51.5, 'metal', 9.2));
     P.push(cap([24, 55], [31, 58.5], 1.3, 1.3, 'brass', 30.6), cap([31, 58.5], [39, 56.5], 1.3, 1.3, 'brass', 30.6)); // ammunition belt
     for (const x of [26, 29, 32, 35, 38]) P.push(...detail(cap([x, 55.5 + (x < 31 ? (x - 24) * 0.45 : 3 - (x - 31) * 0.25)], [x, 58 + (x < 31 ? (x - 24) * 0.45 : 3 - (x - 31) * 0.25)], 0.45, 0.45, 'gunDark', 30.7)));
+  } else if (kind === 'jet') {
+    // Twin thrusters with fins; glowing nozzles, and flames when flying.
+    P.push(box(18.5, 35, 26, 50, mats.pack, 9));
+    P.push(cap([19.5, 37], [19.5, 55], 2.4, 2.4, 'metal', 9.3), cap([24.5, 37], [24.5, 55], 2.4, 2.4, 'metal', 9.4));
+    P.push(poly([[16, 46], [18, 44], [18, 54], [15.5, 55]], mats.pack, 9.2), poly([[27, 44], [29, 46], [29.5, 55], [27, 54]], mats.pack, 9.5));
+    P.push(ell([19.5, 56.5], 2, 1.2, mats.glow, 9.6), ell([24.5, 56.5], 2, 1.2, mats.glow, 9.6));
+    if (mats.fly) {
+      const len = mats.fly === 1 ? 13 : 18;
+      for (const x of [19.5, 24.5]) P.push(ell([x, 58 + len / 2], 2.1, len / 2, mats.flame, 2), ell([x, 58 + len / 3], 1.2, len / 3, mats.glow, 2.1));
+    }
   } else if (kind === 'tools') {
     P.push(box(17, 38, 26, 55, mats.pack, 9));
     P.push(cap([19.5, 31], [20, 38], 0.8, 0.8, 'brass', 8.8), cap([23.5, 30], [23.5, 38], 0.8, 0.8, 'metal', 8.8)); // tool handles
@@ -220,10 +242,11 @@ function hghRiflePieces(z) {
   return P;
 }
 
-function helghast(legs, { recoil = 0, flash = false, arms = 'ready', gun = true, role = 'rifle' } = {}) {
+function helghast(legs, { recoil = 0, flash = false, arms = 'ready', gun = true, role = 'rifle', fly = 0 } = {}) {
   const P = [];
-  const coat = role !== 'assault'; // assault infantry fight in vest and trousers
-  const pad = { heavy: 1.35, assault: 1.15, recon: 0.9 }[role] || 1;
+  const coat = !['assault', 'jump', 'infiltrator'].includes(role); // these fight in vest and trousers
+  const pad = { heavy: 1.35, assault: 1.15, recon: 0.9, jump: 1.1, infiltrator: 0.7 }[role] || 1;
+  if (role === 'jump') pack(P, 'jet', { pack: 'helmetDark', glow: 'nozzle', flame: 'jetFlame', fly });
   if (role === 'heavy') pack(P, 'ammo', { pack: 'leather' });
   if (role === 'engineer') pack(P, 'tools', { pack: 'pouch' });
   if (role === 'recon') P.push(poly([[20, 32], [46, 32], [49, 71], [17, 73]], 'coatDark', 4)); // scout cloak
@@ -280,6 +303,12 @@ function helghast(legs, { recoil = 0, flash = false, arms = 'ready', gun = true,
   P.push(poly([[24.5, 19.5], [45.5, 20.5], [46.5, 24.5], [24.5, 24]], 'helmetDark', 35.5)); // thick band
   P.push(cap([25, 19.8], [45.5, 20.8], 0.5, 0.5, 'helmetHi', 35.6));
   P.push(cap([24.8, 24.6], [46.6, 25], 0.6, 0.6, 'helmet', 35.7)); // lip
+  if (role === 'infiltrator') {
+    // A dark cloth hood over the helmet and a wrapped scarf at the neck.
+    P.push(ell([34.5, 17.5], 10.8, 10.2, 'maskDark', 35.8), poly([[23, 17], [29, 21], [30, 35], [22.5, 36]], 'maskDark', 35.9));
+    P.push(cap([27, 12], [40, 9.5], 0.6, 0.6, 'mask', 35.85));
+    P.push(cap([29, 37], [44, 38], 2.6, 2.6, 'leather', 31.5));
+  }
   if (role === 'recon') {
     // Hood drawn over the helmet, open at the face.
     P.push(ell([34.5, 17], 11, 10.5, 'coatDark', 35.8), poly([[22, 16], [29, 20], [31, 37], [21, 40]], 'coatDark', 35.9));
@@ -331,9 +360,10 @@ function isaRiflePieces(z) {
   ];
 }
 
-function isa(legs, { recoil = 0, flash = false, arms = 'ready', gun = true, role = 'rifle' } = {}) {
+function isa(legs, { recoil = 0, flash = false, arms = 'ready', gun = true, role = 'rifle', fly = 0 } = {}) {
   const P = [];
-  const pad = { heavy: 1.3, assault: 1.1, recon: 0.85 }[role] || 1;
+  const pad = { heavy: 1.3, assault: 1.1, recon: 0.85, jump: 1.05, infiltrator: 0.7 }[role] || 1;
+  if (role === 'jump') pack(P, 'jet', { pack: 'armourDark', glow: 'nozzle', flame: 'jetFlame', fly });
   if (role === 'heavy') pack(P, 'ammo', { pack: 'oliveDark' });
   if (role === 'engineer') pack(P, 'tools', { pack: 'olive' });
   if (role === 'recon') P.push(poly([[19, 31], [46, 31], [48, 64], [18, 66]], 'olive', 4)); // camouflage cape
@@ -374,7 +404,9 @@ function isa(legs, { recoil = 0, flash = false, arms = 'ready', gun = true, role
   P.push(poly([[39, 55], [46, 55], [47, 61], [40, 62]], 'armour', 27));
   // Collar and helmet with a wide blue visor and a chin guard.
   P.push(poly([[29, 29], [42, 29], [44, 34], [27, 34]], 'armourDark', 31));
-  P.push(ell([35, 20], 9.5, 8.5, 'armour', 34));
+  // Infiltrators wear a soft dark cap instead of the armoured helmet.
+  P.push(ell([35, 20], 9.5, 8.5, role === 'infiltrator' ? 'under' : 'armour', 34));
+  if (role === 'infiltrator') P.push(cap([26, 22], [44, 22], 1.2, 1.2, 'oliveDark', 34.5), ell([28, 31], 5, 3, 'olive', 33), ell([43, 32], 5, 3, 'olive', 40.9));
   P.push(cap([27, 16], [40, 12], 0.7, 0.7, role === 'engineer' ? 'yellow' : 'armourDark', 35)); // crest (yellow stripe for engineers)
   if (role === 'recon') P.push(ell([28, 30], 5, 3, 'olive', 33), ell([43, 31], 5, 3, 'olive', 40.9)); // scarf
   P.push(ell([29.5, 23], 2.6, 3.2, 'metal', 35)); // ear piece
@@ -419,7 +451,7 @@ function piecesFor(side, frame, role) {
   const make = (legs, opts) => BUILD[side](legs, { ...opts, role });
   if (LEG_POSES[frame] || frame === 'fire') {
     const L = LEG_POSES[frame] || LEG_POSES.stand;
-    let P = make(L, { recoil: frame === 'fire' ? 1 : 0, flash: frame === 'fire' });
+    let P = make(L, { recoil: frame === 'fire' ? 1 : 0, flash: frame === 'fire', fly: L.fly || 0 });
     // Keep the lowest boot on the ground, so strides lower the body naturally.
     return shiftPieces(P, 0, GROUND - lowestY(P.filter((p) => p.mat === 'boot')) + L.bob);
   }
@@ -437,7 +469,7 @@ function piecesFor(side, frame, role) {
   return P;
 }
 
-export const PIXEL_FRAMES = ['stand', 'walk1', 'walk2', 'walk3', 'walk4', 'fire', 'prone1', 'prone2', 'fall1', 'fall2', 'dead'];
+export const PIXEL_FRAMES = ['stand', 'walk1', 'walk2', 'walk3', 'walk4', 'fire', 'prone1', 'prone2', 'fall1', 'fall2', 'dead', 'fly1', 'fly2'];
 
 const cache = new Map();
 

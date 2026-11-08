@@ -45,7 +45,7 @@
     hp.textContent = 'Detailed troopers';
     sheet.append(hp);
     for (const side of ['isa', 'hgh']) {
-      for (const role of ROLE_NAMES) {
+      for (const role of [...ROLE_NAMES, 'jump', 'infiltrator']) {
         const h = document.createElement('h2');
         h.textContent = `${side === 'isa' ? 'ISA' : 'Helghast'} ${role}`;
         sheet.append(h);

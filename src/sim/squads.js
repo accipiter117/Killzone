@@ -73,7 +73,7 @@ function formUp(state, sq, list, dest, snapCover) {
     }
     // On broken ground a soldier's own spot can be across a cliff from
     // them: then they follow the squad's point, or find their own way.
-    if (state.map.hasHeight && !straightClear(state.map, s, { x, y }, true)) {
+    if (state.map.hasHeight && !state.cfg.roles[s.role].flies && !straightClear(state.map, s, { x, y }, true)) {
       if (straightClear(state.map, s, dest, true)) { x = dest.x; y = dest.y; }
       else {
         let p = findPath(state.map, s, dest, { maxNodes: 12000, mirror: s.side === 1 });
@@ -158,6 +158,13 @@ export function thinkSquad(state, sq) {
   }
   const order = pl.order;
   // Abilities in progress come first.
+  if (sq.diveTarget && sq.diveUntil > state.tick) {
+    sq.mode = 'dive';
+    sq.status = 'Diving in!';
+    sq.pinned = false;
+    formUp(state, sq, list, sq.diveTarget, false);
+    return;
+  }
   if (sq.chargeUntil > state.tick) {
     let t = state.soldiers[sq.chargeTarget];
     if (!t || !isActive(t)) {
@@ -322,7 +329,7 @@ function advance(state, sq, pl, list, c, firing) {
   // little for the platoon's engineers unless the stance is aggressive.
   const next = nextStep(state, sq, c, target);
   let crossing = false;
-  const w = sq.role !== 'engineer' && !pushing ? wireOnLine(state, c, next, 80) : null;
+  const w = sq.role !== 'engineer' && !cfg.roles[sq.role].flies && !pushing ? wireOnLine(state, c, next, 80) : null;
   if (w) {
     crossing = dist(c, w) < 40;
     const hasEngineers = pl.squads.some((id) => state.squads[id].role === 'engineer' && members(state, state.squads[id]).length);
@@ -438,33 +445,38 @@ export function moveSoldiers(state, dt) {
     if (!isActive(s)) continue;
     const sq = state.squads[s.squad];
     const pl = state.platoons[sq.platoon];
-    if (sq.pinned && sq.mode !== 'rout' && sq.mode !== 'crawl' && sq.mode !== 'charge') continue;
+    if (sq.pinned && sq.mode !== 'rout' && sq.mode !== 'crawl' && sq.mode !== 'charge' && sq.mode !== 'dive') continue;
     const dx = s.tx - s.x, dy = s.ty - s.y;
     const d = Math.hypot(dx, dy);
     if (d < 0.5) continue;
     let speed = cfg.roles[s.role].speed * cfg.stances[pl.stance].speedMult;
+    const flies = cfg.roles[s.role].flies;
     if (sq.mode === 'move') {
       // Squad cohesion: soldiers out in front ease off, stragglers hurry.
       const ahead = ((s.x - sq.cx) * dx + (s.y - sq.cy) * dy) / d;
       if (ahead > cfg.squad.paceAhead) speed *= 0.55;
       else if (ahead < -cfg.squad.paceBehind) speed *= 1.25;
     }
-    speed *= cfg.cover[coverName(state, s.x, s.y)].speed;
-    if (wireAt(state.map, s.x, s.y) > 0) speed *= cfg.wire.speedMult;
+    if (!flies) {
+      speed *= cfg.cover[coverName(state, s.x, s.y)].speed;
+      if (wireAt(state.map, s.x, s.y) > 0) speed *= cfg.wire.speedMult;
+    }
     if (sq.mode === 'rout') speed *= cfg.squad.routSpeedMult;
     if (sq.mode === 'crawl') speed *= 0.5;
     if (sq.mode === 'charge') speed *= cfg.abilities.charge.speedMult;
+    if (sq.mode === 'dive') speed *= 3;
     // Fresh reinforcements run until they have caught up with their squad.
     if (s.joining) {
       if (Math.hypot(s.x - sq.cx, s.y - sq.cy) < 45) s.joining = false;
       else speed *= cfg.reinforce.joinSpeedMult;
     }
-    if (rampAt(state.map, s.x, s.y)) speed *= cfg.height.rampSpeed;
+    if (!flies && rampAt(state.map, s.x, s.y)) speed *= cfg.height.rampSpeed;
     const step = Math.min(d, speed * dt);
-    // Cliffs: only ramps lead up or down. Slide along the edge if blocked.
+    // Cliffs: only ramps lead up or down (jetpacks fly over). Slide along
+    // the edge if blocked.
     const from = cellIndex(state.map, s.x, s.y);
     const nx = s.x + (dx / d) * step, ny = s.y + (dy / d) * step;
-    if (canStep(state.map, from, cellIndex(state.map, nx, ny))) { s.x = nx; s.y = ny; }
+    if (flies || canStep(state.map, from, cellIndex(state.map, nx, ny))) { s.x = nx; s.y = ny; }
     else if (canStep(state.map, from, cellIndex(state.map, nx, s.y))) s.x = nx;
     else if (canStep(state.map, from, cellIndex(state.map, s.x, ny))) s.y = ny;
     if (sq.mode === 'rout' && pl.rallied && (s.x < 35 || s.x > W - 35)) {

@@ -6,7 +6,7 @@ import { generateMap } from './map.js';
 import { updateVision, updateFiring, updateSuppression } from './combat.js';
 import { updateSites, updateEmplacements, updateStrikes, updateSmokes } from './features.js';
 import { thinkSquad, moveSoldiers, resetPlans } from './squads.js';
-import { updateThrows } from './abilities.js';
+import { updateThrows, updateDives } from './abilities.js';
 import { platoonAlive, feed, sideName } from './util.js';
 
 // Deep merge so tests and the menu can override a few numbers.
@@ -51,7 +51,7 @@ export function createBattle(seed, options = {}) {
           supp: 0, pinned: false, lastHitTick: -9999, lastFiredTick: -9999, tally: {},
           mode: 'idle', status: 'Awaiting orders', bound: null, pauseUntil: 0, holdSpot: null, flankDone: false, waitSince: -1, cx: 0, cy: 0,
           bestD: Infinity, bestTick: 0, pushUntil: 0, path: null, pathTo: null, pathTick: 0,
-          abilityReady: 0, barrageUntil: 0, chargeUntil: 0, chargeTarget: -1,
+          abilityReady: 0, barrageUntil: 0, chargeUntil: 0, chargeTarget: -1, diveUntil: 0, diveTarget: null, vanishUntil: 0,
         };
         state.squads.push(sq);
         pl.squads.push(sq.id);
@@ -65,7 +65,7 @@ export function createBattle(seed, options = {}) {
           let y = baseY + (k - 1) * 62 + (n - 2) * 11;
           if (side === 1) { x = W - x; y = H - y; }
           const hp = cfg.roles[role].hp;
-          const s = { id: state.soldiers.length, squad: sq.id, side, role, x, y, tx: x, ty: y, hp, maxHp: hp, alive: true, fled: false, cd: jitter[key][1], target: -1, retarget: 0, markUntil: 0 };
+          const s = { id: state.soldiers.length, squad: sq.id, side, role, x, y, tx: x, ty: y, hp, maxHp: hp, alive: true, fled: false, cd: jitter[key][1], target: -1, retarget: 0, markUntil: 0, lastShotTick: -9999 };
           state.soldiers.push(s);
           sq.soldiers.push(s.id);
         }
@@ -108,6 +108,7 @@ export function step(state) {
   updateEmplacements(state, dt);
   updateStrikes(state);
   updateThrows(state);
+  updateDives(state);
   updateSmokes(state);
   updateSuppression(state, dt);
   updateSites(state, dt);

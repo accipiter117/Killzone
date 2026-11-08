@@ -59,6 +59,17 @@ export function updateVision(state) {
     for (const e of sol) {
       if (e.side === side || !isActive(e)) continue;
       if (e.markUntil > state.tick) { seen[e.id] = 1; continue; } // marked by recon
+      // Infiltrators: hidden unless they have just fired or someone is close
+      // (and fully hidden while they Vanish).
+      const er = state.cfg.roles[e.role];
+      const hiddenNow = er.hidden && (state.squads[e.squad].vanishUntil > state.tick || state.tick - e.lastShotTick > er.revealSec * state.cfg.tickRate);
+      if (hiddenNow) {
+        if (state.squads[e.squad].vanishUntil > state.tick) continue;
+        for (const s of sol) {
+          if (s.side === side && isActive(s) && (s.x - e.x) ** 2 + (s.y - e.y) ** 2 < er.revealDist * er.revealDist) { seen[e.id] = 1; break; }
+        }
+        continue;
+      }
       for (const s of sol) {
         if (s.side !== side || !isActive(s)) continue;
         const sight = sightOf(state, s);
@@ -84,9 +95,15 @@ function pickTarget(state, s) {
   return best;
 }
 
+// Cover for a soldier: none for jetpack troopers while they are in the air.
+export function coverOf(state, t) {
+  if (state.cfg.roles[t.role]?.flies && ['move', 'dive', 'charge', 'rout', 'evade'].includes(state.squads[t.squad].mode)) return state.cfg.cover.open;
+  return coverAt(state, t.x, t.y);
+}
+
 export function hitChance(state, accuracy, d, range, target, shooterPinned, shooter = null) {
   const c = state.cfg.combat;
-  const cover = coverAt(state, target.x, target.y);
+  const cover = target.role ? coverOf(state, target) : coverAt(state, target.x, target.y);
   let p = accuracy * (1 - c.rangeFalloff * Math.min(1, d / range));
   p *= 1 - cover.hit;
   if (shooterPinned) p *= c.pinnedAccuracy;
@@ -121,7 +138,10 @@ export function updateFiring(state, dt) {
     }
     if (!t) { s.cd = 0.2; continue; }
     const barrage = sq.barrageUntil > state.tick;
-    const base = cfg.roles[s.role];
+    let base = cfg.roles[s.role];
+    // An infiltrator firing from hiding: the first shots hit much harder.
+    if (base.hidden && state.tick - s.lastShotTick > base.revealSec * cfg.tickRate) base = { ...base, damage: base.damage * base.ambushMult };
+    s.lastShotTick = state.tick;
     const b = cfg.abilities.barrage;
     const role = barrage ? { ...base, suppress: base.suppress * b.suppressMult } : base;
     const pinned = sq.pinned && !barrage;
@@ -146,7 +166,7 @@ export function fireShot(state, from, t, w, range, shooterPinned, source) {
     ix = t.x + Math.cos(a) * r; iy = t.y + Math.sin(a) * r;
     strayImpact(state, ix, iy);
   }
-  const cover = coverAt(state, t.x, t.y);
+  const cover = coverOf(state, t);
   suppress(state, state.squads[t.squad], w.suppress * cover.supp * (hit ? state.cfg.suppression.hitMult : 1), source);
   state.events.push({ type: 'shot', id: from.id === undefined ? -1 : from.id, side: from.side, x1: from.x, y1: from.y, x2: ix, y2: iy, hit, src: source });
 }

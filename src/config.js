@@ -66,13 +66,19 @@ export const CONFIG = {
     assault: { label: 'Assault', speed: 44, range: 150, sight: 280, hp: 115, fireInterval: 0.9, damage: 26, accuracy: 0.55, suppress: 6, closeRange: 90, closeMult: 1.8 },
     engineer: { label: 'Engineer', speed: 32, range: 220, sight: 280, hp: 100, fireInterval: 1.3, damage: 26, accuracy: 0.45, suppress: 6, cutRate: 0.5, cutRadius: 32 },
     recon: { label: 'Recon', speed: 36, range: 400, sight: 480, hp: 90, fireInterval: 2.2, damage: 45, accuracy: 0.6, suppress: 8 },
+    // Jetpack troopers fly straight over cliffs, wire and trenches, but get
+    // no cover while in the air.
+    jump: { label: 'Jetpack', speed: 58, range: 180, sight: 300, hp: 85, fireInterval: 0.6, damage: 20, accuracy: 0.5, suppress: 6, flies: true },
+    // Infiltrators stay hidden until they fire or an enemy comes close; their
+    // first shots from hiding hit much harder.
+    infiltrator: { label: 'Infiltrator', speed: 38, range: 240, sight: 320, hp: 90, fireInterval: 1.3, damage: 32, accuracy: 0.6, suppress: 5, hidden: true, revealDist: 110, revealSec: 4, ambushMult: 1.7 },
   },
 
   // Three squads per platoon, five soldiers per squad.
   platoons: [
     ['rifle', 'heavy', 'engineer'],
-    ['rifle', 'assault', 'engineer'],
-    ['assault', 'heavy', 'recon'],
+    ['jump', 'assault', 'engineer'],
+    ['infiltrator', 'heavy', 'recon'],
   ],
   soldiersPerSquad: 5,
 
@@ -165,6 +171,8 @@ export const CONFIG = {
     charge: { label: 'Charge', cooldownSec: 22, durationSec: 5, range: 260, speedMult: 2.1 },
     sandbags: { label: 'Sandbags', cooldownSec: 30, radius: 26, thickness: 9, offset: 14 },
     mark: { label: 'Mark', cooldownSec: 24, durationSec: 10, radius: 170, hitMult: 1.4 },
+    dive: { label: 'Dive', cooldownSec: 20, range: 320, flightSec: 1.2, radius: 38, damage: 45, suppress: 45 },
+    vanish: { label: 'Vanish', cooldownSec: 25, durationSec: 8 },
   },
 
   // Interface pacing: game speed while a platoon is selected or a strike is
@@ -211,6 +219,8 @@ export const ABILITY_HELP = {
   charge: 'Assault squad shakes off suppression and sprints at the nearest enemy.',
   sandbags: 'Engineers throw up a sandbag wall facing the enemy: instant cover.',
   mark: 'Recon marks an enemy group for ten seconds: everyone can see them and hits them more often.',
+  dive: 'Jetpack squad leaps onto the nearest enemy group and lands with a stomp that hurts and pins them.',
+  vanish: 'Infiltrators go fully hidden for eight seconds, even up close: slip away or set up the next ambush.',
 };
 
 export const SIDE_NAMES = ['ISA', 'Helghast'];

@@ -53,6 +53,8 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 | Assault | Fast, short range, deadly close up. Swings wide to flank the target. |
 | Engineer | Average fighter. Cuts wire on the way (other squads use the gap or wait for it). |
 | Recon | Long range and long sight. Hangs back and spots, so the whole side can see further. |
+| Jetpack | Flies straight over cliffs, wire and trenches, fast and close range, but lightly armoured and without cover while in the air. |
+| Infiltrator | Hidden from the enemy until it fires or someone comes within about 110 units; its first shots from hiding hit much harder. A recon Mark reveals it. |
 
 | Ability | Squad | What it does |
 | --- | --- | --- |
@@ -61,8 +63,10 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 | Charge | Assault | Shakes off suppression and sprints at the nearest enemy. |
 | Sandbags | Engineer | Builds a sandbag wall facing the enemy: instant cover as good as a trench. |
 | Mark | Recon | Tags an enemy group for ten seconds: everyone can see them and hits them more often. |
+| Dive | Jetpack | Leaps onto the nearest enemy group and lands with a stomp that hurts and pins them. |
+| Vanish | Infiltrator | Goes fully hidden for eight seconds, even up close, to slip away or set up the next ambush. |
 
-Platoon mixes: 1st (Rifle, Heavy, Engineer), 2nd (Rifle, Assault, Engineer), 3rd (Assault, Heavy, Recon). Each role has its own look: Heavies carry machine guns and ammo packs, Assault troops are armoured with short guns, Engineers carry tool packs, Recon carry sniper rifles (the Helghast scout is hooded and cloaked).
+Platoon mixes: 1st (Rifle, Heavy, Engineer), 2nd (Jetpack, Assault, Engineer), 3rd (Infiltrator, Heavy, Recon). Both sides have the same mix; change `platoons` in `src/config.js` to try others. Each role has its own look: Heavies carry machine guns and ammo packs, Assault troops are armoured with short guns, Engineers carry tool packs, Recon carry sniper rifles (the Helghast scout is hooded and cloaked), Jetpack troopers wear twin-thruster packs, Infiltrators wear hoods or soft caps and carry suppressed rifles.
 
 ### The battlefield (one rule each)
 

@@ -155,6 +155,8 @@ function decide(state, side, prof, memory) {
       const list = members(state, sq);
       if (!list.length || sq.mode === 'rout' || state.tick < sq.abilityReady) continue;
       if (sq.role === 'assault' && platoonStrength(state, pl) < 0.4) continue;
+      // Infiltrators only vanish once they have given themselves away.
+      if (sq.role === 'infiltrator' && !list.some((x) => state.tick - x.lastShotTick < cfg.roles.infiltrator.revealSec * cfg.tickRate)) continue;
       if (sq.role === 'engineer') {
         const c = centroid(list);
         if (!seenFoes.some((e) => dist(e, c) < 400)) continue;
