@@ -135,16 +135,23 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 /* The order tray: pops up above the unit chips while a unit is selected. */
 #tray { position: absolute; left: var(--hud-l); bottom: calc(var(--hud-b) + 64px); width: max-content; min-width: min(340px, calc(100% - var(--hud-l) - var(--hud-r))); max-width: min(640px, calc(100% - var(--hud-l) - var(--hud-r) - 136px)); box-sizing: border-box; padding: 7px 9px 9px; display: flex; flex-direction: column; gap: 6px; z-index: 4; animation: tray-in 0.14s ease-out; }
 #tray[hidden] { display: none; }
-#tray-head { display: flex; align-items: center; gap: 8px; min-width: 0; height: 26px; }
+#tray-head { display: flex; align-items: center; gap: 8px; min-width: 0; height: 36px; }
 #tray-title { font-size: 15px; white-space: nowrap; }
-#tray-sub { font-size: 11px; color: #a39b88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+#tray-scope { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+#tray-scope::-webkit-scrollbar { display: none; }
+#tray-scope button { height: 34px; min-height: 34px; min-width: 0; padding: 0 10px; border-radius: 17px; border: 1px solid rgba(236, 230, 214, 0.2); background: transparent; font-size: 12px; font-weight: 600; color: #c9c2b2; white-space: nowrap; position: relative; flex: none; }
+#tray-scope button.on { background: #e8c04a; border-color: #e8c04a; color: #1d1a15; }
+#tray-scope button.away::after { content: ""; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: #aaffaa; }
+#tray-scope button:disabled { opacity: 0.35; }
+#tray-close { width: 34px; height: 34px; min-width: 34px; min-height: 34px; font-size: 14px; color: #c9c2b2; margin: 0 -4px 0 auto; flex: none; }
+#tray-foot { display: flex; gap: 10px; min-width: 0; font-size: 11px; line-height: 14px; }
+#tray-sub { color: #a39b88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
 #tray-sub.pinned { color: #ff8a80; }
-#tray-hint { margin-left: auto; font-size: 11px; color: #aaffaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
-#tray-close { width: 34px; height: 34px; min-width: 34px; min-height: 34px; font-size: 14px; color: #c9c2b2; margin-right: -4px; flex: none; }
+#tray-hint { margin-left: auto; color: #aaffaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
 #tray-row { display: flex; gap: 5px; overflow-x: auto; scrollbar-width: none; }
 #tray-row::-webkit-scrollbar { display: none; }
 #tray-cmds, #squads { display: flex; gap: 5px; }
-#tray-cmds[hidden] { display: none; }
+#tray-cmds[hidden], #tray-row button[hidden] { display: none; }
 #squads { padding-left: 6px; border-left: 1px solid rgba(236, 230, 214, 0.18); }
 #tray-cmds[hidden] + #squads { padding-left: 0; border-left: 0; }
 #tray-row button { height: 44px; min-width: 58px; padding: 0 8px; border-radius: 10px; border: 1px solid rgba(236, 230, 214, 0.18); background: rgba(236, 230, 214, 0.06); font-size: 12px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1.1; white-space: nowrap; flex: none; }
@@ -154,6 +161,13 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 #tray-row button.ab.dead { opacity: 0.35; }
 #tray-row .empty { font-size: 12px; color: #a39b88; align-self: center; padding: 0 4px; white-space: nowrap; }
 
+/* Short landscape screens: the tray drops its status line (the chips and
+   the map labels already show it) so it covers as little map as possible. */
+@media (orientation: landscape) and (max-height: 430px) {
+  #tray { padding-top: 5px; padding-bottom: 7px; gap: 5px; }
+  #tray-foot { display: none; }
+}
+
 /* Upright phones: the same pieces, packed a little tighter. */
 @media (orientation: portrait) {
   #hud-tr { top: calc(var(--hud-t) + 52px); }
@@ -162,6 +176,8 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
   #banner { top: calc(var(--hud-t) + 4px); left: auto; right: var(--hud-r); transform: none; margin-top: 8px; }
   #hint { left: var(--hud-l); right: var(--hud-r); bottom: calc(var(--hud-b) + 70px); }
   #tray { max-width: calc(100% - var(--hud-l) - var(--hud-r)); }
+  #tray-head { flex-wrap: wrap; height: auto; row-gap: 6px; }
+  #tray-scope { order: 3; width: 100%; flex-wrap: wrap; }
   #tray-row, #tray-cmds, #squads { flex-wrap: wrap; overflow: visible; }
   #squads { padding-left: 0; border-left: 0; }
   .card, .sup { width: 50px; height: 50px; min-width: 50px; }

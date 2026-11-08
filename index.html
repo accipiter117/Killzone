@@ -39,8 +39,7 @@
       <section id="tray" class="glass" hidden>
         <div id="tray-head">
           <b id="tray-title">2nd Platoon</b>
-          <span id="tray-sub"></span>
-          <span id="tray-hint"></span>
+          <div id="tray-scope" role="group" aria-label="Who the orders are for"></div>
           <button id="tray-close" class="hud-btn bare" aria-label="Close">&#10005;</button>
         </div>
         <div id="tray-row">
@@ -49,9 +48,11 @@
             <button data-act="fallback">Fall back<small>1 pt</small></button>
             <button data-act="stance">Stance<small id="stance-label">Balanced</small></button>
             <button data-act="reinforce">Reinforce<small>2 pts</small></button>
+            <button id="tray-rejoin" hidden>Rejoin<small>free</small></button>
           </div>
           <div id="squads"></div>
         </div>
+        <div id="tray-foot"><span id="tray-sub"></span><span id="tray-hint"></span></div>
       </section>
 
       <div id="cards"></div>
@@ -71,6 +72,7 @@
       <ul>
         <li>You command the <b class="isa-text">ISA</b> on the left. The <b class="hgh-text">Helghast</b> hold the right.</li>
         <li>Your units are the chips bottom left (three platoons and the tank). Tap one (or its soldiers on the map) and its orders pop up; then tap the map. Tap an objective or a capturable post to <b>take</b> it, or open ground to <b>move</b> there.</li>
+        <li><b>Squad orders:</b> a platoon order is the shared goal for all three squads. When you need one squad somewhere else, pick it in the tray (or tap one of its soldiers), then tap the map (1 point). <b>Rejoin</b> sends it back; the platoon's next order brings everyone back too.</li>
         <li><b>Focus fire:</b> with a platoon selected, tap an enemy soldier you can see. All three squads shoot that squad first for 40 seconds (1 point). A red target marks it.</li>
         <li>While a unit is selected the grid shows <b>cover</b>: green tiles have good cover (trenches, ruins, sandbags), amber some (craters, rubble, high ground).</li>
         <li>Squads look after themselves: rifles bound between cover, heavies stop and suppress, assault squads flank, engineers cut wire, recon spots from behind.</li>
@@ -105,6 +107,7 @@
         </select>
       </div>
       <label class="row toggle"><span>Watch mode (AI plays both sides)</span><input type="checkbox" id="watch-toggle"></label>
+      <label class="row toggle"><span>Tilted battlefield (hills and ruins stand up)</span><input type="checkbox" id="tilt-toggle"></label>
       <div class="row"><span>Soldier style</span>
         <select id="view-select" aria-label="Soldier style">
           <option value="pixel">Detailed troopers</option>

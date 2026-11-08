@@ -30,7 +30,7 @@ src/sim/                  pure simulation (no DOM, no Math.random)
   ai.js                   the AI commander (same commands as the player)
   path.js                 route finding round cliffs and through wire gaps
   abilities.js            squad abilities (grenade, barrage, charge, sandbags, mark)
-src/render/               canvas drawing, camera, cosmetic effects, terrain painter, audio.js (synthesised sound),
+src/render/               canvas drawing, camera, cosmetic effects, terrain painters (terrain.js flat, terrain-tilt.js tilted three quarter view with liftAt), audio.js (synthesised sound),
                           puppet.js + pixel-troopers.js (the detailed soldier sprites)
 src/ui/                   DOM panels, input, overlays
 src/main.js               wires it together and owns the game loop

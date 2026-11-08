@@ -23,20 +23,32 @@ export function resetPlans(state, pl) {
     sq.bestTick = state.tick;
     sq.pushUntil = 0;
     sq.path = null;
+    sq.order = null; // a new platoon order brings every squad back to the shared goal
   }
 }
 
-function goalOf(state, pl) {
-  const o = pl.order;
+// Reset one squad's plans when it is given an order of its own.
+export function resetSquadPlan(state, sq) {
+  sq.bound = null; sq.pauseUntil = 0; sq.holdSpot = null; sq.flankDone = false;
+  sq.waitSince = -1; sq.bestD = Infinity; sq.bestTick = state.tick; sq.pushUntil = 0; sq.path = null;
+}
+
+// A squad follows its platoon's shared goal unless it has been given an
+// order of its own (cleared whenever the platoon gets a new order).
+export const orderOf = (pl, sq) => sq.order || pl.order;
+
+function goalOf(state, o) {
   if (o.type === 'take') return state.sites.find((s) => s.id === o.siteId);
   return { x: o.x, y: o.y };
 }
 
 function slotFor(state, pl, sq, goal) {
   const dir = sideDir(sq.side);
+  // A squad on its own order goes exactly where it was sent.
+  if (sq.order) return sq.order.type === 'take' ? { x: goal.x, y: goal.y } : { x: clamp(goal.x, 15, state.map.width - 15), y: clamp(goal.y, 15, state.map.height - 15) };
   const k = (pl.squads.indexOf(sq.id) - 1) * dir; // -1, 0, 1 (mirrored for the Helghast)
   const W = state.map.width, H = state.map.height;
-  if (pl.order.type === 'take') {
+  if (orderOf(pl, sq).type === 'take') {
     const r = goal.r;
     return { x: clamp(goal.x - dir * r * 0.15 * Math.abs(k), 15, W - 15), y: clamp(goal.y + k * r * 0.5, 15, H - 15) };
   }
@@ -156,7 +168,7 @@ export function thinkSquad(state, sq) {
     }
     return;
   }
-  const order = pl.order;
+  const order = orderOf(pl, sq);
   // Abilities in progress come first.
   if (sq.diveTarget && sq.diveUntil > state.tick) {
     sq.mode = 'dive';
@@ -254,18 +266,18 @@ export function thinkSquad(state, sq) {
     formUp(state, sq, list, there ? dest : nextStep(state, sq, c, dest), there);
     return;
   }
-  advance(state, sq, pl, list, c, firing);
+  advance(state, sq, pl, list, c, firing, order);
 }
 
-function advance(state, sq, pl, list, c, firing) {
+function advance(state, sq, pl, list, c, firing, order) {
   const cfg = state.cfg;
   const sc = cfg.squad;
   const st = cfg.stances[pl.stance];
   const dir = sideDir(sq.side);
-  const goalSite = goalOf(state, pl);
-  const label = pl.order.type === 'take' ? siteLabel(goalSite) : null;
+  const goalSite = goalOf(state, order);
+  const label = order.type === 'take' ? siteLabel(goalSite) : null;
   let goal = slotFor(state, pl, sq, goalSite);
-  if (sq.role === 'recon') {
+  if (sq.role === 'recon' && !sq.order) {
     // Recon hangs back behind the platoon's goal and spots for everyone.
     const back = goal.x - dir * sc.reconBackoff;
     goal = { x: sq.side === 0 ? Math.max(back, 140) : Math.min(back, state.map.width - 140), y: goal.y };
@@ -382,11 +394,12 @@ function advance(state, sq, pl, list, c, firing) {
 
   // Keep the platoon together: a squad that has got well ahead of the
   // slowest squad in its platoon waits in cover for it to catch up.
-  if (sq.role !== 'recon' && d > 140) {
+  // Squads on orders of their own neither wait nor are waited for.
+  if (sq.role !== 'recon' && !sq.order && d > 140) {
     let slowest = Infinity;
     for (const id of pl.squads) {
       const o = state.squads[id];
-      if (o === sq || o.role === 'recon' || o.mode === 'dead' || o.mode === 'arrived' || o.mode === 'rout') continue;
+      if (o === sq || o.order || o.role === 'recon' || o.mode === 'dead' || o.mode === 'arrived' || o.mode === 'rout') continue;
       slowest = Math.min(slowest, dir * o.cx);
     }
     if (slowest < Infinity && dir * c.x - slowest > sc.platoonLead) {

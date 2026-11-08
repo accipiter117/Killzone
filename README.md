@@ -22,6 +22,7 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 
 - You command the **ISA** (left, steel blue). The **Helghast** hold the right (dark grey, orange highlights).
 - You have three platoons, each of three squads of five soldiers. You give orders to **platoons**, never to single soldiers.
+- **Tilted view:** the battlefield is drawn tilted into a three quarter view: hills and ridges rise up the screen with cliff faces, ruins stand as walls, trenches and craters have depth, and anything on raised ground is drawn lifted with it (taps are mapped back to the ground). Switch it off in the menu for the flat view.
 - **Screen:** the map fills the screen. Clock, objectives and score sit top left; order points, minimap (hidden until you want it), pause and speed top right; your unit chips (three platoons and the tank, each with a strength bar) bottom left; smoke and artillery bottom right.
 - **Select** a unit by tapping its chip or its soldiers on the map: its order tray pops up above the chips (orders plus each squad's ability). Then **tap the map**:
   - tap an objective (A, B, C) or a capturable post (MG nest, arc tower, comms post) to **take** it;
@@ -32,6 +33,7 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 - **Artillery** (3 points, 25 second reload): tap the button, then the target. After a 3 second warning, shells land in a circle and hit **everyone**, your troops included. The craters they leave become cover. Squads that can still move will try to scramble out of the warning circle.
 - **Smoke** (2 points): blocks sight through an area for about 20 seconds. Good for crossing open ground.
 - Hold objectives to score a point per second each. The higher score when the timer ends wins, or break every enemy platoon at once for an immediate win.
+- **Squad orders:** a platoon order is the shared goal for all three squads. To send one squad somewhere else, pick it in the tray's pills (Platoon, Rifle, Heavy...) or tap one of its soldiers, then tap ground or an objective (1 order point, free to change for 5 seconds), or Hold. A green dot marks a squad on its own orders. Rejoin (free) sends it back; the platoon's next order brings every squad back too. Squads on their own orders do not wait for the rest of the platoon.
 - **Focus fire:** with a platoon selected, tap an enemy soldier your side can see: all three squads shoot that squad first for 40 seconds (1 order point), shown by a red target. The AI focuses enemy heavy squads near its platoons.
 - **Cover preview:** while a unit is selected, grid tiles are tinted by the best cover a squad could find there: green good (trench, ruins, sandbags), amber some (crater, rubble, high ground).
 - **Breaking and rallying:** a platoon that loses too many men breaks and runs back to its own lines. The first time, the survivors regroup there for 25 seconds and then rejoin the fight (a countdown shows). A rallied platoon that loses half of what was left breaks for good and leaves the field.
