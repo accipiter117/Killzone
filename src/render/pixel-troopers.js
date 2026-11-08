@@ -13,8 +13,8 @@ export const PT_FOOT = [40, 84]; // where the soldier's feet touch the ground
 
 const MATS = {
   hgh: materials({
-    helmet: '#4a4d51', helmetDark: '#2e3033', mask: '#5b5e61', metal: '#7d8083', rubber: '#2b2c2d',
-    lens: { glow: true, ramp: [0, 0, 0, [255, 84, 26], [255, 84, 26]], core: [255, 214, 150] },
+    helmet: '#4a4d51', helmetDark: '#2e3033', helmetHi: '#6b6f74', mask: '#5b5e61', maskDark: '#2a2c2f', metal: '#7d8083', rubber: '#2b2c2d',
+    lens: { glow: true, ramp: [0, 0, [176, 38, 12], [255, 92, 28], [255, 92, 28]], core: [255, 226, 160] },
     sight: { glow: true, ramp: [0, 0, 0, [255, 60, 30], [255, 60, 30]], core: [255, 170, 120] },
     coat: '#4b4c43', coatDark: '#383930', armour: '#5a5d60', pouch: '#504f41', strap: '#3a3a31',
     leather: '#40382d', trousers: '#3d3f3c', boot: '#28282a', glove: '#303032', red: '#922c1d',
@@ -109,17 +109,31 @@ function helghast(legs, { recoil = 0, flash = false, arms = 'ready', gun = true 
   P.push(cap([39, 57], [43, 71], 0.5, 0.5, 'coatDark', 30.5)); // fold
   // Collar, then helmet and gas mask.
   P.push(poly([[28, 30], [43, 31], [45, 36], [27, 36]], 'coatDark', 31));
-  P.push(poly([[26, 21], [31, 21], [32, 31], [25, 30]], 'helmet', 32)); // neck guard
-  P.push(poly([[29, 25], [44, 26], [44, 32], [40, 35], [31, 34], [29, 30]], 'mask', 33));
-  P.push(ell([36, 20], 9.5, 8, 'helmet', 34));
-  P.push(poly([[27, 22], [45, 23], [45, 26], [27, 25]], 'helmetDark', 35)); // rim band
-  P.push(poly([[39, 23], [50, 26], [49, 28], [38, 26]], 'helmet', 36)); // peak
-  P.push(cap([29, 14], [41, 15], 0.6, 0.6, 'helmetDark', 35)); // crest ridge
-  P.push(ell([36, 29], 2.9, 2.7, 'metal', 37), ell([42, 29], 2.7, 2.6, 'metal', 37));
-  P.push(ell([36, 29], 2, 1.9, 'lens', 38), ell([42, 29], 1.9, 1.8, 'lens', 38));
-  P.push(poly([[37, 32], [44, 31], [46, 35], [40, 38], [36, 36]], 'metal', 39)); // respirator
-  P.push(ell([46.5, 35], 2.7, 2.7, 'mask', 40), ell([47, 35], 1.1, 1.1, 'rubber', 41)); // filter
-  P.push(cap([40, 38], [37, 43], 1.3, 1.3, 'rubber', 40), cap([37, 43], [33, 46], 1.3, 1.3, 'rubber', 40)); // hose
+  // Helmet: a tall dome with a skirt that flares down over the ear and the
+  // back of the neck, a raised crest, a flared rim and a short angled peak.
+  P.push(poly([[24, 18], [33, 19], [34, 30], [30, 32.5], [23.5, 29.5]], 'helmet', 32)); // side and neck skirt
+  P.push(cap([25, 27], [31, 31.5], 0.5, 0.5, 'helmetDark', 32.5)); // skirt edge
+  // Gas mask: a dark face plate so the lenses stand out.
+  P.push(poly([[30, 24], [45, 25], [45.5, 33], [41, 37], [32, 36.5], [30, 31]], 'maskDark', 33));
+  P.push(ell([35, 18], 10, 9, 'helmet', 34));
+  P.push(ell([31.5, 13.5], 3, 1.6, 'helmetHi', 34.5)); // light on the dome
+  P.push(cap([26.5, 15.5], [43, 13.5], 0.9, 0.9, 'helmetDark', 35), cap([26.5, 14.6], [43, 12.6], 0.5, 0.5, 'helmetHi', 35.1)); // crest
+  P.push(poly([[24.5, 22], [46, 23], [46.5, 25.5], [24.5, 25]], 'helmetDark', 35.5)); // flared rim
+  P.push(poly([[40, 22.5], [51, 25], [50, 27.3], [39.5, 25.2]], 'helmet', 36)); // peak
+  P.push(cap([40.5, 25.4], [50, 27.2], 0.5, 0.5, 'helmetDark', 36.1)); // shadow under the peak
+  // Two big round lenses in thick dark rims (the far one a little smaller).
+  P.push(ell([36, 29.5], 3.8, 3.6, 'rubber', 37), ell([42.6, 29.6], 3.4, 3.3, 'rubber', 37));
+  P.push(ell([36, 29.5], 2.7, 2.6, 'lens', 38), ell([42.6, 29.6], 2.4, 2.3, 'lens', 38));
+  // Respirator: a grilled snout with a front filter, a cheek canister and a
+  // ribbed hose running down to the chest. It juts forward, so it is drawn
+  // in front of the shoulder (but behind the rifle).
+  P.push(ell([32.5, 35], 2.3, 2.8, 'metal', 38.5)); // cheek canister
+  P.push(poly([[37, 33], [45, 32.5], [48.5, 36], [46.5, 40], [39, 40.5], [36, 37.5]], 'mask', 43));
+  P.push(cap([39, 35.3], [45.5, 35], 0.45, 0.45, 'rubber', 43.1), cap([39, 37.4], [45.8, 37.2], 0.45, 0.45, 'rubber', 43.1));
+  P.push(ell([48.6, 37.6], 2.7, 2.7, 'metal', 43.3), ell([49, 37.6], 1.2, 1.2, 'rubber', 43.4));
+  const hose = [[38, 40.5], [36, 43], [33.5, 45], [31, 46.5]];
+  for (let k = 0; k < hose.length - 1; k++) P.push(cap(hose[k], hose[k + 1], 1.4, 1.4, 'rubber', 43.5));
+  for (const h of hose.slice(1)) P.push(ell(h, 1.6, 1.1, 'mask', 43.6)); // ribs
   // Front arm, rifle, gloves on top.
   P.push(ell(sF, 4.8, 4, 'armour', 41));
   P.push(cap(sF, eF, 3.4, 3, 'coat', 42), cap(eF, hands.front, 3, 2.6, 'coat', 42));

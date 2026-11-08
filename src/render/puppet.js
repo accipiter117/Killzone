@@ -79,6 +79,7 @@ export function rasterise(pieces, mats, w, h, { dim = 1 } = {}) {
   const owner = new Int32Array(n).fill(-1);
   const zbuf = new Float32Array(n).fill(-1e9);
   const val = new Float32Array(n);
+  const rad = new Float32Array(n); // distance from the centre of glowing ellipses (0..1)
   pieces.forEach((p, idx) => {
     // Bounding box to keep this quick.
     let x0, y0, x1, y1;
@@ -99,6 +100,7 @@ export function rasterise(pieces, mats, w, h, { dim = 1 } = {}) {
         const s = sample(p, x + 0.5, y + 0.5);
         if (s === null) continue;
         zbuf[i] = p.z; owner[i] = idx; val[i] = s;
+        if (p.kind === 'ell') rad[i] = Math.hypot((x + 0.5 - p.c[0]) / p.rx, (y + 0.5 - p.c[1]) / p.ry);
       }
     }
   });
@@ -117,7 +119,13 @@ export function rasterise(pieces, mats, w, h, { dim = 1 } = {}) {
       }
       const p = pieces[o];
       const m = mats[p.mat];
-      if (m.glow) { out.set([...(val[i] > 0.75 ? m.core : m.ramp[3]), 255], i * 4); continue; }
+      if (m.glow) {
+        // Glowing lenses and flashes: hot core, bright body, deeper rim.
+        const r = p.kind === 'ell' ? rad[i] : 0.6;
+        const c = r < 0.45 ? m.core : r < 0.8 || !m.ramp[2] ? m.ramp[3] : m.ramp[2];
+        out.set([...c, 255], i * 4);
+        continue;
+      }
       let tone = Math.round(1 + val[i] * 3.2);
       // Bevel: light where the piece starts at the top or left, dark where it ends.
       const up = at(x, y - 1), left = at(x - 1, y), down = at(x, y + 1), right = at(x + 1, y);
