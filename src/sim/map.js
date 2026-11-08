@@ -4,8 +4,8 @@
 
 import { range, int } from './rng.js';
 
-export const T = { open: 0, trench: 1, rubble: 2, crater: 3, building: 4 };
-export const T_NAMES = ['open', 'trench', 'rubble', 'crater', 'building'];
+export const T = { open: 0, trench: 1, rubble: 2, crater: 3, building: 4, sandbag: 5 };
+export const T_NAMES = ['open', 'trench', 'rubble', 'crater', 'building', 'sandbag'];
 
 export function generateMap(seedInt, cfg) {
   const { width: W, height: H, cell } = cfg.world;

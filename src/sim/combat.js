@@ -58,6 +58,7 @@ export function updateVision(state) {
     seen.fill(0);
     for (const e of sol) {
       if (e.side === side || !isActive(e)) continue;
+      if (e.markUntil > state.tick) { seen[e.id] = 1; continue; } // marked by recon
       for (const s of sol) {
         if (s.side !== side || !isActive(s)) continue;
         const sight = sightOf(state, s);
@@ -89,6 +90,7 @@ export function hitChance(state, accuracy, d, range, target, shooterPinned, shoo
   let p = accuracy * (1 - c.rangeFalloff * Math.min(1, d / range));
   p *= 1 - cover.hit;
   if (shooterPinned) p *= c.pinnedAccuracy;
+  if (target.markUntil > state.tick) p *= state.cfg.abilities.mark.hitMult;
   if (shooter) {
     // Firing down from higher ground is easier; firing up at it is harder.
     const diff = heightAt(state.map, shooter.x, shooter.y) - heightAt(state.map, target.x, target.y);
@@ -118,9 +120,13 @@ export function updateFiring(state, dt) {
       t = s.target >= 0 ? state.soldiers[s.target] : null;
     }
     if (!t) { s.cd = 0.2; continue; }
-    const role = cfg.roles[s.role];
-    fireShot(state, s, t, role, range, sq.pinned, 'fire');
-    s.cd = role.fireInterval * (sq.pinned ? cfg.combat.pinnedFireSlow : 1) * (0.85 + 0.3 * next(state));
+    const barrage = sq.barrageUntil > state.tick;
+    const base = cfg.roles[s.role];
+    const b = cfg.abilities.barrage;
+    const role = barrage ? { ...base, suppress: base.suppress * b.suppressMult } : base;
+    const pinned = sq.pinned && !barrage;
+    fireShot(state, s, t, role, range, pinned, 'fire');
+    s.cd = (role.fireInterval / (barrage ? b.fireMult : 1)) * (pinned ? cfg.combat.pinnedFireSlow : 1) * (0.85 + 0.3 * next(state));
     sq.lastFiredTick = state.tick;
   }
 }

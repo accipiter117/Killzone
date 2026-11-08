@@ -83,7 +83,7 @@ function nearestEnemies(state, p, side, range, n) {
 }
 
 // Damage everyone in a radius (friend and foe), with falloff from the centre.
-function blast(state, x, y, radius, damage, suppRadius, suppAmount, source, buildingMult = 1) {
+export function blast(state, x, y, radius, damage, suppRadius, suppAmount, source, buildingMult = 1) {
   const hitSquads = new Set();
   for (const s of state.soldiers) {
     if (!isActive(s)) continue;

@@ -57,7 +57,23 @@ export function buildTerrain(map, seedInt) {
   for (const b of map.buildings) drawBuilding(g, b, r);
   for (const t of map.trenches) drawTrench(g, t);
 
-  return { canvas, addCrater: (c) => drawCrater(g, c, r) };
+  // Sandbags built by engineers mid-battle: rows of stout bags.
+  const addSandbags = (cells) => {
+    for (const i of cells) {
+      const x = (i % map.cols) * map.cell, y = Math.floor(i / map.cols) * map.cell;
+      g.fillStyle = '#2a251b';
+      g.fillRect(x, y + 1, map.cell, map.cell);
+      for (const [ox, oy] of [[0, 0], [5, 0], [2.5, 5]]) {
+        g.fillStyle = '#9a8a62';
+        g.beginPath();
+        g.roundRect(x + ox, y + oy, 5, 4.5, 1.6);
+        g.fill();
+        g.fillStyle = 'rgba(255,240,200,0.25)';
+        g.fillRect(x + ox + 1, y + oy + 0.5, 3, 1);
+      }
+    }
+  };
+  return { canvas, addCrater: (c) => drawCrater(g, c, r), addSandbags };
 }
 
 function drawCrater(g, c, r) {

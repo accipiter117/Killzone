@@ -5,12 +5,26 @@
 import { clamp } from './util.js';
 import { resetPlans, thinkSquad } from './squads.js';
 import { callArtillery, dropSmoke } from './features.js';
+import { useAbility } from './abilities.js';
 
-export const COMMAND_TYPES = ['move', 'take', 'hold', 'fallback', 'stance', 'artillery', 'smoke'];
+export const COMMAND_TYPES = ['move', 'take', 'hold', 'fallback', 'stance', 'artillery', 'smoke', 'ability'];
 
 const fail = (reason) => ({ ok: false, reason });
 
+// Visual events from an order (a grenade thrown, sandbags built) are held
+// over and handed out with the next tick's events, so the screen sees them.
 export function applyCommand(state, cmd) {
+  const tickEvents = state.events;
+  state.cmdEvents = state.cmdEvents || [];
+  state.events = state.cmdEvents;
+  try {
+    return applyInner(state, cmd);
+  } finally {
+    state.events = tickEvents;
+  }
+}
+
+function applyInner(state, cmd) {
   if (state.result) return fail('The battle is over');
   const { side, type } = cmd;
   const p = cmd.params || {};
@@ -22,7 +36,7 @@ export function applyCommand(state, cmd) {
   if (sd.op + 1e-9 < cost) return fail('Not enough order points');
 
   let pl = null;
-  if (['move', 'take', 'hold', 'fallback', 'stance'].includes(type)) {
+  if (['move', 'take', 'hold', 'fallback', 'stance', 'ability'].includes(type)) {
     pl = state.platoons[p.platoon];
     if (!pl || pl.side !== side) return fail('Not your platoon');
     if (pl.broken) return fail(`${pl.name} has broken and will not take orders`);
@@ -63,6 +77,14 @@ export function applyCommand(state, cmd) {
       const pt = point();
       if (!pt) return fail('Bad position');
       dropSmoke(state, side, pt.x, pt.y);
+      break;
+    }
+    case 'ability': {
+      // params.role picks which of the platoon's squads uses its ability.
+      const sq = pl.squads.map((id) => state.squads[id]).find((q) => q.role === p.role);
+      if (!sq) return fail('No such squad in that platoon');
+      const res = useAbility(state, sq);
+      if (!res.ok) return res;
       break;
     }
     default:

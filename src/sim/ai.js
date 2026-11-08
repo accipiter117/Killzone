@@ -4,6 +4,7 @@
 // battle always gets the same decisions.
 
 import { members, centroid, dist, platoonStrength, isActive } from './util.js';
+import { cellIndex, T } from './map.js';
 
 const PROFILES = {
   standard: { stanceStrong: 'balanced', stanceWeak: 'cautious', reserve: 1 },
@@ -118,6 +119,28 @@ function decide(state, side, prof, memory) {
       continue;
     }
     if (can(cost.take)) spend({ type: 'take', params: { platoon: pl.id, site: best.id } }, cost.take);
+  }
+
+  // Abilities are free, so use them whenever the moment is right.
+  let used = 0;
+  for (const pl of mine) {
+    for (const id of pl.squads) {
+      if (used >= 3) break;
+      const sq = state.squads[id];
+      const list = members(state, sq);
+      if (!list.length || sq.mode === 'rout' || state.tick < sq.abilityReady) continue;
+      const c = centroid(list);
+      let near = Infinity, count = 0;
+      for (const e of seenFoes) { const d = dist(e, c); near = Math.min(near, d); if (d < 400) count++; }
+      const ab = cfg.abilities;
+      const go =
+        (sq.role === 'rifle' && near < ab.grenade.range * 0.9) ||
+        (sq.role === 'heavy' && near < cfg.roles.heavy.range * 0.9 && ['suppress', 'arrived', 'hold', 'cover', 'pinned'].includes(sq.mode)) ||
+        (sq.role === 'assault' && near < ab.charge.range * 0.85 && platoonStrength(state, pl) > 0.5) ||
+        (sq.role === 'engineer' && sq.supp > 25 && near < 400 && state.map.grid[cellIndex(state.map, c.x, c.y)] === T.open) ||
+        (sq.role === 'recon' && count >= 3);
+      if (go) { cmds.push({ side, type: 'ability', params: { platoon: pl.id, role: sq.role } }); used++; }
+    }
   }
 
   // Smoke to cover a platoon that is pinned down on its way in.

@@ -138,6 +138,29 @@ export function thinkSquad(state, sq) {
     return;
   }
   const order = pl.order;
+  // Abilities in progress come first.
+  if (sq.chargeUntil > state.tick) {
+    let t = state.soldiers[sq.chargeTarget];
+    if (!t || !isActive(t)) {
+      t = nearestVisibleEnemy(state, sq.side, c)?.e;
+      if (t && dist(t, c) > 150) t = null;
+      sq.chargeTarget = t ? t.id : -1;
+    }
+    if (t) {
+      sq.mode = 'charge';
+      sq.status = 'Charging!';
+      sq.pinned = false;
+      formUp(state, sq, list, { x: t.x, y: t.y }, false);
+      return;
+    }
+    sq.chargeUntil = 0;
+  }
+  if (sq.barrageUntil > state.tick) {
+    sq.mode = 'barrage';
+    sq.status = 'Barrage!';
+    stopAll(list);
+    return;
+  }
   if (sq.pinned) {
     if (order.type === 'fallback') {
       sq.mode = 'crawl';
@@ -392,7 +415,7 @@ export function moveSoldiers(state, dt) {
     if (!isActive(s)) continue;
     const sq = state.squads[s.squad];
     const pl = state.platoons[sq.platoon];
-    if (sq.pinned && sq.mode !== 'rout' && sq.mode !== 'crawl') continue;
+    if (sq.pinned && sq.mode !== 'rout' && sq.mode !== 'crawl' && sq.mode !== 'charge') continue;
     const dx = s.tx - s.x, dy = s.ty - s.y;
     const d = Math.hypot(dx, dy);
     if (d < 0.5) continue;
@@ -407,6 +430,7 @@ export function moveSoldiers(state, dt) {
     if (wireAt(state.map, s.x, s.y) > 0) speed *= cfg.wire.speedMult;
     if (sq.mode === 'rout') speed *= cfg.squad.routSpeedMult;
     if (sq.mode === 'crawl') speed *= 0.5;
+    if (sq.mode === 'charge') speed *= cfg.abilities.charge.speedMult;
     if (rampAt(state.map, s.x, s.y)) speed *= cfg.height.rampSpeed;
     const step = Math.min(d, speed * dt);
     // Cliffs: only ramps lead up or down. Slide along the edge if blocked.

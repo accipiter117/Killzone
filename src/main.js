@@ -1,7 +1,8 @@
 // Wires the simulation, renderer and UI together and owns the game loop.
 // The sim advances in fixed 1/30 second ticks; drawing happens every frame.
 
-import { RULES, SIDE_NAMES } from './config.js';
+import { CONFIG, RULES, SIDE_NAMES, ABILITY_HELP } from './config.js';
+import { ABILITY_OF } from './sim/abilities.js';
 import { createMatch, issue, advance } from './sim/match.js';
 import { createAI } from './sim/ai.js';
 import { fingerprint } from './sim/battle.js';
@@ -31,7 +32,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), labelsAll: store.get('labels', false), view: store.get('soldierStyle', 'pixel'), lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), labelsAll: store.get('labels', false), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, armed: null, marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -47,6 +48,14 @@ const ui = createUI({
     if (game.selected !== null) focusPlatoon(pl);
   },
   action,
+  ability(platoon, role) {
+    if (game.replay || game.watch) return;
+    if (order('ability', { platoon, role })) {
+      const st = game.match.state;
+      const key = ABILITY_OF[role];
+      toast(ui, st.cfg.abilities[key].label, ABILITY_HELP[key]);
+    }
+  },
   togglePause() { game.paused = !game.paused; },
   cycleSpeed() {
     const opts = game.watch || game.replay ? [1, 2, 4] : [1, 2];
@@ -252,6 +261,7 @@ function openMenu() {
   document.getElementById('watch-toggle').checked = game.watch;
   document.getElementById('labels-toggle').checked = game.labelsAll;
   document.getElementById('view-select').value = game.view;
+  document.getElementById('slowmo-toggle').checked = game.slowMo;
   openOverlay('overlay-menu');
 }
 document.getElementById('overlay-menu').addEventListener('click', (e) => {
@@ -270,6 +280,10 @@ document.getElementById('watch-toggle').addEventListener('change', (e) => {
   if (!game.replay) game.match.controllers = controllersFor(game.watch);
   game.selected = null;
   game.armed = null;
+});
+document.getElementById('slowmo-toggle').addEventListener('change', (e) => {
+  game.slowMo = e.target.checked;
+  store.set('slowMo', game.slowMo);
 });
 document.getElementById('view-select').addEventListener('change', (e) => {
   game.view = e.target.value;
@@ -318,7 +332,7 @@ function hintText() {
   if (game.replay || game.watch) return '';
   if (game.armed === 'artillery') return 'Tap where the shells should land. They hit everyone, yours too.';
   if (game.armed === 'smoke') return 'Tap where to drop smoke. It blocks sight for a while.';
-  if (game.selected !== null) return `${game.match.state.platoons[game.selected].name}: tap an objective to take it, or ground to move`;
+  if (game.selected !== null) return `${game.match.state.platoons[game.selected].name}: tap an objective to take it, or ground to move (slowed while you decide)`;
   return 'Tap a platoon card to command it. Press and hold anything to learn what it does.';
 }
 
@@ -329,8 +343,11 @@ function frame(t) {
   const m = game.match;
   const st = m.state;
   const tickDt = 1 / st.cfg.tickRate;
+  // Slow motion while giving orders, so there is time to think on a phone.
+  const slow = game.slowMo && !game.watch && !game.replay && (game.selected !== null || game.armed !== null);
+  document.getElementById('stage').classList.toggle('slowmo', slow && !game.paused);
   if (!game.paused && !st.result) {
-    game.acc += dt * game.speed;
+    game.acc += dt * game.speed * (slow ? CONFIG.ui.slowMo : 1);
     let n = 0;
     while (game.acc >= tickDt && n < 16) {
       advance(m);

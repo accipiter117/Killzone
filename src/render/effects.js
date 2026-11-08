@@ -14,6 +14,7 @@ export function createEffects() {
   return {
     tracers: [], flashes: [], puffs: [], booms: [], zaps: [], bodies: [], smokes: new Map(), rings: [],
     lastShot: new Map(), // soldier id -> time of their last shot (for the firing frame)
+    throws: [], marks: [],
     shake: 0, reduced: false, terrain: null,
   };
 }
@@ -56,6 +57,19 @@ export function ingest(fxs, events, now) {
         break;
       case 'smoke':
         break; // smoke clouds are drawn from the sim's smoke list
+      case 'throw':
+        fxs.throws.push({ ...e, t0: now, life: e.sec });
+        break;
+      case 'grenadeBlast':
+        boom(fxs, e.x, e.y, 34, now, '255,190,110');
+        fxs.shake = Math.max(fxs.shake, 3);
+        break;
+      case 'sandbags':
+        if (fxs.terrain) fxs.terrain.addSandbags(e.cells);
+        break;
+      case 'mark':
+        fxs.marks.push({ x: e.x, y: e.y, r: e.r, t0: now, life: 0.8 });
+        break;
       case 'capture':
         fxs.rings.push({ site: e.site, side: e.side, t0: now, life: 1.2 });
         break;
@@ -95,6 +109,8 @@ export function prune(fxs, now) {
   fxs.booms = fxs.booms.filter(alive);
   fxs.zaps = fxs.zaps.filter(alive);
   fxs.rings = fxs.rings.filter(alive);
+  fxs.throws = fxs.throws.filter(alive);
+  fxs.marks = fxs.marks.filter(alive);
 }
 
 export function drawSmoke(g, fxs, smokes, now, tickNow, tickRate) {
@@ -161,6 +177,24 @@ export function drawEffects(g, fxs, now, px) {
     g.lineWidth = 3 * px;
     g.beginPath();
     g.arc(b.x, b.y, b.r * (0.5 + k * 1.2), 0, Math.PI * 2);
+    g.stroke();
+  }
+  // Grenades in flight: a dark dot on a lobbed arc.
+  for (const t of fxs.throws) {
+    const k = Math.min(1, (now - t.t0) / t.life);
+    const x = t.x1 + (t.x2 - t.x1) * k, y = t.y1 + (t.y2 - t.y1) * k - Math.sin(k * Math.PI) * 40;
+    g.fillStyle = '#1b1c1e';
+    g.beginPath();
+    g.arc(x, y, Math.max(2, 1.6 * px), 0, Math.PI * 2);
+    g.fill();
+  }
+  // Recon mark: a red ring pulse where the group was tagged.
+  for (const m of fxs.marks) {
+    const k = (now - m.t0) / m.life;
+    g.strokeStyle = `rgba(255,70,50,${1 - k})`;
+    g.lineWidth = 2.5 * px;
+    g.beginPath();
+    g.arc(m.x, m.y, m.r * (0.4 + 0.6 * k), 0, Math.PI * 2);
     g.stroke();
   }
   for (const z of fxs.zaps) {

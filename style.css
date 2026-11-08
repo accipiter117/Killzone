@@ -77,6 +77,8 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 /* Battlefield */
 #stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #1d1a15; }
 #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 70px rgba(20, 40, 70, 0.55); opacity: 0; transition: opacity 0.25s; }
+#stage.slowmo::after { opacity: 1; }
 #minimap { position: absolute; left: 8px; top: 8px; width: min(46%, 210px); aspect-ratio: 30 / 11; border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; box-shadow: var(--shadow); touch-action: none; }
 #feed { position: absolute; right: 8px; top: 8px; width: min(48%, 250px); display: flex; flex-direction: column; gap: 3px; pointer-events: none; }
 #feed div { background: rgba(15, 14, 12, 0.72); color: #f2ede0; padding: 3px 7px; border-radius: 6px; font-size: 11px; border-left: 3px solid #a49d8c; transition: opacity 0.6s; }
@@ -92,11 +94,16 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 
 /* Bottom panel */
 #panel { background: var(--panel); border-top: 1px solid var(--line); padding: 6px 6px calc(6px + var(--safe-b)); display: flex; flex-direction: column; gap: 6px; z-index: 2; }
-#squads { display: grid; grid-template-columns: 1fr; gap: 2px; font-size: 12px; min-height: 48px; }
+#squads { display: grid; grid-template-columns: 1fr; gap: 3px; font-size: 12px; min-height: 48px; }
 #squads div { display: flex; gap: 6px; white-space: nowrap; overflow: hidden; }
 #squads div b { width: 62px; flex: none; color: var(--muted); font-weight: 600; }
 #squads div span { overflow: hidden; text-overflow: ellipsis; }
+#squads div { align-items: center; }
 #squads div.pinned span { color: var(--danger); font-weight: 600; }
+#squads div.dead { opacity: 0.45; }
+#squads div span { flex: 1; min-width: 0; }
+#squads button.ab { min-height: 30px; min-width: 88px; padding: 2px 8px; font-size: 12px; font-weight: 600; border-radius: 15px; flex: none; }
+#squads button.ab.ready { background: var(--accent); color: #fff; border-color: transparent; }
 #squads .empty { color: var(--muted); }
 #cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .card { text-align: left; padding: 6px 7px; border-radius: 10px; min-height: 64px; display: flex; flex-direction: column; gap: 3px; border: 2px solid var(--line); }

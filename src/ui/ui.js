@@ -4,6 +4,7 @@
 
 import { platoonStrength } from '../sim/util.js';
 import { platoonHeadline } from '../sim/squads.js';
+import { ABILITY_OF, abilityHasTarget } from '../sim/abilities.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -126,28 +127,47 @@ export function updateUI(ui, state, view) {
     st.classList.toggle('pinned', head.startsWith('Pinned') || head === 'Routing');
   });
 
-  // Squad lines for the selected platoon.
+  // Squad lines for the selected platoon, each with its ability button.
+  // Rows are built once per selection and then only updated, so a tap on a
+  // button is never lost to a rebuild.
   const sel = view.selected !== null ? state.platoons[view.selected] : null;
-  e.squads.innerHTML = '';
-  if (sel) {
-    e.stanceLabel.textContent = state.cfg.stances[sel.stance].label;
-    for (const id of sel.squads) {
-      const sq = state.squads[id];
-      const row = document.createElement('div');
-      row.className = sq.pinned ? 'pinned' : '';
-      const b = document.createElement('b');
-      b.textContent = state.cfg.roles[sq.role].label;
-      const s = document.createElement('span');
-      s.textContent = sq.status;
-      row.append(b, s);
-      e.squads.appendChild(row);
+  const key = sel ? `p${sel.id}` : view.replay ? 'replay' : view.watch ? 'watch' : 'none';
+  if (ui.rowsFor !== key) {
+    ui.rowsFor = key;
+    e.squads.innerHTML = '';
+    ui.rows = [];
+    if (sel) {
+      for (const id of sel.squads) {
+        const sq = state.squads[id];
+        const row = document.createElement('div');
+        const b = document.createElement('b');
+        b.textContent = state.cfg.roles[sq.role].label;
+        const s = document.createElement('span');
+        const btn = document.createElement('button');
+        btn.className = 'ab';
+        btn.addEventListener('click', () => ui.handlers.ability(sel.id, sq.role));
+        row.append(b, s, btn);
+        e.squads.appendChild(row);
+        ui.rows.push({ sq, row, s, btn });
+      }
+    } else {
+      const d = document.createElement('div');
+      d.className = 'empty';
+      d.textContent = view.replay ? 'Watching the replay.' : view.watch ? 'Watch mode: the AI is commanding both sides.' : 'Select a platoon card, then tap the map to give it an order.';
+      e.squads.appendChild(d);
     }
-  } else {
-    e.stanceLabel.textContent = '-';
-    const d = document.createElement('div');
-    d.className = 'empty';
-    d.textContent = view.replay ? 'Watching the replay.' : view.watch ? 'Watch mode: the AI is commanding both sides.' : 'Select a platoon card, then tap the map to give it an order.';
-    e.squads.appendChild(d);
+  }
+  e.stanceLabel.textContent = sel ? state.cfg.stances[sel.stance].label : '-';
+  for (const r of ui.rows || []) {
+    const { sq } = r;
+    const dead = sq.mode === 'dead';
+    r.row.className = sq.pinned ? 'pinned' : dead ? 'dead' : '';
+    r.s.textContent = sq.status;
+    const ab = state.cfg.abilities[ABILITY_OF[sq.role]];
+    const wait = Math.ceil((sq.abilityReady - state.tick) / state.cfg.tickRate);
+    r.btn.textContent = wait > 0 ? `${ab.label} ${wait}s` : ab.label;
+    r.btn.disabled = dead || wait > 0 || view.replay || view.watch || sq.mode === 'rout';
+    r.btn.classList.toggle('ready', !r.btn.disabled && abilityHasTarget(state, sq));
   }
 
   // Event feed: newest three, fading after a few seconds.

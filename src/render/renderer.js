@@ -57,6 +57,25 @@ export function drawFrame(g, r, state, cam, opts) {
   drawSiteIcons(g, state, cam);
   r.badges = drawBadges(g, state, cam, opts);
   drawSquadLabels(g, state, cam, opts);
+  drawMarks(g, state, cam, opts);
+}
+
+// Red brackets over enemies marked by recon.
+function drawMarks(g, state, cam, opts) {
+  const px = 1 / cam.z;
+  const lift = opts.view === 'pixel' ? 74 * spriteScalePixel(px) : opts.view === 'top' ? 10 : 26 * Math.max(1, 0.7 * px);
+  g.strokeStyle = '#ff4a32';
+  g.lineWidth = 2;
+  for (const s of state.soldiers) {
+    if (!isActive(s) || !(s.markUntil > state.tick) || !visible(state, s, opts)) continue;
+    const p = toScreen(cam, s.x, s.y - lift);
+    const r = 5;
+    g.beginPath();
+    g.moveTo(p.x - r, p.y - r + 3); g.lineTo(p.x - r, p.y - r); g.lineTo(p.x - r + 3, p.y - r);
+    g.moveTo(p.x + r - 3, p.y - r); g.lineTo(p.x + r, p.y - r); g.lineTo(p.x + r, p.y - r + 3);
+    g.moveTo(p.x, p.y + 1); g.lineTo(p.x - 3, p.y - 2); g.moveTo(p.x, p.y + 1); g.lineTo(p.x + 3, p.y - 2);
+    g.stroke();
+  }
 }
 
 function drawWire(g, r, state, cam) {

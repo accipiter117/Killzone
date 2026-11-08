@@ -48,7 +48,7 @@ export const CONFIG = {
     cap: 6,
     regenSec: 9, // seconds per order point
     commsRegenMult: 1.75, // owning the comms post speeds refill by this much
-    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2 },
+    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0 },
   },
 
   // Squad roles. range/sight in world units, fireInterval in seconds,
@@ -95,6 +95,7 @@ export const CONFIG = {
     rubble: { hit: 0.45, supp: 0.55, speed: 0.85 },
     crater: { hit: 0.35, supp: 0.6, speed: 0.85 },
     building: { hit: 0.5, supp: 0.5, speed: 0.8, rangeMult: 1.2, artilleryMult: 2 },
+    sandbag: { hit: 0.55, supp: 0.45, speed: 0.85 },
   },
   wire: { speedMult: 0.22 },
 
@@ -143,6 +144,19 @@ export const CONFIG = {
 
   smoke: { radius: 120, durationSec: 22 },
 
+  // Squad abilities: free, one per role, each on its own cooldown.
+  abilities: {
+    grenade: { label: 'Grenade', cooldownSec: 18, range: 190, fuseSec: 1.1, radius: 38, damage: 75, suppress: 40 },
+    barrage: { label: 'Barrage', cooldownSec: 24, durationSec: 6, fireMult: 2.5, suppressMult: 1.8 },
+    charge: { label: 'Charge', cooldownSec: 22, durationSec: 5, range: 260, speedMult: 2.1 },
+    sandbags: { label: 'Sandbags', cooldownSec: 30, radius: 26, thickness: 9, offset: 14 },
+    mark: { label: 'Mark', cooldownSec: 24, durationSec: 10, radius: 170, hitMult: 1.4 },
+  },
+
+  // Interface pacing: game speed while a platoon is selected or a strike is
+  // being aimed (slow motion, as in Bad North).
+  ui: { slowMo: 0.25 },
+
   ai: {
     thinkSec: 4,
     siteValue: { objective: 10, comms: 5, mg: 4, arc: 4 },
@@ -165,7 +179,16 @@ export const RULES = {
   mg: ['MG nest', 'Capture it and it fires on any enemy in range, pinning them down.'],
   arc: ['Arc tower', 'Capture it and it zaps nearby enemies every few seconds.'],
   comms: ['Comms post', 'Capture it and your order points refill faster.'],
+  sandbag: ['Sandbags', 'Cover built by engineers: as good as a trench.'],
   tank: ['Petrusite tank', 'Explodes when hit by stray fire or shells, hurting everyone nearby.'],
+};
+
+export const ABILITY_HELP = {
+  grenade: 'Rifle squad throws a grenade at the nearest enemy in range. Hurts anyone near the blast.',
+  barrage: 'Heavy squad holds still and pours out fire for six seconds, pinning whoever it hits.',
+  charge: 'Assault squad shakes off suppression and sprints at the nearest enemy.',
+  sandbags: 'Engineers throw up a sandbag wall facing the enemy: instant cover.',
+  mark: 'Recon marks an enemy group for ten seconds: everyone can see them and hits them more often.',
 };
 
 export const SIDE_NAMES = ['ISA', 'Helghast'];
