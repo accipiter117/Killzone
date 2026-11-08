@@ -224,8 +224,8 @@ test('reinforcements refill the weakest squad from your own lines, at a price', 
   dead.forEach((m) => { m.alive = false; m.hp = 0; });
   s.sides[0].op = 6;
   assert.ok(applyCommand(s, { tick: 0, side: 0, type: 'reinforce', params: { platoon: pl.id } }).ok);
-  assert.ok(dead.every((m) => m.alive && m.hp === m.maxHp && m.x < 250), 'back on their feet at the ISA lines');
-  assert.ok(Math.abs(s.sides[0].op - 2) < 1e-9, 'costs 4 order points');
+  assert.ok(dead.every((m) => m.alive && m.hp === m.maxHp && m.x < 250 && m.joining), 'back on their feet at the ISA lines, running to rejoin');
+  assert.ok(Math.abs(s.sides[0].op - (6 - s.cfg.orders.cost.reinforce)) < 1e-9, 'costs order points');
   // Cooldown, and nothing to do at full strength.
   s.sides[0].op = 6;
   const again = applyCommand(s, { tick: 0, side: 0, type: 'reinforce', params: { platoon: pl.id } });
@@ -235,4 +235,21 @@ test('reinforcements refill the weakest squad from your own lines, at a price', 
   const full = applyCommand(s, { tick: 0, side: 0, type: 'reinforce', params: { platoon: pl.id } });
   assert.equal(full.ok, false);
   assert.match(full.reason, /full strength/);
+});
+
+test('a movement order can be changed free within a few seconds, then it costs again', () => {
+  const s = quietBattle();
+  s.sides[0].op = 3;
+  const order = (params) => applyCommand(s, { tick: s.tick, side: 0, type: 'move', params: { platoon: 0, ...params } });
+  assert.ok(order({ x: 600, y: 300 }).ok);
+  assert.equal(s.sides[0].op, 2, 'the first order is paid for');
+  run(s, 30 * 3);
+  const before = s.sides[0].op;
+  assert.ok(order({ x: 700, y: 350 }).ok);
+  assert.ok(Math.abs(s.sides[0].op - before) < 1e-9, 'a change within the window is free');
+  assert.equal(s.platoons[0].order.x, 700);
+  run(s, 30 * 3); // the window is counted from the first order, so now it has closed
+  const later = s.sides[0].op;
+  assert.ok(order({ x: 800, y: 350 }).ok);
+  assert.ok(Math.abs(s.sides[0].op - (later - 1)) < 1e-9, 'after the window it costs again');
 });

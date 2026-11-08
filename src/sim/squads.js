@@ -440,6 +440,11 @@ export function moveSoldiers(state, dt) {
     if (sq.mode === 'rout') speed *= cfg.squad.routSpeedMult;
     if (sq.mode === 'crawl') speed *= 0.5;
     if (sq.mode === 'charge') speed *= cfg.abilities.charge.speedMult;
+    // Fresh reinforcements run until they have caught up with their squad.
+    if (s.joining) {
+      if (Math.hypot(s.x - sq.cx, s.y - sq.cy) < 45) s.joining = false;
+      else speed *= cfg.reinforce.joinSpeedMult;
+    }
     if (rampAt(state.map, s.x, s.y)) speed *= cfg.height.rampSpeed;
     const step = Math.min(d, speed * dt);
     // Cliffs: only ramps lead up or down. Slide along the edge if blocked.

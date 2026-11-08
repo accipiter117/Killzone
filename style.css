@@ -116,6 +116,7 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 .card .bar i.low { background: var(--danger); }
 .card .status { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .status.pinned { color: var(--danger); font-weight: 600; }
+.card .status.amend { color: var(--accent); font-weight: 600; }
 #actions { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
 #actions button { display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; padding: 3px 1px; line-height: 1.1; min-width: 0; overflow: hidden; }
 #actions button small { font-weight: 400; font-size: 10px; color: var(--muted); margin-top: 2px; }

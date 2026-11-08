@@ -50,9 +50,10 @@ export const CONFIG = {
   orders: {
     start: 3,
     cap: 6,
-    regenSec: 9, // seconds per order point
+    regenSec: 6, // seconds per order point
+    amendSec: 5, // a movement order can be changed free for this long after giving it
     commsRegenMult: 1.75, // owning the comms post speeds refill by this much
-    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 4 },
+    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2 },
   },
 
   // Squad roles. range/sight in world units, fireInterval in seconds,
@@ -152,7 +153,7 @@ export const CONFIG = {
 
   // Reinforcements: refill the weakest squad of a platoon with fresh
   // soldiers who arrive from your own lines. Cooldown is per side.
-  reinforce: { soldiers: 5, cooldownSec: 75 },
+  reinforce: { soldiers: 5, cooldownSec: 35, nearSiteReach: 600, joinSpeedMult: 1.7 },
 
   // Squad abilities: free, one per role, each on its own cooldown.
   abilities: {
