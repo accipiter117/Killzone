@@ -109,15 +109,22 @@ export function updateVehicles(state, dt) {
   }
 }
 
+// Tracks roll flat any wire under them, leaving a lane infantry can use.
+// Squads drop their cached routes so they notice the new gap straight away.
 function crushWire(state, v) {
   const r = state.cfg.tank.crushRadius;
   const map = state.map;
+  let crushed = false;
   forCells(map, v.x - r, v.y - r, v.x + r, v.y + r, (i, x, y) => {
     if (map.wire[i] > 0 && (x - v.x) ** 2 + (y - v.y) ** 2 <= r * r) {
       map.wire[i] = 0;
+      if (!map.crushed) map.crushed = new Uint8Array(map.wire.length);
+      map.crushed[i] = 1;
+      crushed = true;
       state.events.push({ type: 'wireCut', i });
     }
   });
+  if (crushed) for (const sq of state.squads) { sq.path = null; sq.waitSince = -1; }
 }
 
 // The best main gun target: the enemy tank if it can be seen and reached,

@@ -97,6 +97,20 @@ function drawWire(g, r, state, cam) {
     g.moveTo(cx + ox + s, cy + oy); g.lineTo(cx + ox, cy + oy + s);
   }
   g.stroke();
+  // Wire a tank has rolled flat: pressed into the mud, no longer a barrier.
+  if (m.crushed) {
+    g.strokeStyle = 'rgba(30,28,25,0.35)';
+    g.lineWidth = 1;
+    g.beginPath();
+    for (const i of r.wireCells) {
+      if (!m.crushed[i]) continue;
+      const cx = (i % m.cols) * m.cell, cy = Math.floor(i / m.cols) * m.cell;
+      if (cx < x0 || cx > x1) continue;
+      const oy = 3 + ((i * 13) % 5);
+      g.moveTo(cx, cy + oy); g.lineTo(cx + m.cell, cy + oy + 1);
+    }
+    g.stroke();
+  }
   // Posts.
   g.fillStyle = '#2c2925';
   for (const i of r.wireCells) {
