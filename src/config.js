@@ -119,7 +119,7 @@ export const CONFIG = {
     boundMax: 170,
     flankOffset: 170,
     reconBackoff: 210,
-    slotSpacing: 75,
+    slotSpacing: 60, // squads of a platoon on a move order stand one tile apart
     arriveDist: 28,
     routSpeedMult: 1.25,
     stallSec: 8, // no headway for this long and a squad pushes straight on...
@@ -169,7 +169,9 @@ export const CONFIG = {
 
   // Interface pacing: game speed while a platoon is selected or a strike is
   // being aimed (slow motion, as in Bad North).
-  ui: { slowMo: 0.25 },
+  // grid: tile size for move orders (orders snap to tile centres; a
+  // platoon's three squads take the tile and the ones above and below).
+  ui: { slowMo: 0.25, tile: 60 },
 
   ai: {
     thinkSec: 4,

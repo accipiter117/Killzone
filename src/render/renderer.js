@@ -45,6 +45,7 @@ export function drawFrame(g, r, state, cam, opts) {
   drawSitesWorld(g, state, now, px, fxs);
   drawBodies(g, r, state, fxs, now, px, opts.view);
   drawTanks(g, state, now);
+  drawGrid(g, state, cam, opts, px);
   drawOrderLine(g, state, opts, px);
   drawSoldiers(g, r, state, opts, px);
   drawSmoke(g, fxs, state.smokes, now, state.tick, state.cfg.tickRate);
@@ -188,6 +189,32 @@ function platoonCentre(state, pl) {
   const list = [];
   for (const id of pl.squads) list.push(...members(state, state.squads[id]));
   return list.length ? centroid(list) : null;
+}
+
+// The order grid: faint tiles while a platoon is selected or a strike is
+// being aimed, and the tiles the selected platoon's squads are heading for.
+function drawGrid(g, state, cam, opts, px) {
+  if (!opts.grid) return;
+  const t = state.cfg.ui.tile;
+  const x0 = Math.floor(cam.x / t) * t, y0 = Math.floor(cam.y / t) * t;
+  const x1 = cam.x + cam.vw / cam.z, y1 = cam.y + cam.vh / cam.z;
+  g.strokeStyle = 'rgba(240,236,220,0.13)';
+  g.lineWidth = px;
+  g.beginPath();
+  for (let x = x0; x <= x1; x += t) { g.moveTo(x, Math.max(0, y0)); g.lineTo(x, Math.min(state.map.height, y1)); }
+  for (let y = y0; y <= y1; y += t) { g.moveTo(Math.max(0, x0), y); g.lineTo(Math.min(state.map.width, x1), y); }
+  g.stroke();
+  const pl = opts.selected !== null && opts.selected !== undefined ? state.platoons[opts.selected] : null;
+  if (!pl || pl.order.type !== 'move') return;
+  // The platoon's tile and the ones above and below (one per squad).
+  const cx = Math.floor(pl.order.x / t) * t, cy = Math.floor(pl.order.y / t) * t;
+  for (const k of [-1, 0, 1]) {
+    g.fillStyle = 'rgba(170,255,170,0.14)';
+    g.fillRect(cx, cy + k * t, t, t);
+    g.strokeStyle = 'rgba(170,255,170,0.65)';
+    g.lineWidth = 1.5 * px;
+    g.strokeRect(cx + px, cy + k * t + px, t - 2 * px, t - 2 * px);
+  }
 }
 
 function drawOrderLine(g, state, opts, px) {

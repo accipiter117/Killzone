@@ -59,7 +59,9 @@
         <li>Each squad has an <b>ability</b> (grenade, barrage, charge, sandbags, mark) with its own button under the platoon cards. They are free but need time to recharge.</li>
         <li><b>High ground</b> gives range and accuracy. Cliffs can only be climbed at ramps, so hills make chokepoints.</li>
         <li>Time slows right down while a platoon is selected, so you can think. Tap the card again to let go.</li>
-        <li><b>Reinforce</b> (4 points) sends up to five fresh soldiers from your lines to refill the selected platoon's weakest squad.</li>
+        <li>Tapped the wrong spot? For 5 seconds after an order you can tap again to change it for free (the card counts down).</li>
+        <li>While a platoon is selected a faint <b>grid</b> shows; move orders snap to a tile, and its three squads take that tile and the ones above and below.</li>
+        <li><b>Reinforce</b> (2 points) sends up to five fresh soldiers from your lines to refill the selected platoon's weakest squad.</li>
         <li>A platoon that loses too many men <b>breaks</b> and runs back to its own lines. The first time, it regroups there and rejoins the fight; break it again and it is gone.</li>
         <li>Drag to pan, pinch to zoom, tap the minimap to jump. Press and hold anything to see what it does.</li>
       </ul>
@@ -86,6 +88,7 @@
           <option value="top">Top-down</option>
         </select>
       </div>
+      <label class="row toggle"><span>Grid when giving orders</span><input type="checkbox" id="grid-toggle"></label>
       <label class="row toggle"><span>Sound</span><input type="checkbox" id="sound-toggle"></label>
       <label class="row toggle"><span>Slow motion while giving orders</span><input type="checkbox" id="slowmo-toggle"></label>
       <label class="row toggle"><span>Show every squad's status</span><input type="checkbox" id="labels-toggle"></label>
