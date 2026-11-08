@@ -19,11 +19,12 @@
 </head>
 <body>
   <h1>Sprite sheet</h1>
-  <p>Every soldier is drawn in code. The 2.5D ones are tiny 3D block models drawn from a three quarter view; the top-down ones are 17 by 17 pixel grids. Top row of each block is animated; below are the single frames. <a href="./">Back to the battle</a></p>
+  <p>Every soldier is drawn in code. The detailed troopers (the default) are puppets of shaped pieces rendered into pixel art. The 2.5D ones are tiny 3D block models drawn from a three quarter view; the top-down ones are 17 by 17 pixel grids. Top row of each block is animated; below are the single frames. <a href="./">Back to the battle</a></p>
   <div id="sheet"></div>
   <script type="module">
     import { getSprite, FRAMES, ROLE_NAMES, SPRITE_SIZE } from './src/render/sprites.js';
     import { getSprite25, FRAMES_25D, W25, H25 } from './src/render/sprites25d.js';
+    import { getPixelTrooper, PIXEL_FRAMES, PT_W, PT_H } from './src/render/pixel-troopers.js';
     const SCALE = 4;
     const sheet = document.getElementById('sheet');
     const animated = [];
@@ -39,6 +40,29 @@
       if (label) fig.append(label);
       return { fig, g, c, is25: true };
     };
+    // Detailed troopers (the default style): every role and frame per side.
+    const hp = document.createElement('h2');
+    hp.textContent = 'Detailed troopers';
+    sheet.append(hp);
+    for (const side of ['isa', 'hgh']) {
+      for (const role of ROLE_NAMES) {
+        const h = document.createElement('h2');
+        h.textContent = `${side === 'isa' ? 'ISA' : 'Helghast'} ${role}`;
+        sheet.append(h);
+        const row = document.createElement('div');
+        row.className = 'row';
+        for (const f of PIXEL_FRAMES) {
+          const fig = document.createElement('figure');
+          const c = document.createElement('canvas');
+          c.width = PT_W * 2; c.height = PT_H * 2;
+          const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+          g.drawImage(getPixelTrooper(side, f, 1, role), 0, 0, c.width, c.height);
+          const cap = document.createElement('figcaption'); cap.textContent = f;
+          fig.append(c, cap); row.append(fig);
+        }
+        sheet.append(row);
+      }
+    }
     const h25 = document.createElement('h2');
     h25.textContent = '2.5D soldiers';
     sheet.append(h25);

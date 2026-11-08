@@ -8,13 +8,13 @@ import { getSprite, dirIndex, SPRITE_SIZE } from './sprites.js';
 import { getSprite25, W25, H25, ANCHOR_X, ANCHOR_Y } from './sprites25d.js';
 import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './pixel-troopers.js';
 
-// Detailed troopers: every role uses the faction's rifleman for now.
+// Detailed troopers: each faction and role has its own sprite set.
 const FACTION = ['isa', 'hgh'];
 export const spriteScalePixel = (px) => Math.max(0.42, 0.3 * px);
-function drawTrooper(g, side, frame, ang, x, y, ps) {
+function drawTrooper(g, side, frame, ang, x, y, ps, role) {
   const facing = Math.cos(ang) >= 0 ? 1 : -1;
   const fx = facing === 1 ? PT_FOOT[0] : PT_W - 1 - PT_FOOT[0];
-  g.drawImage(getPixelTrooper(FACTION[side], frame, facing), x - fx * ps, y - PT_FOOT[1] * ps, PT_W * ps, PT_H * ps);
+  g.drawImage(getPixelTrooper(FACTION[side], frame, facing, role), x - fx * ps, y - PT_FOOT[1] * ps, PT_W * ps, PT_H * ps);
 }
 
 export const OWNER = { 0: '#7fb6ff', 1: '#ff6a2a', null: '#d8d2c0' };
@@ -291,7 +291,7 @@ function drawSoldiers(g, r, state, opts, px) {
   }
   for (const { s, sq, frame, dir, ang } of list) {
     g.globalAlpha = sq.mode === 'rout' ? 0.6 : 1;
-    if (pixel) { drawTrooper(g, s.side, frame, ang, s.x, s.y, ps); continue; }
+    if (pixel) { drawTrooper(g, s.side, frame, ang, s.x, s.y, ps, s.role); continue; }
     g.drawImage(getSprite25(s.side, s.role, frame, dir), s.x - ANCHOR_X * ps, s.y - ANCHOR_Y * ps, W25 * ps, H25 * ps);
   }
   g.globalAlpha = 1;
@@ -312,7 +312,7 @@ function drawBodies(g, r, state, fxs, now, px, view) {
     const frame = t < 0.12 ? 'fall1' : t < 0.26 ? 'fall2' : 'dead';
     const role = state.soldiers[b.id].role;
     if (top) g.drawImage(getSprite(b.side, role, frame, b.dir), b.x - size / 2, b.y - size / 2, size, size);
-    else if (view === 'pixel') drawTrooper(g, b.side, frame, b.ang, b.x, b.y, spriteScalePixel(px));
+    else if (view === 'pixel') drawTrooper(g, b.side, frame, b.ang, b.x, b.y, spriteScalePixel(px), role);
     else g.drawImage(getSprite25(b.side, role, frame, b.dir), b.x - ANCHOR_X * ps, b.y - ANCHOR_Y * ps, W25 * ps, H25 * ps);
   }
 }
