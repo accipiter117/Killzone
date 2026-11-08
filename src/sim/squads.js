@@ -76,8 +76,10 @@ function formUp(state, sq, list, dest, snapCover) {
     if (state.map.hasHeight && !straightClear(state.map, s, { x, y }, true)) {
       if (straightClear(state.map, s, dest, true)) { x = dest.x; y = dest.y; }
       else {
-        const p = findPath(state.map, s, dest, { maxNodes: 3000, mirror: s.side === 1 });
-        let pt = p && p[0] ? p[Math.min(p.length - 1, 6)] : dest;
+        let p = findPath(state.map, s, dest, { maxNodes: 12000, mirror: s.side === 1 });
+        // No way to the squad's destination from here: rejoin the squad.
+        if (!p || !p.length) p = findPath(state.map, s, { x: sq.cx, y: sq.cy }, { maxNodes: 12000, mirror: s.side === 1 });
+        let pt = p && p[0] ? p[Math.min(p.length - 1, 6)] : { x: s.x, y: s.y };
         for (let k = Math.min(p ? p.length - 1 : 0, 30); k > 0; k--) {
           if (straightClear(state.map, s, p[k], true)) { pt = p[k]; break; }
         }
@@ -127,7 +129,15 @@ export function thinkSquad(state, sq) {
   const list = members(state, sq);
   if (!list.length) { sq.mode = 'dead'; sq.status = 'Wiped out'; return; }
   const pl = state.platoons[sq.platoon];
-  const c = centroid(list);
+  // The squad's position. Usually the middle of its soldiers, but if it has
+  // been split (say round a hill) the middle can be somewhere nobody is
+  // standing, so then use the soldier nearest the middle instead.
+  let c = centroid(list);
+  if (!list.some((s) => dist(s, c) < 45)) {
+    let best = list[0];
+    for (const s of list) if (dist(s, c) < dist(best, c)) best = s;
+    c = { x: best.x, y: best.y };
+  }
   sq.cx = c.x; sq.cy = c.y;
   const dir = sideDir(sq.side);
   const H = state.map.height;
@@ -237,7 +247,11 @@ function advance(state, sq, pl, list, c, firing) {
     if (cv) goal = cv;
   }
   const d = dist(c, goal);
-  const arrived = d < sc.arriveDist * 1.6;
+  // Arrived when close; also when nearly there but blocked from getting
+  // closer for a while (say the last few yards are up a cliff), rather than
+  // pressing against the edge for the rest of the battle.
+  const blockedNear = d < sc.nearEnough && state.tick - sq.bestTick > sc.stallSec * cfg.tickRate;
+  const arrived = d < sc.arriveDist * 1.6 || blockedNear;
   const threat = nearestVisibleEnemy(state, sq.side, c);
   const role = cfg.roles[sq.role];
 

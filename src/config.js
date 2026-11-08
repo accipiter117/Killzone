@@ -11,6 +11,8 @@ export const CONFIG = {
     rallyLine: 70, // broken platoons fall back to this far from their own edge...
     rallyZone: 160, // ...and once all are within this distance of it, they regroup
     rallySec: 25, // for this long, then rejoin the fight (once per battle)
+    rallyShareHome: 0.7, // the regroup clock starts once this share of survivors are back...
+    rallyMaxWaitSec: 30, // ...or this long after breaking, whichever comes first
     rallyBreakShare: 0.5, // a rallied platoon breaks for good after losing half of what was left
     margin: { narrow: 0.2, clear: 0.6 }, // score gap as a share of total score: below narrow = narrow win, below clear = clear win, else crushing
   },
@@ -37,7 +39,7 @@ export const CONFIG = {
       top: [58, 52], // the second tier right on B
       ridges: [1, 2], // extra ridges per half of the map
       ridgeSize: [90, 150],
-      rampRadius: 30,
+      rampRadius: 36,
     },
   },
 
@@ -125,6 +127,7 @@ export const CONFIG = {
     platoonLead: 170, // a squad this far ahead of its platoon's slowest squad waits for it
     paceAhead: 18, // soldiers this far in front of their squad's centre slow down
     paceBehind: 22, // soldiers this far behind it speed up
+    nearEnough: 110, // a squad this close to its goal but stuck counts as arrived
     highCoverBonus: 25, // when settling into cover, a level of high ground is worth this many units of walking
   },
 
