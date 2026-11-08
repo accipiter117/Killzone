@@ -268,14 +268,16 @@ export function distToSeg(px, py, a, b) {
 
 // Find the best cover cell near (x, y). score(cx, cy) returns a number (higher
 // is better) or -Infinity to skip. Returns null when nothing qualifies.
-export function findCover(map, x, y, radius, score) {
+// mirror: break ties the other way round, so the Helghast (whose map is
+// the ISA map turned 180 degrees) choose the mirror image of the same spot.
+export function findCover(map, x, y, radius, score, mirror = false) {
   let best = null, bestScore = -Infinity;
   forCells(map, x - radius, y - radius, x + radius, y + radius, (i, cx, cy) => {
     const t = map.grid[i];
     if (t === T.open || map.wire[i] > 0) return;
     if ((cx - x) ** 2 + (cy - y) ** 2 > radius * radius) return;
     const s = score(cx, cy, t);
-    if (s > bestScore) { bestScore = s; best = { x: cx, y: cy }; }
+    if (s > bestScore || (mirror && s === bestScore)) { bestScore = s; best = { x: cx, y: cy }; }
   });
   return best;
 }

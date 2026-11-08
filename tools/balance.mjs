@@ -1,6 +1,7 @@
 // AI vs AI balance runs. Every seed is played twice with the two AI profiles
 // swapped between ISA and the Helghast, so a profile's win rate is not just
-// the map (or turn order) favouring one side.
+// the map (or turn order) favouring one side. With the same profile on both
+// sides every game gets its own map, so N seeds means 2N distinct battles.
 //
 //   node tools/balance.mjs [seeds] [profileA] [profileB]
 //   node tools/balance.mjs 10 standard aggressive
@@ -14,10 +15,14 @@ const B = process.argv[4] || 'standard';
 
 const tally = { sides: [0, 0], draws: 0, profiles: { [A + ' (A)']: 0, [B + ' (B)']: 0 }, margins: {}, reasons: {}, length: 0, games: 0, tanks: 0 };
 const t0 = Date.now();
+// With the same profile on both sides, swapping them would just replay the
+// identical game, so each run uses its own map instead.
+const same = A === B;
 for (let seed = 1; seed <= seeds; seed++) {
   for (const swap of [false, true]) {
     const profiles = swap ? [B, A] : [A, B];
-    const m = createMatch({ seed, controllers: [createAI(0, profiles[0]), createAI(1, profiles[1])] });
+    const mapSeed = same ? seed * 2 - (swap ? 0 : 1) : seed;
+    const m = createMatch({ seed: mapSeed, controllers: [createAI(0, profiles[0]), createAI(1, profiles[1])] });
     const r = runToEnd(m);
     tally.games++;
     tally.length += r.durationSec;
@@ -30,7 +35,7 @@ for (let seed = 1; seed <= seeds; seed++) {
       const winnerIsA = (r.winner === 0) !== swap;
       tally.profiles[winnerIsA ? A + ' (A)' : B + ' (B)']++;
     }
-    console.log(`seed ${String(seed).padStart(3)} ${swap ? 'swapped' : 'normal '}  ISA ${profiles[0].padEnd(10)} vs Helghast ${profiles[1].padEnd(10)}  winner ${r.winner === null ? 'draw' : r.winner === 0 ? 'ISA     ' : 'Helghast'}  ${r.margin.padEnd(8)} ${r.reason.padEnd(6)} ${String(r.durationSec).padStart(3)}s  score ${r.scores.join('-')}  dead ${r.casualties.join('/')}`);
+    console.log(`seed ${String(mapSeed).padStart(3)} ${swap ? 'swapped' : 'normal '}  ISA ${profiles[0].padEnd(10)} vs Helghast ${profiles[1].padEnd(10)}  winner ${r.winner === null ? 'draw' : r.winner === 0 ? 'ISA     ' : 'Helghast'}  ${r.margin.padEnd(8)} ${r.reason.padEnd(6)} ${String(r.durationSec).padStart(3)}s  score ${r.scores.join('-')}  dead ${r.casualties.join('/')}`);
   }
 }
 const pct = (n) => `${Math.round((100 * n) / tally.games)}%`;

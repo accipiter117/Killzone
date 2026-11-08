@@ -68,7 +68,7 @@ function formUp(state, sq, list, dest, snapCover) {
     let y = clamp(dest.y + ox * sa + oy * ca, 5, H - 5);
     if (snapCover && coverName(state, x, y) === 'open') {
       // Nearby cover, preferring cover on higher ground.
-      const cv = findCover(state.map, x, y, 22, (cx, cy) => -Math.hypot(cx - x, cy - y) + state.cfg.squad.highCoverBonus * heightAt(state.map, cx, cy));
+      const cv = findCover(state.map, x, y, 22, (cx, cy) => -Math.hypot(cx - x, cy - y) + state.cfg.squad.highCoverBonus * heightAt(state.map, cx, cy), s.side === 1);
       if (cv) { x = cv.x; y = cv.y; }
     }
     // On broken ground a soldier's own spot can be across a cliff from
@@ -203,7 +203,7 @@ export function thinkSquad(state, sq) {
     return;
   }
   if (order.type === 'hold') {
-    if (!sq.holdSpot) sq.holdSpot = findCover(state.map, c.x, c.y, 90, (x, y) => -Math.hypot(x - c.x, y - c.y) + 2.5 * state.cfg.squad.highCoverBonus * heightAt(state.map, x, y)) || c;
+    if (!sq.holdSpot) sq.holdSpot = findCover(state.map, c.x, c.y, 90, (x, y) => -Math.hypot(x - c.x, y - c.y) + 2.5 * state.cfg.squad.highCoverBonus * heightAt(state.map, x, y), sq.side === 1) || c;
     const there = dist(c, sq.holdSpot) < cfg.squad.arriveDist * 1.5;
     sq.mode = 'hold';
     sq.status = there ? (firing ? 'Dug in, firing' : 'Dug in') : 'Moving to cover';
@@ -233,7 +233,7 @@ function advance(state, sq, pl, list, c, firing) {
     // Recon hangs back behind the platoon's goal and spots for everyone.
     const back = goal.x - dir * sc.reconBackoff;
     goal = { x: sq.side === 0 ? Math.max(back, 140) : Math.min(back, state.map.width - 140), y: goal.y };
-    const cv = findCover(state.map, goal.x, goal.y, 70, (x, y) => -Math.hypot(x - goal.x, y - goal.y));
+    const cv = findCover(state.map, goal.x, goal.y, 70, (x, y) => -Math.hypot(x - goal.x, y - goal.y), sq.side === 1);
     if (cv) goal = cv;
   }
   const d = dist(c, goal);
@@ -331,7 +331,7 @@ function advance(state, sq, pl, list, c, firing) {
 
   // Under fire, cautious squads drop into cover before carrying on.
   if (sq.supp > st.coverAt) {
-    const cv = findCover(state.map, c.x, c.y, 60, (x, y) => -Math.hypot(x - c.x, y - c.y));
+    const cv = findCover(state.map, c.x, c.y, 60, (x, y) => -Math.hypot(x - c.x, y - c.y), sq.side === 1);
     if (cv) {
       sq.mode = 'cover';
       sq.status = 'Taking cover';
@@ -352,7 +352,7 @@ function advance(state, sq, pl, list, c, firing) {
     if (slowest < Infinity && dir * c.x - slowest > sc.platoonLead) {
       sq.mode = 'wait';
       sq.status = 'Waiting for the platoon';
-      const cv = findCover(state.map, c.x, c.y, 40, (x, y) => -Math.hypot(x - c.x, y - c.y));
+      const cv = findCover(state.map, c.x, c.y, 40, (x, y) => -Math.hypot(x - c.x, y - c.y), sq.side === 1);
       if (cv) formUp(state, sq, list, cv, true); else stopAll(list);
       return;
     }
@@ -363,7 +363,7 @@ function advance(state, sq, pl, list, c, firing) {
     // check moves them up a bound now and then so they keep pace.
     sq.mode = 'suppress';
     sq.status = 'Suppressing';
-    const cv = findCover(state.map, c.x, c.y, 50, (x, y) => -Math.hypot(x - c.x, y - c.y));
+    const cv = findCover(state.map, c.x, c.y, 50, (x, y) => -Math.hypot(x - c.x, y - c.y), sq.side === 1);
     if (cv) formUp(state, sq, list, cv, true); else stopAll(list);
     return;
   }
@@ -399,7 +399,7 @@ function advance(state, sq, pl, list, c, firing) {
       const prog = (x - c.x) * ux + (y - c.y) * uy;
       if (prog < sc.boundMin * 0.6) return -Infinity;
       return prog - Math.abs((x - c.x) * uy - (y - c.y) * ux) * 0.6;
-    });
+    }, sq.side === 1);
     sq.bound = cv && dist(cv, next) < dist(c, next) ? cv : probe;
     sq.pauseUntil = 0;
     sq.mode = 'move';
