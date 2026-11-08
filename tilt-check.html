@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tilted View Check</title>
+  <style>
+    /* Field manual plate, as the tank check: parchment page, stencilled labels. */
+    :root {
+      --page: #ece6d6; --ink: #221e17; --muted: #6d6656; --accent: #3f7fd0;
+      --display: "Black Ops One", "Impact", "Arial Narrow", sans-serif;
+      --body: "IBM Plex Sans", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+    }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #15130f; --ink: #ece6d6; --muted: #a39b88; --accent: #7fb6ff; color-scheme: dark; } }
+    :root[data-theme="dark"] { --page: #15130f; --ink: #ece6d6; --muted: #a39b88; --accent: #7fb6ff; color-scheme: dark; }
+    body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.5 var(--body); padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+    main { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+    h1 { font: 400 30px/1.1 var(--display); letter-spacing: 0.04em; margin: 0; text-wrap: balance; }
+    h2 { font: 400 20px/1.2 var(--display); letter-spacing: 0.05em; margin: 0 0 8px; }
+    .lede, .note { color: var(--muted); max-width: 66ch; margin: 6px 0 0; }
+    .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+    figure { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    figcaption { font: 12px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    figure.new figcaption { color: var(--accent); }
+    canvas { display: block; width: 100%; height: auto; border-radius: 8px; image-rendering: pixelated; background: #3f3b2d; }
+    ul { color: var(--muted); margin: 6px 0 0; padding-left: 20px; max-width: 70ch; }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Tilted view check</h1>
+      <p class="lede">The same battlefield, same units, drawn two ways: as now, and tilted into a three quarter view so hills, ruins, trenches and craters stand up off the ground. Only the picture changes; the rules stay the same.</p>
+      <ul>
+        <li>Raised ground lifts up the screen with a tall banded cliff face, and anyone standing on it is lifted with it.</li>
+        <li>Ruins become walls with height: lit tops, shaded fronts, window gaps, long shadows.</li>
+        <li>Trenches show their planked far wall and floor; craters are bowls.</li>
+        <li>A little more ground life (tyre ruts, grass tufts, pebbles) but still quiet so units read clearly.</li>
+      </ul>
+    </header>
+    <section>
+      <h2>Hill B and its ruins</h2>
+      <div class="pair" id="b"></div>
+    </section>
+    <section>
+      <h2>Objective A ruins</h2>
+      <div class="pair" id="a"></div>
+    </section>
+    <section>
+      <h2>A ridge: troops on top, troops below</h2>
+      <div class="pair" id="s"></div>
+    </section>
+    <section>
+      <h2>ISA trench line and the wire</h2>
+      <div class="pair" id="t"></div>
+    </section>
+    <p class="note">Units are at the battle's normal sprite scale. In the real game the camera zooms, so close up looks like these and zoomed out reads as a tilted table.</p>
+  </main>
+
+  <script type="module">
+    import { CONFIG } from './src/config.js';
+    import { generateMap } from './src/sim/map.js';
+    import { seedFrom } from './src/sim/rng.js';
+    import { buildTerrain } from './src/render/terrain.js';
+    import { buildTiltTerrain, liftAt } from './src/render/terrain-tilt.js';
+    import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './src/render/pixel-troopers.js';
+    import { getTank, TANK_W, TANK_H, TANK_FOOT } from './src/render/tanks.js';
+
+    const seed = seedFrom('12');
+    const map = generateMap(seed, CONFIG);
+    const flat = buildTerrain(map, seed);
+    const tilt = buildTiltTerrain(map, seed);
+    const S = 0.42; // battle sprite scale
+    const SC = 2; // page zoom
+
+    // Units placed by hand on the real map, as a battle might look.
+    const squad = (side, role, x, y, n = 5) => Array.from({ length: n }, (_, k) => ({ kind: 'trooper', side, role, x: x + (k % 2) * 13 - 6 + (k - 2) * 2, y: y + (k - 2) * 10 }));
+    const units = [
+      ...squad('isa', 'rifle', 1490, 548), ...squad('isa', 'heavy', 1440, 600), ...squad('hgh', 'assault', 1640, 640), ...squad('hgh', 'rifle', 1590, 470),
+      { kind: 'tank', side: 'isa', x: 1360, y: 640, facing: 1 },
+      ...squad('isa', 'engineer', 1010, 300), ...squad('hgh', 'heavy', 1140, 210), ...squad('isa', 'recon', 960, 240),
+      ...squad('isa', 'rifle', 330, 520), ...squad('isa', 'heavy', 345, 610), ...squad('hgh', 'jump', 560, 560),
+      { kind: 'tank', side: 'hgh', x: 600, y: 660, facing: -1 },
+      ...squad('isa', 'rifle', 760, 350), ...squad('isa', 'heavy', 860, 340), ...squad('isa', 'assault', 700, 480), ...squad('hgh', 'infiltrator', 940, 470),
+      { kind: 'tank', side: 'isa', x: 640, y: 500, facing: 1 },
+    ];
+
+    function draw(canvas, terrain, crop, tilted) {
+      const [x0, y0, w, h] = crop;
+      canvas.width = w * SC; canvas.height = h * SC;
+      const g = canvas.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      g.setTransform(SC, 0, 0, SC, -x0 * SC, -y0 * SC);
+      g.drawImage(terrain.canvas, 0, 0);
+      // Wire, drawn live in the game.
+      g.strokeStyle = '#1e1c19'; g.lineWidth = 1.3; g.beginPath();
+      for (let i = 0; i < map.wire.length; i++) {
+        if (!map.wire[i]) continue;
+        const cx = (i % map.cols) * map.cell, cy = Math.floor(i / map.cols) * map.cell;
+        if (cx < x0 - 20 || cx > x0 + w + 20) continue;
+        const s = 10, ox = (i * 7) % 4, oy = (i * 13) % 4;
+        g.moveTo(cx + ox, cy + oy); g.lineTo(cx + ox + s, cy + oy + s); g.moveTo(cx + ox + s, cy + oy); g.lineTo(cx + ox, cy + oy + s);
+      }
+      g.stroke();
+      const list = units.filter((u) => u.x > x0 - 60 && u.x < x0 + w + 60 && u.y > y0 - 40 && u.y < y0 + h + 80).sort((a, b) => a.y - b.y);
+      for (const u of list) {
+        const lift = tilted ? liftAt(map, u.x, u.y) : 0;
+        const y = u.y - lift;
+        if (u.kind === 'tank') {
+          const fx = u.facing === 1 ? TANK_FOOT[0] : TANK_W - TANK_FOOT[0];
+          g.fillStyle = 'rgba(15,12,8,0.35)'; g.beginPath(); g.ellipse(u.x, y, 96 * S, 16 * S, 0, 0, 7); g.fill();
+          g.drawImage(getTank(u.side, 'idle', u.facing), u.x - fx * S, y - TANK_FOOT[1] * S, TANK_W * S, TANK_H * S);
+        } else {
+          const facing = u.side === 'isa' ? 1 : -1;
+          const fx = facing === 1 ? PT_FOOT[0] : PT_W - 1 - PT_FOOT[0];
+          g.fillStyle = 'rgba(15,12,8,0.35)'; g.beginPath(); g.ellipse(u.x, y + 0.5, 6 * S * 2.4, 2.6 * S * 2.4, 0, 0, 7); g.fill();
+          g.drawImage(getPixelTrooper(u.side, u.role === 'jump' ? 'fly1' : 'stand', facing, u.role), u.x - fx * S, y - PT_FOOT[1] * S - (u.role === 'jump' ? 16 * S : 0), PT_W * S, PT_H * S);
+        }
+      }
+    }
+
+    for (const [id, crop] of [['b', [1290, 400, 440, 300]], ['a', [890, 90, 380, 270]], ['s', [560, 250, 440, 300]], ['t', [220, 430, 440, 300]]]) {
+      const host = document.getElementById(id);
+      for (const [label, terrain, tilted] of [['Now', flat, false], ['Tilted', tilt, true]]) {
+        const fig = document.createElement('figure');
+        if (tilted) fig.className = 'new';
+        const c = document.createElement('canvas');
+        const cap = document.createElement('figcaption');
+        cap.textContent = label;
+        fig.append(c, cap);
+        host.append(fig);
+        draw(c, terrain, crop, tilted);
+      }
+    }
+  </script>
+</body>
+</html>

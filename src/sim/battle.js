@@ -42,7 +42,7 @@ export function createBattle(seed, options = {}) {
     cfg.platoons.forEach((roles, pi) => {
       const pl = {
         id: state.platoons.length, side, index: pi, name: PLATOON_NAMES[pi],
-        squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, breakBase: 0, paidTick: -1, brokeTick: 0, size: roles.length * cfg.soldiersPerSquad,
+        squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, breakBase: 0, paidTick: -1, brokeTick: 0, focus: -1, focusUntil: 0, size: roles.length * cfg.soldiersPerSquad,
       };
       state.platoons.push(pl);
       const baseY = H * cfg.deploy.spreadY[pi];

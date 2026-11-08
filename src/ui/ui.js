@@ -181,10 +181,11 @@ export function updateUI(ui, state, view) {
   if (sel) {
     e.trayTitle.textContent = sel.name;
     const head = platoonHeadline(state, sel);
-    e.traySub.textContent = `${state.cfg.stances[sel.stance].label} \u00b7 ${Math.round(platoonStrength(state, sel) * 100)}% \u00b7 ${head}`;
+    const focus = sel.focus >= 0 && state.tick < sel.focusUntil ? ` \u00b7 Focus ${state.cfg.roles[state.squads[sel.focus].role].label}` : '';
+    e.traySub.textContent = `${state.cfg.stances[sel.stance].label} \u00b7 ${Math.round(platoonStrength(state, sel) * 100)}% \u00b7 ${head}${focus}`;
     e.traySub.classList.toggle('pinned', head.startsWith('Pinned') || head === 'Routing');
     const free = Math.ceil(amendWindow(state, sel) / state.cfg.tickRate);
-    e.trayHint.textContent = free > 0 ? `Tap again to change, free (${free}s)` : 'Tap: ground to move, objective to take';
+    e.trayHint.textContent = free > 0 ? `Tap again to change, free (${free}s)` : 'Tap ground, an objective or an enemy';
   } else if (open) {
     e.trayTitle.textContent = 'Tank';
     e.traySub.textContent = `${Math.ceil((100 * tank.hp) / tank.maxHp)}% \u00b7 ${tank.alive ? tank.status : 'Knocked out'}`;

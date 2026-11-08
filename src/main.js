@@ -252,6 +252,19 @@ function tankHit(v, w) {
   return Math.abs(w.x - v.x) < r && w.y < v.y + 12 * ps && w.y > v.y - 100 * ps;
 }
 
+// The visible enemy soldier under a tap (aimed at the chest, like your own).
+function enemyAt(st, w) {
+  const px = 1 / game.cam.z;
+  const lift = bodyLift();
+  let best = null, bd = 16 * px;
+  for (const s of st.soldiers) {
+    if (s.side === PLAYER || !isActive(s) || !st.sides[PLAYER].spotted[s.id]) continue;
+    const d = Math.hypot(s.x - w.x, s.y - lift - w.y);
+    if (d < bd) { bd = d; best = s; }
+  }
+  return best;
+}
+
 function onTap(sx, sy) {
   const st = game.match.state;
   const w = toWorld(game.cam, sx, sy);
@@ -287,6 +300,15 @@ function onTap(sx, sy) {
     }
     if (game.selected !== null) {
       const pl = st.platoons[game.selected];
+      // Tapping an enemy soldier you can see: focus fire on their squad.
+      const foe = enemyAt(st, w);
+      if (foe) {
+        if (order('focus', { platoon: pl.id, target: foe.squad })) {
+          const role = st.cfg.roles[st.squads[foe.squad].role].label;
+          toast(ui, `${pl.name}: focus fire`, `All three squads shoot the Helghast ${role} squad first while they can see it.`);
+        }
+        return;
+      }
       const site = siteAt(st, w);
       // Move orders snap to the centre of a grid tile (Bad North style), so
       // where the platoon will stand is clear and taps land cleanly.
