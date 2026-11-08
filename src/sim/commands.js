@@ -4,7 +4,7 @@
 
 import { clamp, isActive } from './util.js';
 import { T, cellIndex } from './map.js';
-import { resetPlans, thinkSquad } from './squads.js';
+import { resetPlans, resetSquadPlan, thinkSquad } from './squads.js';
 import { callArtillery, dropSmoke } from './features.js';
 import { useAbility } from './abilities.js';
 import { mainGunTarget, shell } from './vehicles.js';
@@ -53,7 +53,7 @@ function reinforce(state, pl) {
   return { ok: true };
 }
 
-export const COMMAND_TYPES = ['move', 'take', 'hold', 'fallback', 'stance', 'artillery', 'smoke', 'ability', 'reinforce', 'vmove', 'vability', 'focus'];
+export const COMMAND_TYPES = ['move', 'take', 'hold', 'fallback', 'stance', 'artillery', 'smoke', 'ability', 'reinforce', 'vmove', 'vability', 'focus', 'squad'];
 
 const fail = (reason) => ({ ok: false, reason });
 
@@ -81,7 +81,7 @@ function applyInner(state, cmd) {
   if (!sd) return fail('Unknown side');
 
   let pl = null;
-  if (['move', 'take', 'hold', 'fallback', 'stance', 'ability', 'reinforce', 'focus'].includes(type)) {
+  if (['move', 'take', 'hold', 'fallback', 'stance', 'ability', 'reinforce', 'focus', 'squad'].includes(type)) {
     pl = state.platoons[p.platoon];
     if (!pl || pl.side !== side) return fail('Not your platoon');
     // A platoon regrouping after breaking can still be reinforced.
@@ -96,7 +96,16 @@ function applyInner(state, cmd) {
     v = state.vehicles.find((o) => o.side === side);
     if (!v || !v.alive) return fail('Your tank has been destroyed');
   }
-  const amending = (MOVES.includes(type) && amendWindow(state, pl) > 0) || (type === 'vmove' && amendWindow(state, v) > 0);
+  // Squad orders: params.role picks the squad, params.what is move, take,
+  // hold or rejoin (back to the platoon's goal, free).
+  let sq = null;
+  if (type === 'squad') {
+    sq = pl.squads.map((id) => state.squads[id]).find((q) => q.role === p.role);
+    if (!sq || sq.mode === 'dead') return fail('No such squad in that platoon');
+    if (p.what === 'rejoin') cost = 0;
+  }
+  const amending = (MOVES.includes(type) && amendWindow(state, pl) > 0) || (type === 'vmove' && amendWindow(state, v) > 0)
+    || (type === 'squad' && p.what !== 'rejoin' && amendWindow(state, sq) > 0);
   if (amending) cost = 0;
   if (sd.op + 1e-9 < cost) return fail('Not enough order points');
   const W = state.map.width, H = state.map.height;
@@ -151,6 +160,19 @@ function applyInner(state, cmd) {
       if (!sq) return fail('No such squad in that platoon');
       const res = useAbility(state, sq);
       if (!res.ok) return res;
+      break;
+    }
+    case 'squad': {
+      let o = null;
+      if (p.what === 'move') { const pt = point(); if (!pt) return fail('Bad position'); o = { type: 'move', ...pt }; }
+      else if (p.what === 'take') { const site = state.sites.find((s) => s.id === p.site); if (!site) return fail('Unknown objective'); o = { type: 'take', siteId: site.id, x: site.x, y: site.y }; }
+      else if (p.what === 'hold') o = { type: 'hold' };
+      else if (p.what !== 'rejoin') return fail('Unknown squad order');
+      if (p.what === 'rejoin' && !sq.order) return fail('That squad is already with its platoon');
+      if (o && !amending) sq.paidTick = state.tick;
+      sq.order = o;
+      resetSquadPlan(state, sq);
+      thinkSquad(state, sq);
       break;
     }
     case 'focus': {

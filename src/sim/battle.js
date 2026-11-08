@@ -52,7 +52,7 @@ export function createBattle(seed, options = {}) {
           supp: 0, pinned: false, lastHitTick: -9999, lastFiredTick: -9999, tally: {},
           mode: 'idle', status: 'Awaiting orders', bound: null, pauseUntil: 0, holdSpot: null, flankDone: false, waitSince: -1, cx: 0, cy: 0,
           bestD: Infinity, bestTick: 0, pushUntil: 0, path: null, pathTo: null, pathTick: 0,
-          abilityReady: 0, barrageUntil: 0, chargeUntil: 0, chargeTarget: -1, diveUntil: 0, diveTarget: null, vanishUntil: 0, breachUntil: 0, breachVehicle: -1,
+          order: null, paidTick: -1, abilityReady: 0, barrageUntil: 0, chargeUntil: 0, chargeTarget: -1, diveUntil: 0, diveTarget: null, vanishUntil: 0, breachUntil: 0, breachVehicle: -1,
         };
         state.squads.push(sq);
         pl.squads.push(sq.id);

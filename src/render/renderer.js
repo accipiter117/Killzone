@@ -264,7 +264,18 @@ function drawGrid(g, state, cam, opts, px) {
     }
   }
   const pl = opts.selected !== null && opts.selected !== undefined ? state.platoons[opts.selected] : null;
-  if (!pl || pl.order.type !== 'move') return;
+  if (!pl) return;
+  const sq = opts.scope !== null && opts.scope !== undefined ? state.squads[opts.scope] : null;
+  if (sq && sq.order && sq.order.type === 'move') {
+    const cx = Math.floor(sq.order.x / t) * t, cy = Math.floor(sq.order.y / t) * t;
+    g.fillStyle = 'rgba(170,255,170,0.14)';
+    g.fillRect(cx, cy, t, t);
+    g.strokeStyle = 'rgba(170,255,170,0.65)';
+    g.lineWidth = 1.5 * px;
+    g.strokeRect(cx + px, cy + px, t - 2 * px, t - 2 * px);
+    return;
+  }
+  if (pl.order.type !== 'move') return;
   // The platoon's tile and the ones above and below (one per squad).
   const cx = Math.floor(pl.order.x / t) * t, cy = Math.floor(pl.order.y / t) * t;
   for (const k of [-1, 0, 1]) {
@@ -279,20 +290,31 @@ function drawGrid(g, state, cam, opts, px) {
 function drawOrderLine(g, state, opts, px) {
   if (opts.selected === null || opts.selected === undefined) return;
   const pl = state.platoons[opts.selected];
-  if (!pl || (pl.order.type !== 'move' && pl.order.type !== 'take')) return;
-  const c = platoonCentre(state, pl);
-  if (!c) return;
-  g.strokeStyle = pl.order.type === 'take' ? 'rgba(255,224,120,0.8)' : 'rgba(170,255,170,0.8)';
-  g.lineWidth = 2 * px;
-  g.setLineDash([10 * px, 8 * px]);
-  g.beginPath();
-  g.moveTo(c.x, c.y);
-  g.lineTo(pl.order.x, pl.order.y);
-  g.stroke();
-  g.setLineDash([]);
-  g.beginPath();
-  g.arc(pl.order.x, pl.order.y, 6 * px, 0, Math.PI * 2);
-  g.stroke();
+  if (!pl) return;
+  const line = (from, o, faint) => {
+    if (!from || (o.type !== 'move' && o.type !== 'take')) return;
+    g.strokeStyle = o.type === 'take' ? `rgba(255,224,120,${faint ? 0.45 : 0.8})` : `rgba(170,255,170,${faint ? 0.45 : 0.8})`;
+    g.lineWidth = (faint ? 1.5 : 2) * px;
+    g.setLineDash([10 * px, 8 * px]);
+    g.beginPath();
+    g.moveTo(from.x, from.y);
+    g.lineTo(o.x, o.y);
+    g.stroke();
+    g.setLineDash([]);
+    g.beginPath();
+    g.arc(o.x, o.y, 6 * px, 0, Math.PI * 2);
+    g.stroke();
+  };
+  // The platoon's shared goal from the squads still following it, then a
+  // line of its own for each squad sent somewhere else.
+  const withPlatoon = pl.squads.map((id) => state.squads[id]).filter((q) => !q.order).flatMap((q) => members(state, q));
+  line(withPlatoon.length ? centroid(withPlatoon) : null, pl.order, opts.scope !== null && opts.scope !== undefined);
+  for (const id of pl.squads) {
+    const q = state.squads[id];
+    if (!q.order) continue;
+    const ms = members(state, q);
+    line(ms.length ? centroid(ms) : null, q.order, opts.scope !== null && opts.scope !== undefined && opts.scope !== q.id);
+  }
 }
 
 // World units per sprite pixel: near true size close up, never smaller than
@@ -428,8 +450,9 @@ function drawSoldiers(g, r, state, opts, px) {
     g.ellipse(s.x, s.y + 0.5 * ps, 6 * ps * foot, 2.6 * ps * foot, 0, 0, Math.PI * 2);
     g.fill();
     if (sel === sq.platoon) {
-      g.strokeStyle = 'rgba(255,240,170,0.9)';
-      g.lineWidth = 1.6 * px;
+      const dim = opts.scope !== null && opts.scope !== undefined && opts.scope !== sq.id;
+      g.strokeStyle = dim ? 'rgba(255,240,170,0.3)' : 'rgba(255,240,170,0.9)';
+      g.lineWidth = (dim ? 1 : 1.6) * px;
       g.beginPath();
       g.ellipse(s.x, s.y + 0.5 * ps, 8 * ps * foot, 3.6 * ps * foot, 0, 0, Math.PI * 2);
       g.stroke();

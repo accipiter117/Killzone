@@ -55,7 +55,7 @@ export const CONFIG = {
     regenSec: 6, // seconds per order point
     amendSec: 5, // a movement order can be changed free for this long after giving it
     commsRegenMult: 1.75, // owning the comms post speeds refill by this much
-    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0, focus: 1 },
+    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0, focus: 1, squad: 1 },
   },
 
   // Squad roles. range/sight in world units, fireInterval in seconds,

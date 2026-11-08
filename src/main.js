@@ -35,7 +35,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
   watch: store.get('watch', false), labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), lengthSec: store.get('length', 600),
-  replay: false, original: null, paused: false, speed: 1, selected: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
+  replay: false, original: null, paused: false, speed: 1, selected: null, scope: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
 window.__kz = game; // handy for debugging and browser tests
@@ -54,6 +54,7 @@ const ui = createUI({
       if (game.watch || !v.alive) { centreOn(game.cam, v.x, v.y); return; }
       game.vehicle = !game.vehicle;
       game.selected = null;
+      game.scope = null;
       game.armed = null;
       game.release = null;
       if (game.vehicle) focusPoint(v.x, v.y);
@@ -61,6 +62,7 @@ const ui = createUI({
     }
     game.vehicle = false;
     game.release = null;
+    game.scope = null;
     const pl = game.match.state.platoons.filter((p) => p.side === PLAYER)[i];
     if (!pl || game.replay) return;
     if (game.watch) { focusPlatoon(pl); return; }
@@ -79,6 +81,16 @@ const ui = createUI({
     }
   },
   closeTray() { deselect(); },
+  setScope(id) {
+    game.scope = id;
+    game.release = null;
+  },
+  rejoin() {
+    if (game.replay || game.watch || game.scope === null) return;
+    const st = game.match.state;
+    const sq = st.squads[game.scope];
+    if (order('squad', { platoon: sq.platoon, role: sq.role, what: 'rejoin' })) game.scope = null;
+  },
   toggleMinimap() {
     game.minimap = !game.minimap;
     store.set('minimap', game.minimap);
@@ -177,6 +189,11 @@ function action(act) {
     return;
   }
   if (!pl) { toast(ui, 'Select a platoon first', 'Tap one of the platoon chips, bottom left.'); return; }
+  if (act === 'hold' && game.scope !== null) {
+    const sq = st.squads[game.scope];
+    if (order('squad', { platoon: pl.id, role: sq.role, what: 'hold' })) releaseAfterOrder('squad', sq.id);
+    return;
+  }
   if (act === 'hold' || act === 'fallback') order(act, { platoon: pl.id });
   if (act === 'reinforce' && order('reinforce', { platoon: pl.id })) toast(ui, 'Reinforcements', `Fresh soldiers are on their way to ${pl.name}'s weakest squad.`);
   if (act === 'stance') {
@@ -190,6 +207,7 @@ function action(act) {
 
 function deselect() {
   game.selected = null;
+  game.scope = null;
   game.vehicle = false;
   game.armed = null;
   game.release = null;
@@ -277,10 +295,10 @@ function onTap(sx, sy) {
       return;
     }
     const badge = game.renderer.badges.find((b) => b.side === PLAYER && Math.hypot(b.x - sx, b.y - sy) < 20);
-    if (badge) { game.selected = badge.platoon; game.vehicle = false; game.release = null; return; }
+    if (badge) { game.selected = badge.platoon; game.scope = null; game.vehicle = false; game.release = null; return; }
     // Tapping your own tank selects it.
     const mine = st.vehicles.find((v) => v.side === PLAYER && v.alive);
-    if (mine && !game.vehicle && tankHit(mine, w)) { game.vehicle = true; game.selected = null; game.release = null; return; }
+    if (mine && !game.vehicle && tankHit(mine, w)) { game.vehicle = true; game.selected = null; game.scope = null; game.release = null; return; }
     let near = null, nd = 18 * px;
     const lift = bodyLift();
     for (const s of st.soldiers) {
@@ -290,7 +308,9 @@ function onTap(sx, sy) {
     }
     if (near) {
       const pid = st.squads[near.squad].platoon;
-      if (pid !== game.selected) { game.selected = pid; game.vehicle = false; game.release = null; return; }
+      if (pid !== game.selected) { game.selected = pid; game.scope = null; game.vehicle = false; game.release = null; return; }
+      // A soldier of the selected platoon: pick their squad for squad orders.
+      if (near.squad !== game.scope) { game.scope = near.squad; game.release = null; return; }
     }
     if (game.vehicle && mine) {
       const t = CONFIG.ui.tile;
@@ -314,8 +334,15 @@ function onTap(sx, sy) {
       // where the platoon will stand is clear and taps land cleanly.
       const t = CONFIG.ui.tile;
       const snap = game.grid ? { x: Math.floor(w.x / t) * t + t / 2, y: Math.floor(w.y / t) * t + t / 2 } : w;
-      const ok = site ? order('take', { platoon: pl.id, site: site.id }) : order('move', { platoon: pl.id, x: snap.x, y: snap.y });
-      if (ok) releaseAfterOrder('platoon', pl.id);
+      const scoped = game.scope !== null ? st.squads[game.scope] : null;
+      let ok;
+      if (scoped) {
+        ok = site ? order('squad', { platoon: pl.id, role: scoped.role, what: 'take', site: site.id }) : order('squad', { platoon: pl.id, role: scoped.role, what: 'move', x: snap.x, y: snap.y });
+        if (ok) releaseAfterOrder('squad', scoped.id);
+      } else {
+        ok = site ? order('take', { platoon: pl.id, site: site.id }) : order('move', { platoon: pl.id, x: snap.x, y: snap.y });
+        if (ok) releaseAfterOrder('platoon', pl.id);
+      }
       if (ok && !site) { game.marker = { x: snap.x, y: snap.y, t0: performance.now() / 1000, colour: '#aaffaa' }; return; }
       if (ok) game.marker = { x: site ? site.x : w.x, y: site ? site.y : w.y, t0: performance.now() / 1000, colour: site ? '#ffe078' : '#aaffaa' };
       return;
@@ -507,8 +534,8 @@ function frame(t) {
   if (game.vehicle && !st.vehicles.some((v) => v.side === PLAYER && v.alive)) game.vehicle = false;
   if (game.release) {
     const r = game.release;
-    const target = r.kind === 'tank' ? st.vehicles[r.id] : st.platoons[r.id];
-    const still = r.kind === 'tank' ? game.vehicle : game.selected === r.id;
+    const target = r.kind === 'tank' ? st.vehicles[r.id] : r.kind === 'squad' ? st.squads[r.id] : st.platoons[r.id];
+    const still = r.kind === 'tank' ? game.vehicle : r.kind === 'squad' ? game.scope === r.id : game.selected === r.id;
     if (!still) game.release = null;
     else if (amendWindow(st, target) <= 0) deselect();
   }
@@ -516,11 +543,11 @@ function frame(t) {
   prune(game.fxs, now);
   const shake = shakeOffset(game.fxs, dt);
   const reveal = game.watch || game.replay;
-  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, vehicleSelected: game.vehicle, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null) };
+  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, scope: game.scope, vehicleSelected: game.vehicle, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null) };
   drawFrame(g, game.renderer, st, game.cam, view);
   if (game.minimap && miniCanvas.width > 0) drawMinimap(mg, game.renderer, st, game.cam, view);
   updateUI(ui, st, {
-    now, playerSide: PLAYER, selected: game.selected, vehicle: game.vehicle, armed: game.armed, paused: game.paused, speed: game.speed,
+    now, playerSide: PLAYER, selected: game.selected, scope: game.scope, vehicle: game.vehicle, armed: game.armed, paused: game.paused, speed: game.speed,
     replay: game.replay, watch: game.watch, hint: hintText(),
     banner: game.replay ? 'REPLAY' : game.watch ? 'WATCH MODE' : game.planning ? 'PLANNING' : game.paused ? 'PAUSED' : slow ? 'SLOW MOTION' : '',
   });

@@ -25,7 +25,7 @@ export function createUI(handlers) {
       cards: $('#cards'), squads: $('#squads'), feed: $('#feed'), hint: $('#hint'), toast: $('#toast'), banner: $('#banner'),
       actions: Object.fromEntries([...document.querySelectorAll('#stage button[data-act]')].map((b) => [b.dataset.act, b])),
       stanceLabel: $('#stance-label'), stage: $('#stage'),
-      tray: $('#tray'), trayTitle: $('#tray-title'), traySub: $('#tray-sub'), trayHint: $('#tray-hint'), trayCmds: $('#tray-cmds'),
+      tray: $('#tray'), trayTitle: $('#tray-title'), traySub: $('#tray-sub'), trayHint: $('#tray-hint'), trayCmds: $('#tray-cmds'), trayScope: $('#tray-scope'), trayRejoin: $('#tray-rejoin'),
     },
   };
   const e = ui.els;
@@ -44,6 +44,7 @@ export function createUI(handlers) {
   e.speed.addEventListener('click', handlers.cycleSpeed);
   $('#btn-menu').addEventListener('click', handlers.openMenu);
   $('#tray-close').addEventListener('click', handlers.closeTray);
+  $('#tray-rejoin').addEventListener('click', handlers.rejoin);
   $('#btn-minimap').addEventListener('click', handlers.toggleMinimap);
   e.toast.addEventListener('click', () => { e.toast.hidden = true; });
 
@@ -101,7 +102,7 @@ export function updateUI(ui, state, view) {
 
   // Selecting or letting go of a unit redraws straight away (the tray must
   // pop up on the tap, not a moment later).
-  const selKey = `${view.selected}|${view.vehicle}`;
+  const selKey = `${view.selected}|${view.vehicle}|${view.scope}`;
   if (ui.selKey !== selKey) { ui.selKey = selKey; ui.lastText = -1; }
   if (view.now - ui.lastText < 0.2) return;
   ui.lastText = view.now;
@@ -165,8 +166,22 @@ export function updateUI(ui, state, view) {
   if (ui.rowsFor !== key) {
     ui.rowsFor = key;
     e.squads.innerHTML = '';
+    e.trayScope.innerHTML = '';
     ui.rows = [];
+    ui.pills = [];
     e.trayCmds.hidden = !sel;
+    // Who the orders are for: the whole platoon, or one of its squads.
+    if (sel) {
+      const pill = (label, id) => {
+        const b = document.createElement('button');
+        b.textContent = label;
+        b.addEventListener('click', () => ui.handlers.setScope(id));
+        e.trayScope.appendChild(b);
+        ui.pills.push({ b, id });
+      };
+      pill('Platoon', null);
+      for (const id of sel.squads) pill(state.cfg.roles[state.squads[id].role].label, id);
+    }
     const add = (label, onClick, extra) => {
       const btn = document.createElement('button');
       btn.className = 'ab';
@@ -178,7 +193,27 @@ export function updateUI(ui, state, view) {
     if (sel) for (const id of sel.squads) { const sq = state.squads[id]; add('', () => ui.handlers.ability(sel.id, sq.role), { sq }); }
     else if (open) add('', () => ui.handlers.tankAbility(), { tank });
   }
-  if (sel) {
+  const scoped = sel && view.scope !== null && view.scope !== undefined ? state.squads[view.scope] : null;
+  for (const p of ui.pills || []) {
+    p.b.classList.toggle('on', (p.id ?? null) === (view.scope ?? null));
+    if (p.id !== null) {
+      const q = state.squads[p.id];
+      p.b.classList.toggle('away', !!q.order);
+      p.b.disabled = q.mode === 'dead' || !live;
+    }
+  }
+  // With one squad picked, only its orders and ability show.
+  for (const act of ['fallback', 'stance', 'reinforce']) e.actions[act].hidden = !!scoped;
+  e.trayRejoin.hidden = !(scoped && scoped.order);
+  e.trayRejoin.disabled = !live;
+  for (const r of ui.rows || []) if (r.sq) r.btn.hidden = !!scoped && r.sq !== scoped;
+  if (scoped) {
+    e.trayTitle.textContent = sel.name;
+    e.traySub.textContent = `${state.cfg.roles[scoped.role].label} squad \u00b7 ${scoped.order ? 'own orders' : 'with the platoon'} \u00b7 ${scoped.status}`;
+    e.traySub.classList.toggle('pinned', scoped.pinned);
+    const free = Math.ceil(amendWindow(state, scoped) / state.cfg.tickRate);
+    e.trayHint.textContent = free > 0 ? `Tap again to change, free (${free}s)` : `${state.cfg.roles[scoped.role].label} only: tap ground or an objective`;
+  } else if (sel) {
     e.trayTitle.textContent = sel.name;
     const head = platoonHeadline(state, sel);
     const focus = sel.focus >= 0 && state.tick < sel.focusUntil ? ` \u00b7 Focus ${state.cfg.roles[state.squads[sel.focus].role].label}` : '';
