@@ -124,6 +124,7 @@ export function callArtillery(state, side, x, y) {
   const a = state.cfg.artillery;
   const start = state.tick + Math.round(a.warningSec * state.cfg.tickRate);
   state.strikes.push({ side, x, y, start, shellsLeft: a.shells, nextTick: start });
+  state.events.push({ type: 'strike', side, x, y });
   const near = nearObjective(state, { x, y }, 400);
   feed(state, `${sideName(side)} artillery incoming${near ? ' near ' + near.id : ''}`, side);
 }

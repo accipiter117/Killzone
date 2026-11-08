@@ -13,6 +13,7 @@ import { createCamera, setViewport, toWorld, centreOn, clampCamera } from './ren
 import { buildTerrain } from './render/terrain.js';
 import { createRenderer, drawFrame, drawMinimap } from './render/renderer.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
+import { createAudio, unlockAudio, newFrame, playEvents, uiClick } from './render/audio.js';
 import { attachMapInput, attachMinimapInput } from './ui/input.js';
 import { createUI, updateUI, toast, flashOrderPoints, openOverlay, closeOverlay, showEnd, resetFeed } from './ui/ui.js';
 
@@ -37,6 +38,11 @@ const game = {
   acc: 0, last: performance.now(), dpr: 1,
 };
 window.__kz = game; // handy for debugging and browser tests
+const audio = createAudio();
+audio.enabled = store.get('sound', true);
+// Sound can only start after a touch; buttons click.
+document.addEventListener('pointerdown', () => unlockAudio(audio));
+document.addEventListener('click', (e) => { if (e.target.closest('button')) uiClick(audio); });
 
 const ui = createUI({
   selectCard(i) {
@@ -262,6 +268,7 @@ function openMenu() {
   document.getElementById('labels-toggle').checked = game.labelsAll;
   document.getElementById('view-select').value = game.view;
   document.getElementById('slowmo-toggle').checked = game.slowMo;
+  document.getElementById('sound-toggle').checked = audio.enabled;
   openOverlay('overlay-menu');
 }
 document.getElementById('overlay-menu').addEventListener('click', (e) => {
@@ -280,6 +287,10 @@ document.getElementById('watch-toggle').addEventListener('change', (e) => {
   if (!game.replay) game.match.controllers = controllersFor(game.watch);
   game.selected = null;
   game.armed = null;
+});
+document.getElementById('sound-toggle').addEventListener('change', (e) => {
+  audio.enabled = e.target.checked;
+  store.set('sound', audio.enabled);
 });
 document.getElementById('slowmo-toggle').addEventListener('change', (e) => {
   game.slowMo = e.target.checked;
@@ -344,6 +355,7 @@ function frame(t) {
   const st = m.state;
   const tickDt = 1 / st.cfg.tickRate;
   // Slow motion while giving orders, so there is time to think on a phone.
+  newFrame(audio);
   const slow = game.slowMo && !game.watch && !game.replay && (game.selected !== null || game.armed !== null);
   document.getElementById('stage').classList.toggle('slowmo', slow && !game.paused);
   if (!game.paused && !st.result) {
@@ -352,6 +364,7 @@ function frame(t) {
     while (game.acc >= tickDt && n < 16) {
       advance(m);
       ingest(game.fxs, st.events, now);
+      playEvents(audio, st.events, game.cam, PLAYER);
       game.acc -= tickDt;
       n++;
     }
