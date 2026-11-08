@@ -5,8 +5,8 @@
 import { fx } from './fx-random.js';
 
 export const COLOURS = {
-  isa: { body: '#6f9fd6', dark: '#2b4a70', light: '#d9e9fb', tracer: 'rgba(225,240,255,0.95)', flash: '#eaf4ff' },
-  hgh: { body: '#3d4046', dark: '#16171a', light: '#ff5a1f', tracer: 'rgba(255,110,50,0.95)', flash: '#ffb070' },
+  isa: { body: '#6f9fd6', dark: '#2b4a70', rim: '#1f3a5c', light: '#d9e9fb', tracer: 'rgba(225,240,255,0.95)', flash: '#eaf4ff' },
+  hgh: { body: '#454850', dark: '#16171a', rim: '#e0581f', light: '#ff5a1f', tracer: 'rgba(255,110,50,0.95)', flash: '#ffb070' },
 };
 export const sideColours = (side) => (side === 0 ? COLOURS.isa : COLOURS.hgh);
 

@@ -150,7 +150,7 @@ export function updateUI(ui, state, view) {
     e.squads.appendChild(d);
   }
 
-  // Event feed: newest four, fading after a few seconds.
+  // Event feed: newest three, fading after a few seconds.
   while (ui.feedSeen < state.feed.length) {
     const f = state.feed[ui.feedSeen++];
     const div = document.createElement('div');
@@ -159,7 +159,7 @@ export function updateUI(ui, state, view) {
     e.feed.prepend(div);
     setTimeout(() => div.classList.add('old'), 6000);
     setTimeout(() => div.remove(), 6800);
-    while (e.feed.children.length > 4) e.feed.lastChild.remove();
+    while (e.feed.children.length > 3) e.feed.lastChild.remove();
   }
 
   e.hint.textContent = view.hint || '';

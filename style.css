@@ -77,8 +77,8 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 #stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #1d1a15; }
 #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 #minimap { position: absolute; left: 8px; top: 8px; width: min(46%, 210px); aspect-ratio: 30 / 11; border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; box-shadow: var(--shadow); touch-action: none; }
-#feed { position: absolute; right: 8px; top: 8px; width: min(50%, 260px); display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
-#feed div { background: rgba(15, 14, 12, 0.78); color: #f2ede0; padding: 4px 8px; border-radius: 6px; font-size: 12px; border-left: 3px solid #a49d8c; transition: opacity 0.6s; }
+#feed { position: absolute; right: 8px; top: 8px; width: min(48%, 250px); display: flex; flex-direction: column; gap: 3px; pointer-events: none; }
+#feed div { background: rgba(15, 14, 12, 0.72); color: #f2ede0; padding: 3px 7px; border-radius: 6px; font-size: 11px; border-left: 3px solid #a49d8c; transition: opacity 0.6s; }
 #feed div.s0 { border-left-color: #7fb6ff; }
 #feed div.s1 { border-left-color: #ff7a3a; }
 #feed div.old { opacity: 0; }

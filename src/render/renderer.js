@@ -213,7 +213,8 @@ function drawSoldiers(g, r, state, opts, px) {
     g.beginPath();
     g.arc(s.x, s.y, rr, 0, Math.PI * 2);
     g.fill();
-    g.lineWidth = Math.max(0.8, rr * 0.22);
+    g.strokeStyle = c.rim;
+    g.lineWidth = Math.max(0.9, rr * 0.24);
     g.stroke();
     // Helmet highlight (ISA) or glowing goggles (Helghast).
     g.fillStyle = c.light;
