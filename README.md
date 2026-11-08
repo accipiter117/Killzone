@@ -22,7 +22,8 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 
 - You command the **ISA** (left, steel blue). The **Helghast** hold the right (dark grey, orange highlights).
 - You have three platoons, each of three squads of five soldiers. You give orders to **platoons**, never to single soldiers.
-- **Select** a platoon by tapping its card at the bottom or its soldiers on the map, then **tap the map**:
+- **Screen:** the map fills the screen. Clock, objectives and score sit top left; order points, minimap (hidden until you want it), pause and speed top right; your unit chips (three platoons and the tank, each with a strength bar) bottom left; smoke and artillery bottom right.
+- **Select** a unit by tapping its chip or its soldiers on the map: its order tray pops up above the chips (orders plus each squad's ability). Then **tap the map**:
   - tap an objective (A, B, C) or a capturable post (MG nest, arc tower, comms post) to **take** it;
   - tap open ground to **move** there.
 - **Hold** digs the platoon in at the nearest cover. **Fall back** pulls it back towards your edge (even pinned squads crawl back).
@@ -31,13 +32,13 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 - **Artillery** (3 points, 25 second reload): tap the button, then the target. After a 3 second warning, shells land in a circle and hit **everyone**, your troops included. The craters they leave become cover. Squads that can still move will try to scramble out of the warning circle.
 - **Smoke** (2 points): blocks sight through an area for about 20 seconds. Good for crossing open ground.
 - Hold objectives to score a point per second each. The higher score when the timer ends wins, or break every enemy platoon at once for an immediate win.
-- **Breaking and rallying:** a platoon that loses too many men breaks and runs back to its own lines. The first time, the survivors regroup there for 25 seconds and then rejoin the fight (the card counts down). A rallied platoon that loses half of what was left breaks for good and leaves the field.
-- **Changing your mind:** for 5 seconds after giving a platoon a movement order you can tap again to change it for free; the card counts down ("Tap the map to change (4s)"). After that the order is locked in.
+- **Breaking and rallying:** a platoon that loses too many men breaks and runs back to its own lines. The first time, the survivors regroup there for 25 seconds and then rejoin the fight (a countdown shows). A rallied platoon that loses half of what was left breaks for good and leaves the field.
+- **Changing your mind:** for 5 seconds after giving a platoon a movement order you can tap again to change it for free; the chip shows a green countdown. Slow motion ends as soon as you order, and the tray puts itself away when the free window closes.
 - **Grid:** while a platoon is selected a faint grid of tiles shows (as in Bad North). Move orders snap to the centre of a tile, and the platoon's three squads take that tile and the ones above and below (highlighted). Fighting is not limited to tiles: soldiers shoot, throw and charge at enemies nearby. The grid can be switched off in the menu.
 - **Reinforce** (2 points, 35 second cooldown): up to five fresh soldiers refill the selected platoon's weakest squad. They arrive at the nearest objective or post you hold (or your own lines) and run to rejoin. A platoon that is regrouping after breaking can be reinforced too.
 - **Landscape** is the main way to play: the battlefield takes the full height and the controls sit in a column on the right. Portrait works too.
-- **Slow motion:** time slows to a quarter while a platoon is selected or a strike is being aimed, so you can think. Tap the card again to let go (switch it off in the menu).
-- **Abilities:** each squad has one, shown as a button on its line under the platoon cards. They are free but recharge. Grenade (Rifle), Barrage (Heavy), Charge (Assault), Sandbags (Engineer), Mark (Recon). A button turns blue when using it would work right now.
+- **Slow motion:** time slows to a quarter while a platoon is selected or a strike is being aimed, so you can think. Tap the chip again, or the tray's close button, to let go (switch it off in the menu).
+- **Abilities:** each squad has one, shown as a button in the order tray. They are free but recharge. Grenade (Rifle), Barrage (Heavy), Charge (Assault), Sandbags (Engineer), Mark (Recon). A button turns blue when using it would work right now.
 - **High ground:** raised plateaus with cliffs you cannot climb; only ramps (lighter slopes) lead up. From higher ground soldiers see and shoot further and hit more often, and hills block sight between lower troops. B sits on top of a two tier hill.
 - **Sound** is synthesised in code: gunfire, explosions, the artillery whistle, a chime when an objective changes hands and a horn when a platoon breaks or rallies. It starts on your first tap and can be switched off in the menu.
 - **Reading the battle:** a platoon's badge turns red with a "!" when one of its squads is pinned; soldiers flash when hit; enemies marked by recon get red brackets.
@@ -70,7 +71,7 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 
 ### Tanks
 
-Each side has one tank from the start, with the same numbers for both (only the look differs: the ISA tank is low and angular, the Helghast tank tall, riveted and lit by orange vents). It has its own card: tap it, then tap the ground to drive there (1 order point, free to change for 5 seconds). It cannot enter ruins and slows on ramps. Its main gun reloads slowly and bursts on groups of infantry or hits the enemy tank; its machine gun sprays anyone close. Infantry close behind their own tank are covered from fire coming the other way, and it crushes wire as it goes. It cannot take objectives.
+Each side has one tank from the start, with the same numbers for both (only the look differs: the ISA tank is low and angular, the Helghast tank tall, riveted and lit by orange vents). It has its own chip: tap it, then tap the ground to drive there (1 order point, free to change for 5 seconds). It cannot enter ruins and slows on ramps. Its main gun reloads slowly and bursts on groups of infantry or hits the enemy tank; its machine gun sprays anyone close. Infantry close behind their own tank are covered from fire coming the other way, and it crushes wire as it goes. It cannot take objectives.
 
 Counters: rifles barely scratch it. Heavies turn their fire on it first and hurt it properly, blasts (grenades, artillery, petrusite, jetpack landings) and the arc tower hurt it more, engineers can breach it, and the other tank duels it. A knocked out tank stays on the field as a burnt wreck that infantry use as cover. The AI drives its tank behind its strongest platoon, pulls it back when badly damaged, and breaches yours with its engineers. Numbers live in `tank` and `breach` in `src/config.js`.
 

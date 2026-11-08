@@ -4,6 +4,7 @@
 import { CONFIG, RULES, SIDE_NAMES, ABILITY_HELP } from './config.js';
 import { ABILITY_OF } from './sim/abilities.js';
 import { createMatch, issue, advance } from './sim/match.js';
+import { amendWindow } from './sim/commands.js';
 import { createAI } from './sim/ai.js';
 import { fingerprint } from './sim/battle.js';
 import { seedFrom } from './sim/rng.js';
@@ -34,7 +35,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
   watch: store.get('watch', false), labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), lengthSec: store.get('length', 600),
-  replay: false, original: null, paused: false, speed: 1, selected: null, vehicle: false, armed: null, marker: null, endShown: false,
+  replay: false, original: null, paused: false, speed: 1, selected: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
 window.__kz = game; // handy for debugging and browser tests
@@ -54,10 +55,12 @@ const ui = createUI({
       game.vehicle = !game.vehicle;
       game.selected = null;
       game.armed = null;
+      game.release = null;
       if (game.vehicle) focusPoint(v.x, v.y);
       return;
     }
     game.vehicle = false;
+    game.release = null;
     const pl = game.match.state.platoons.filter((p) => p.side === PLAYER)[i];
     if (!pl || game.replay) return;
     if (game.watch) { focusPlatoon(pl); return; }
@@ -74,6 +77,12 @@ const ui = createUI({
       const key = sq.abilityUsed || ABILITY_OF[role];
       toast(ui, key === 'breach' ? st.cfg.breach.label : st.cfg.abilities[key].label, ABILITY_HELP[key]);
     }
+  },
+  closeTray() { deselect(); },
+  toggleMinimap() {
+    game.minimap = !game.minimap;
+    store.set('minimap', game.minimap);
+    showMinimap();
   },
   tankAbility() {
     if (game.replay || game.watch) return;
@@ -110,6 +119,7 @@ function startBattle(seed, { replayLog = null } = {}) {
   game.selected = null;
   game.vehicle = false;
   game.armed = null;
+  game.release = null;
   game.marker = null;
   game.endShown = false;
   // Battles open paused for planning (not replays or watch mode): give your
@@ -121,6 +131,7 @@ function startBattle(seed, { replayLog = null } = {}) {
   resetFeed(ui);
   closeOverlay('overlay-end');
   resize();
+  showMinimap();
   // Open on the ISA lines, a little zoomed in from the full height.
   // Open close enough to see the troopers, on the ISA lines.
   game.cam.z = Math.min(game.cam.maxZ, (game.cam.vh / st.map.height) * 2);
@@ -159,10 +170,13 @@ function action(act) {
   const st = game.match.state;
   const pl = game.selected !== null ? st.platoons[game.selected] : null;
   if (act === 'artillery' || act === 'smoke') {
-    game.armed = game.armed === act ? null : act;
+    // Aiming support fire puts the order tray away so the whole map is free.
+    const next = game.armed === act ? null : act;
+    deselect();
+    game.armed = next;
     return;
   }
-  if (!pl) { toast(ui, 'Select a platoon first', 'Tap one of the three platoon cards.'); return; }
+  if (!pl) { toast(ui, 'Select a platoon first', 'Tap one of the platoon chips, bottom left.'); return; }
   if (act === 'hold' || act === 'fallback') order(act, { platoon: pl.id });
   if (act === 'reinforce' && order('reinforce', { platoon: pl.id })) toast(ui, 'Reinforcements', `Fresh soldiers are on their way to ${pl.name}'s weakest squad.`);
   if (act === 'stance') {
@@ -172,6 +186,26 @@ function action(act) {
       toast(ui, `${pl.name}: ${st.cfg.stances[nextStance].label}`, help[nextStance]);
     }
   }
+}
+
+function deselect() {
+  game.selected = null;
+  game.vehicle = false;
+  game.armed = null;
+  game.release = null;
+}
+
+// After a move or take order the unit stays selected for the free change
+// window (so a misplaced tap can be fixed), then lets go by itself so the
+// tray gets out of the way of the map.
+function releaseAfterOrder(kind, id) {
+  game.release = { kind, id };
+}
+
+function showMinimap() {
+  miniCanvas.hidden = !game.minimap;
+  document.getElementById('btn-minimap').classList.toggle('on', game.minimap);
+  if (game.minimap) resize();
 }
 
 function focusPlatoon(pl) {
@@ -184,8 +218,10 @@ function focusPlatoon(pl) {
 function focusPoint(x, y) {
   const cam = game.cam;
   const sx = (x - cam.x) * cam.z, sy = (y - cam.y) * cam.z;
-  // Only move the view if the platoon is off screen.
-  if (sx < 30 || sy < 30 || sx > cam.vw - 30 || sy > cam.vh - 30) centreOn(cam, x, y);
+  // Only move the view if the unit is off screen or would sit under the
+  // order tray (which pops up along the bottom); then put it a little above
+  // the middle.
+  if (sx < 30 || sy < 60 || sx > cam.vw - 30 || sy > cam.vh - 170) centreOn(cam, x, y + (cam.vh * 0.12) / cam.z);
 }
 
 // In 2.5D a soldier's body is drawn above their feet, so aim taps at the chest.
@@ -228,10 +264,10 @@ function onTap(sx, sy) {
       return;
     }
     const badge = game.renderer.badges.find((b) => b.side === PLAYER && Math.hypot(b.x - sx, b.y - sy) < 20);
-    if (badge) { game.selected = badge.platoon; game.vehicle = false; return; }
+    if (badge) { game.selected = badge.platoon; game.vehicle = false; game.release = null; return; }
     // Tapping your own tank selects it.
     const mine = st.vehicles.find((v) => v.side === PLAYER && v.alive);
-    if (mine && !game.vehicle && tankHit(mine, w)) { game.vehicle = true; game.selected = null; return; }
+    if (mine && !game.vehicle && tankHit(mine, w)) { game.vehicle = true; game.selected = null; game.release = null; return; }
     let near = null, nd = 18 * px;
     const lift = bodyLift();
     for (const s of st.soldiers) {
@@ -241,12 +277,12 @@ function onTap(sx, sy) {
     }
     if (near) {
       const pid = st.squads[near.squad].platoon;
-      if (pid !== game.selected) { game.selected = pid; game.vehicle = false; return; }
+      if (pid !== game.selected) { game.selected = pid; game.vehicle = false; game.release = null; return; }
     }
     if (game.vehicle && mine) {
       const t = CONFIG.ui.tile;
       const snap = game.grid ? { x: Math.floor(w.x / t) * t + t / 2, y: Math.floor(w.y / t) * t + t / 2 } : w;
-      if (order('vmove', { x: snap.x, y: snap.y })) game.marker = { x: mine.order.x, y: mine.order.y, t0: performance.now() / 1000, colour: '#aaffaa' };
+      if (order('vmove', { x: snap.x, y: snap.y })) { game.marker = { x: mine.order.x, y: mine.order.y, t0: performance.now() / 1000, colour: '#aaffaa' }; releaseAfterOrder('tank', mine.id); }
       return;
     }
     if (game.selected !== null) {
@@ -257,6 +293,7 @@ function onTap(sx, sy) {
       const t = CONFIG.ui.tile;
       const snap = game.grid ? { x: Math.floor(w.x / t) * t + t / 2, y: Math.floor(w.y / t) * t + t / 2 } : w;
       const ok = site ? order('take', { platoon: pl.id, site: site.id }) : order('move', { platoon: pl.id, x: snap.x, y: snap.y });
+      if (ok) releaseAfterOrder('platoon', pl.id);
       if (ok && !site) { game.marker = { x: snap.x, y: snap.y, t0: performance.now() / 1000, colour: '#aaffaa' }; return; }
       if (ok) game.marker = { x: site ? site.x : w.x, y: site ? site.y : w.y, t0: performance.now() / 1000, colour: site ? '#ffe078' : '#aaffaa' };
       return;
@@ -404,12 +441,12 @@ document.addEventListener('pointerdown', () => { if (game.match && !game.match.s
 
 function hintText() {
   if (game.replay || game.watch) return '';
-  if (game.planning && game.selected === null && !game.vehicle && !game.armed) return 'Plan your opening: give your platoons orders, then press \u25B6 (top right) to begin.';
+  if (game.planning && game.selected === null && !game.vehicle && !game.armed) return 'Planning: tap a unit, then the map. Press \u25B6 to start.';
   if (game.armed === 'artillery') return 'Tap where the shells should land. They hit everyone, yours too.';
   if (game.armed === 'smoke') return 'Tap where to drop smoke. It blocks sight for a while.';
   if (game.selected !== null) return `${game.match.state.platoons[game.selected].name}: tap an objective to take it, or ground to move (slowed while you decide)`;
   if (game.vehicle) return 'Tank: tap the ground to drive there (it cannot enter ruins). Overwatch fires a heavy aimed shell.';
-  return 'Tap a platoon card to command it. Press and hold anything to learn what it does.';
+  return 'Tap a unit (bottom left) to command it. Press and hold anything to learn what it does.';
 }
 
 function frame(t) {
@@ -421,7 +458,7 @@ function frame(t) {
   const tickDt = 1 / st.cfg.tickRate;
   // Slow motion while giving orders, so there is time to think on a phone.
   newFrame(audio);
-  const slow = game.slowMo && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null);
+  const slow = game.slowMo && !game.watch && !game.replay && !game.release && (game.selected !== null || game.vehicle || game.armed !== null);
   document.getElementById('stage').classList.toggle('slowmo', slow && !game.paused);
   if (!game.paused && !st.result) {
     game.acc += dt * game.speed * (slow ? CONFIG.ui.slowMo : 1);
@@ -446,17 +483,24 @@ function frame(t) {
   }
   if (game.selected !== null && st.platoons[game.selected].broken) game.selected = null;
   if (game.vehicle && !st.vehicles.some((v) => v.side === PLAYER && v.alive)) game.vehicle = false;
+  if (game.release) {
+    const r = game.release;
+    const target = r.kind === 'tank' ? st.vehicles[r.id] : st.platoons[r.id];
+    const still = r.kind === 'tank' ? game.vehicle : game.selected === r.id;
+    if (!still) game.release = null;
+    else if (amendWindow(st, target) <= 0) deselect();
+  }
 
   prune(game.fxs, now);
   const shake = shakeOffset(game.fxs, dt);
   const reveal = game.watch || game.replay;
   const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, vehicleSelected: game.vehicle, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null) };
   drawFrame(g, game.renderer, st, game.cam, view);
-  drawMinimap(mg, game.renderer, st, game.cam, view);
+  if (game.minimap && miniCanvas.width > 0) drawMinimap(mg, game.renderer, st, game.cam, view);
   updateUI(ui, st, {
     now, playerSide: PLAYER, selected: game.selected, vehicle: game.vehicle, armed: game.armed, paused: game.paused, speed: game.speed,
     replay: game.replay, watch: game.watch, hint: hintText(),
-    banner: game.replay ? 'REPLAY' : game.watch ? 'WATCH MODE' : game.planning ? 'PLANNING' : game.paused ? 'PAUSED' : '',
+    banner: game.replay ? 'REPLAY' : game.watch ? 'WATCH MODE' : game.planning ? 'PLANNING' : game.paused ? 'PAUSED' : slow ? 'SLOW MOTION' : '',
   });
   requestAnimationFrame(frame);
 }
