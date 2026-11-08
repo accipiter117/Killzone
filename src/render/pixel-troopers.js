@@ -5,7 +5,7 @@
 // art drawn in code; the equipment follows the references Matthew supplied
 // (Helghast gas mask, peaked helmet, greatcoat; ODST style ISA armour).
 
-import { cap, ell, poly, box, materials, rasterise, rotatePieces, shiftPieces } from './puppet.js';
+import { cap, ell, poly, box, detail, materials, rasterise, rotatePieces, shiftPieces } from './puppet.js';
 
 export const PT_W = 112;
 export const PT_H = 90;
@@ -13,7 +13,8 @@ export const PT_FOOT = [40, 84]; // where the soldier's feet touch the ground
 
 const MATS = {
   hgh: materials({
-    helmet: '#4a4d51', helmetDark: '#2e3033', helmetHi: '#6b6f74', mask: '#5b5e61', maskDark: '#2a2c2f', metal: '#7d8083', rubber: '#2b2c2d',
+    helmet: '#4a4d51', helmetDark: '#2e3033', helmetHi: '#6b6f74', mask: '#45484b', maskDark: '#2a2c2f', maskLight: '#a3a49f', brass: '#a8873c', metal: '#7d8083', rubber: '#2b2c2d', hose: '#3a3631',
+    slot: { glow: true, ramp: [0, 0, [130, 36, 12], [214, 84, 26], [214, 84, 26]], core: [214, 84, 26] }, gunDark: '#18191b',
     lens: { glow: true, ramp: [0, 0, [176, 38, 12], [255, 92, 28], [255, 92, 28]], core: [255, 226, 160] },
     sight: { glow: true, ramp: [0, 0, 0, [255, 60, 30], [255, 60, 30]], core: [255, 170, 120] },
     coat: '#4b4c43', coatDark: '#383930', armour: '#5a5d60', pouch: '#504f41', strap: '#3a3a31',
@@ -53,20 +54,26 @@ const place = (pieces, at, deg) => shiftPieces(rotatePieces(pieces, [0, 0], deg)
 
 // ---- Helghast ----------------------------------------------------------
 
+// Helghast rifle: a long slotted body with glowing orange windows, a top
+// spine and carry handle, an open skeleton stock, a magazine ahead of the
+// pistol grip, and a ringed front shroud ending in a stepped muzzle.
 function hghRifle(z) {
-  return [
-    poly([[0, -2], [9, -3], [10, 3], [1, 4]], 'gun', z),
-    box(9, -3, 27, 3, 'gunLight', z + 1),
-    box(11, -1, 25, 0, 'gun', z + 2), // ejection port line
-    poly([[13, 2], [16, 2], [15, 9], [12, 8]], 'gun', z + 1),
-    poly([[19, 2], [23, 2], [25, 11], [21, 12]], 'gun', z + 2), // curved magazine
-    box(27, -2, 38, 2, 'gun', z + 1),
-    box(29, -1, 30, 1, 'gunLight', z + 2), box(32, -1, 33, 1, 'gunLight', z + 2), box(35, -1, 36, 1, 'gunLight', z + 2),
-    cap([38, 0], [48, 0], 1.1, 1.1, 'gun', z + 1),
-    box(47, -1.6, 51, 1.6, 'gunLight', z + 2), // muzzle brake
-    box(13, -6, 23, -3, 'gunLight', z + 2), // sight housing
-    ell([22, -4.5], 1.1, 1.1, 'sight', z + 3),
+  const P = [
+    poly([[0, -3], [10, -3], [10, 3], [0, 4]], 'gun', z), // skeleton stock
+    box(2, -1, 8, 1.5, 'gunDark', z + 0.5),
+    box(9, -4, 36, 3, 'gunLight', z + 1), // body
+    box(10, -6, 34, -4, 'gun', z + 1.2), // top spine
+    cap([19, -6], [21, -9], 0.8, 0.8, 'gun', z + 1.3), cap([21, -9], [31, -9], 0.8, 0.8, 'gun', z + 1.3), cap([31, -9], [33, -6], 0.8, 0.8, 'gun', z + 1.3), // carry handle
+    poly([[16, 3], [19.5, 3], [18.5, 10], [15, 9]], 'gun', z + 1.4), // pistol grip
+    poly([[22, 3], [26, 3], [27.5, 11.5], [23.5, 12]], 'gun', z + 1.4), // magazine
+    poly([[29, 3], [37, 3], [35.5, 6], [30, 6]], 'gun', z + 1.4), // handguard
+    box(36, -3, 46, 2.5, 'gun', z + 1),
+    cap([46, 0], [51, 0], 1, 1, 'gun', z + 1),
+    box(50, -1.8, 53, 1.8, 'gunLight', z + 1.5), // muzzle
   ];
+  for (let k = 0; k < 6; k++) P.push(box(12 + 4 * k, -2.2, 14.6 + 4 * k, 0.8, 'slot', z + 2)); // glowing windows
+  for (const x of [38.5, 41.5, 44.5]) P.push(cap([x, -2.6], [x, 2.1], 0.55, 0.55, 'gunLight', z + 1.6)); // shroud rings
+  return P;
 }
 
 function helghast(legs, { recoil = 0, flash = false, arms = 'ready', gun = true } = {}) {
@@ -85,10 +92,10 @@ function helghast(legs, { recoil = 0, flash = false, arms = 'ready', gun = true 
   P.push(poly([[25, 54], [34, 54], [33, 71], [21, 70]], 'coatDark', 5));
   // Back arm (holding the pistol grip), drawn behind the body.
   const sB = [28, 38], sF = [43, 38];
-  const handsReady = { back: [37 - recoil, 50], front: [54 - recoil, 50] };
+  const handsReady = { back: [37 - recoil, 52], front: [54 - recoil, 52] };
   const hands = arms === 'up' ? { back: [33, 10], front: [41, 6] } : arms === 'limp' ? { back: [27, 56], front: [46, 56] } : handsReady;
-  const eB = arms === 'up' ? [26, 26] : arms === 'limp' ? [26, 47] : [27, 47];
-  const eF = arms === 'up' ? [47, 26] : arms === 'limp' ? [46, 47] : [49, 45];
+  const eB = arms === 'up' ? [26, 26] : arms === 'limp' ? [26, 47] : [27, 48];
+  const eF = arms === 'up' ? [47, 26] : arms === 'limp' ? [46, 47] : [49, 46.5];
   P.push(cap(sB, eB, 3.2, 2.9, 'coat', 10), cap(eB, hands.back, 2.8, 2.4, 'coat', 10));
   P.push(cap([sB[0] + (eB[0] - sB[0]) * 0.25, sB[1] + (eB[1] - sB[1]) * 0.25], [sB[0] + (eB[0] - sB[0]) * 0.45, sB[1] + (eB[1] - sB[1]) * 0.45], 3.3, 3.1, 'red', 10.5));
   P.push(ell(sB, 4.4, 3.8, 'armour', 11));
@@ -109,37 +116,40 @@ function helghast(legs, { recoil = 0, flash = false, arms = 'ready', gun = true 
   P.push(cap([39, 57], [43, 71], 0.5, 0.5, 'coatDark', 30.5)); // fold
   // Collar, then helmet and gas mask.
   P.push(poly([[28, 30], [43, 31], [45, 36], [27, 36]], 'coatDark', 31));
-  // Helmet: a tall dome with a skirt that flares down over the ear and the
-  // back of the neck, a raised crest, a flared rim and a short angled peak.
-  P.push(poly([[24, 18], [33, 19], [34, 30], [30, 32.5], [23.5, 29.5]], 'helmet', 32)); // side and neck skirt
-  P.push(cap([25, 27], [31, 31.5], 0.5, 0.5, 'helmetDark', 32.5)); // skirt edge
-  // Gas mask: a dark face plate so the lenses stand out.
-  P.push(poly([[30, 24], [45, 25], [45.5, 33], [41, 37], [32, 36.5], [30, 31]], 'maskDark', 33));
-  P.push(ell([35, 18], 10, 9, 'helmet', 34));
-  P.push(ell([31.5, 13.5], 3, 1.6, 'helmetHi', 34.5)); // light on the dome
-  P.push(cap([26.5, 15.5], [43, 13.5], 0.9, 0.9, 'helmetDark', 35), cap([26.5, 14.6], [43, 12.6], 0.5, 0.5, 'helmetHi', 35.1)); // crest
-  P.push(poly([[24.5, 22], [46, 23], [46.5, 25.5], [24.5, 25]], 'helmetDark', 35.5)); // flared rim
-  P.push(poly([[40, 22.5], [51, 25], [50, 27.3], [39.5, 25.2]], 'helmet', 36)); // peak
-  P.push(cap([40.5, 25.4], [50, 27.2], 0.5, 0.5, 'helmetDark', 36.1)); // shadow under the peak
-  // Two big round lenses in thick dark rims (the far one a little smaller).
-  P.push(ell([36, 29.5], 3.8, 3.6, 'rubber', 37), ell([42.6, 29.6], 3.4, 3.3, 'rubber', 37));
-  P.push(ell([36, 29.5], 2.7, 2.6, 'lens', 38), ell([42.6, 29.6], 2.4, 2.3, 'lens', 38));
-  // Respirator: a grilled snout with a front filter, a cheek canister and a
-  // ribbed hose running down to the chest. It juts forward, so it is drawn
-  // in front of the shoulder (but behind the rifle).
-  P.push(ell([32.5, 35], 2.3, 2.8, 'metal', 38.5)); // cheek canister
-  P.push(poly([[37, 33], [45, 32.5], [48.5, 36], [46.5, 40], [39, 40.5], [36, 37.5]], 'mask', 43));
-  P.push(cap([39, 35.3], [45.5, 35], 0.45, 0.45, 'rubber', 43.1), cap([39, 37.4], [45.8, 37.2], 0.45, 0.45, 'rubber', 43.1));
-  P.push(ell([48.6, 37.6], 2.7, 2.7, 'metal', 43.3), ell([49, 37.6], 1.2, 1.2, 'rubber', 43.4));
-  const hose = [[38, 40.5], [36, 43], [33.5, 45], [31, 46.5]];
-  for (let k = 0; k < hose.length - 1; k++) P.push(cap(hose[k], hose[k + 1], 1.4, 1.4, 'rubber', 43.5));
-  for (const h of hose.slice(1)) P.push(ell(h, 1.6, 1.1, 'mask', 43.6)); // ribs
+  // Helmet: a rounded dome with a thick band round it, a small lip, ear cups
+  // and a couple of rivets.
+  P.push(poly([[24, 19], [32, 20], [33, 29], [29.5, 31.5], [23.5, 28.5]], 'helmet', 32)); // side over the ear
+  P.push(ell([27.8, 27], 2.8, 3.4, 'helmetDark', 32.5)); // ear cup
+  // Gas mask face plate with a rounded jaw.
+  P.push(poly([[30, 24], [45.5, 25], [46.5, 31], [44, 36.5], [39.5, 39], [33, 37.5], [30, 32]], 'mask', 33));
+  P.push(ell([35, 17.5], 10, 9.5, 'helmet', 34));
+  P.push(ell([31.5, 12.5], 3, 1.6, 'helmetHi', 34.5)); // light on the dome
+  P.push(ell([29, 16], 0.7, 0.7, 'metal', 34.6), ell([38, 13.5], 0.7, 0.7, 'metal', 34.6)); // rivets
+  P.push(poly([[24.5, 19.5], [45.5, 20.5], [46.5, 24.5], [24.5, 24]], 'helmetDark', 35.5)); // thick band
+  P.push(cap([25, 19.8], [45.5, 20.8], 0.5, 0.5, 'helmetHi', 35.6));
+  P.push(cap([24.8, 24.6], [46.6, 25], 0.6, 0.6, 'helmet', 35.7)); // lip
+  // Goggles: two slanted oval lenses in raised pale rims, joined by a bridge.
+  P.push(...detail(ell([35.6, 28.4], 3.8, 2.9, 'maskLight', 37), ell([42.6, 28.4], 3.3, 2.7, 'maskLight', 37)));
+  P.push(...detail(box(38.6, 27.4, 40, 29.4, 'maskLight', 37.1))); // bridge
+  P.push(ell([35.6, 28.6], 2.7, 1.9, 'lens', 38), ell([42.6, 28.6], 2.3, 1.7, 'lens', 38));
+  P.push(poly([[37.2, 25.8], [39.2, 26.2], [38.6, 28], [37, 27.4]], 'mask', 38.5), poly([[40.2, 26.2], [41.8, 25.8], [42, 27.2], [40.6, 27.8]], 'mask', 38.5)); // inner brows (slant)
+  // Breathing piece: a triangle running down from the nose to a chin
+  // connector with a brass ring, a round filter on the cheek, and a ribbed
+  // hose hanging from the chin down to the chest.
+  P.push(...detail(poly([[34.5, 30.5], [45.8, 30.5], [42.4, 39.2], [37.6, 39.2]], 'maskLight', 39))); // pale frame
+  P.push(poly([[37.2, 32], [43.2, 32], [41.1, 37.9], [38.9, 37.9]], 'maskDark', 39.1)); // dark cone inside
+  P.push(...detail(cap([33.8, 33.2], [35.6, 32.6], 0.8, 0.8, 'maskLight', 39.05))); // strap to the cheek filter
+  P.push(...detail(ell([32.3, 33.6], 2.6, 2.9, 'maskLight', 39), ell([32.3, 33.6], 1.5, 1.7, 'rubber', 39.2), ell([32.3, 33.6], 0.7, 0.8, 'metal', 39.3)));
+  P.push(box(38.2, 38.2, 41.8, 39.6, 'brass', 43), box(38.4, 39.6, 41.6, 41, 'metal', 43));
+  const hose = [[40, 41], [39, 43.5], [36.5, 45.5], [33.5, 46.5], [30.5, 46.5]];
+  for (let k = 0; k < hose.length - 1; k++) P.push(cap(hose[k], hose[k + 1], 1.5, 1.5, 'hose', 43.5));
+  for (const h of hose.slice(1)) P.push(ell(h, 1.7, 1.2, 'rubber', 43.6)); // ribs
   // Front arm, rifle, gloves on top.
   P.push(ell(sF, 4.8, 4, 'armour', 41));
   P.push(cap(sF, eF, 3.4, 3, 'coat', 42), cap(eF, hands.front, 3, 2.6, 'coat', 42));
-  if (gun) P.push(...place(hghRifle(44), [25 - recoil, arms === 'up' ? 24 : 46], arms === 'up' ? -86 : 4.5));
+  if (gun) P.push(...place(hghRifle(44), [25 - recoil, arms === 'up' ? 24 : 48], arms === 'up' ? -86 : 4.5));
   P.push(ell(hands.back, 2.4, 2.2, 'glove', 48), ell(hands.front, 2.6, 2.3, 'glove', 48));
-  if (flash) P.push(ell([77 - recoil, 50], 3, 2, 'flash', 50), ell([81 - recoil, 50.3], 2, 1.2, 'flash', 50));
+  if (flash) P.push(ell([80 - recoil, 52.4], 3, 2, 'flash', 50), ell([84 - recoil, 52.7], 2, 1.2, 'flash', 50));
   return P;
 }
 

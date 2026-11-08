@@ -34,6 +34,9 @@ export const cap = (a, b, ra, rb, mat, z) => ({ kind: 'cap', a, b, ra, rb: rb ??
 export const ell = (c, rx, ry, mat, z) => ({ kind: 'ell', c, rx, ry, mat, z, id: nextId++ });
 export const poly = (pts, mat, z, tilt = 0) => ({ kind: 'poly', pts, mat, z, tilt, id: nextId++ });
 export const box = (x0, y0, x1, y1, mat, z) => poly([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], mat, z);
+// Small kit details keep their own colour: no dark seam or dark bevel edge,
+// which would otherwise swallow a piece only a few pixels wide.
+export const detail = (...pieces) => pieces.map((p) => ({ ...p, detail: true }));
 
 function inPoly(x, y, pts) {
   let inside = false;
@@ -131,9 +134,9 @@ export function rasterise(pieces, mats, w, h, { dim = 1 } = {}) {
       const up = at(x, y - 1), left = at(x - 1, y), down = at(x, y + 1), right = at(x + 1, y);
       if ((up !== o && up >= 0 && pieces[up].z < p.z) || (left !== o && left >= 0 && pieces[left].z < p.z)) tone += 1;
       if (up < 0 || left < 0) tone += 1;
-      if ((down >= 0 && down !== o) || (right >= 0 && right !== o)) tone -= 1;
+      if (!p.detail && ((down >= 0 && down !== o) || (right >= 0 && right !== o))) tone -= 1;
       // Seam: a dark line where this piece sits behind a different one.
-      if ((down >= 0 && pieces[down].id !== p.id && pieces[down].z > p.z) || (right >= 0 && pieces[right].id !== p.id && pieces[right].z > p.z)) tone = 0;
+      if (!p.detail && (down >= 0 && pieces[down].id !== p.id && pieces[down].z > p.z) || (right >= 0 && pieces[right].id !== p.id && pieces[right].z > p.z)) tone = 0;
       if (m.gloss && val[i] > 0.82) tone = 4;
       tone = Math.max(0, Math.min(4, tone));
       const c = m.ramp[tone];
