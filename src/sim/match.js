@@ -39,10 +39,11 @@ export function advance(match) {
       if (applyCommand(s, cmd).ok) record(match, cmd);
     }
   } else {
-    for (const c of match.controllers) {
-      if (!c.due(s)) continue;
-      for (const cmd of c.think(s)) issue(match, cmd.side, cmd.type, cmd.params);
-    }
+    // Every controller decides from the same moment before any order is
+    // applied, so neither side gets to react to the other's orders first.
+    const decided = [];
+    for (const c of match.controllers) if (c.due(s)) decided.push(...c.think(s));
+    for (const cmd of decided) issue(match, cmd.side, cmd.type, cmd.params);
   }
   step(s);
 }

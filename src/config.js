@@ -164,7 +164,12 @@ export const CONFIG = {
 
   ai: {
     thinkSec: 4,
-    siteValue: { objective: 10, comms: 5, mg: 4, arc: 4 },
+    siteValue: { objective: 10, comms: 4, mg: 3, arc: 3 },
+    threatRadius: 320, // enemies seen this close to a site count as massing on it
+    threatValue: 0.6, // extra value per enemy soldier massing on a site
+    highGroundValue: 0.35, // extra value per level of high ground a site sits on
+    garrison: 10, // soldiers an objective needs before the AI sends others elsewhere...
+    garrisonPerLevel: 11, // ...plus this many per level of high ground it sits on
     artilleryMinCluster: 5,
     artillerySafeDist: 170,
     fallbackStrength: 0.5,

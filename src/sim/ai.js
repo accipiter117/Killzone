@@ -3,12 +3,13 @@
 // state but never changes it directly, and uses no randomness, so the same
 // battle always gets the same decisions.
 
-import { members, centroid, dist, platoonStrength, isActive } from './util.js';
-import { cellIndex, T } from './map.js';
+import { members, centroid, dist, platoonStrength, platoonAlive, isActive } from './util.js';
+import { abilityHasTarget } from './abilities.js';
+import { heightAt } from './map.js';
 
 const PROFILES = {
-  standard: { stanceStrong: 'balanced', stanceWeak: 'cautious', reserve: 1 },
-  aggressive: { stanceStrong: 'aggressive', stanceWeak: 'balanced', reserve: 0 },
+  standard: { stanceStrong: 'aggressive', stanceWeak: 'balanced', reserve: 1 },
+  aggressive: { stanceStrong: 'aggressive', stanceWeak: 'aggressive', reserve: 0 },
   cautious: { stanceStrong: 'cautious', stanceWeak: 'cautious', reserve: 2 },
 };
 
@@ -88,28 +89,41 @@ function decide(state, side, prof, memory) {
   const [myScore, theirScore] = [sd.score, state.sides[foe].score];
   const ownedObjectives = state.sites.filter((s) => s.kind === 'objective' && s.owner === side).length;
   const ahead = myScore > theirScore && ownedObjectives >= 2;
-  const claimed = new Set();
+  // Read where the enemy is massing: seen enemies near each site, and how
+  // many of our soldiers this pass has already committed to it. The
+  // strongest platoons choose first.
+  const near = new Map(state.sites.map((st) => [st.id, seenFoes.filter((e) => dist(e, st) < ai.threatRadius).length]));
+  const committed = new Map(state.sites.map((st) => [st.id, 0]));
   const free = mine.filter((pl) => {
     if (pl.order.type === 'fallback') return state.tick - (memory.fallbackTick[pl.id] || 0) > 25 * cfg.tickRate;
     return true;
-  });
+  }).sort((a, b) => platoonAlive(state, b) - platoonAlive(state, a) || a.id - b.id);
   for (const pl of free) {
     const c = centres.get(pl.id);
     if (!c) continue;
+    const alive = platoonAlive(state, pl);
     const current = pl.order.type === 'take' ? pl.order.siteId : null;
     let best = null, bestScore = -Infinity;
     for (const site of state.sites) {
-      let v = ai.siteValue[site.kind] || 1;
-      const threatened = seenFoes.some((e) => dist(e, site) < 350);
+      let v = (ai.siteValue[site.kind] || 1) * (1 + ai.highGroundValue * heightAt(state.map, site.x, site.y)); // hills are worth more
+      const threat = near.get(site.id);
       if (site.owner === foe) v *= 1.3;
-      else if (site.owner === side) v *= threatened || ahead ? 0.9 : 0.15;
+      else if (site.owner === side) v *= threat > 0 || ahead ? 0.9 : 0.15;
+      v += ai.threatValue * threat; // a site the enemy is massing on must be answered
       if (site.id === current) v *= 1.5;
-      if (claimed.has(site.id)) v *= 0.35;
+      const have = committed.get(site.id);
+      // How many soldiers a site needs: enough to beat what we can see there,
+      // plus a garrison that is bigger for objectives and for high ground
+      // (the hill at B needs about two platoons).
+      const h = heightAt(state.map, site.x, site.y);
+      const garrison = site.kind === 'objective' ? ai.garrison + ai.garrisonPerLevel * h : 5;
+      if (have >= threat * 1.2 + garrison) v *= 0.3; // already enough of us going there
+      if (have + alive < threat * 0.6) v *= 0.4; // don't feed a lone platoon into a bigger force
       const score = v / (dist(c, site) + 400);
       if (score > bestScore) { bestScore = score; best = site; }
     }
     if (!best) continue;
-    claimed.add(best.id);
+    committed.set(best.id, committed.get(best.id) + alive);
     const there = dist(c, best) < best.r;
     if (best.id === current || (pl.order.type === 'hold' && there)) {
       // Already on it. If we are winning and sitting on an objective we own, dig in.
@@ -121,25 +135,20 @@ function decide(state, side, prof, memory) {
     if (can(cost.take)) spend({ type: 'take', params: { platoon: pl.id, site: best.id } }, cost.take);
   }
 
-  // Abilities are free, so use them whenever the moment is right.
-  let used = 0;
+  // Abilities are free, so use any that has something to do, as a sharp
+  // player would. Two exceptions: no charging with a badly weakened platoon,
+  // and sandbags only once the enemy is close.
   for (const pl of mine) {
     for (const id of pl.squads) {
-      if (used >= 3) break;
       const sq = state.squads[id];
       const list = members(state, sq);
       if (!list.length || sq.mode === 'rout' || state.tick < sq.abilityReady) continue;
-      const c = centroid(list);
-      let near = Infinity, count = 0;
-      for (const e of seenFoes) { const d = dist(e, c); near = Math.min(near, d); if (d < 400) count++; }
-      const ab = cfg.abilities;
-      const go =
-        (sq.role === 'rifle' && near < ab.grenade.range * 0.9) ||
-        (sq.role === 'heavy' && near < cfg.roles.heavy.range * 0.9 && ['suppress', 'arrived', 'hold', 'cover', 'pinned'].includes(sq.mode)) ||
-        (sq.role === 'assault' && near < ab.charge.range * 0.85 && platoonStrength(state, pl) > 0.5) ||
-        (sq.role === 'engineer' && sq.supp > 25 && near < 400 && state.map.grid[cellIndex(state.map, c.x, c.y)] === T.open) ||
-        (sq.role === 'recon' && count >= 3);
-      if (go) { cmds.push({ side, type: 'ability', params: { platoon: pl.id, role: sq.role } }); used++; }
+      if (sq.role === 'assault' && platoonStrength(state, pl) < 0.4) continue;
+      if (sq.role === 'engineer') {
+        const c = centroid(list);
+        if (!seenFoes.some((e) => dist(e, c) < 400)) continue;
+      } else if (!abilityHasTarget(state, sq)) continue;
+      cmds.push({ side, type: 'ability', params: { platoon: pl.id, role: sq.role } });
     }
   }
 
