@@ -8,6 +8,10 @@ export const CONFIG = {
     durationSec: 600, // default battle length (10 minutes)
     scorePerObjectiveSec: 1, // points per second for each objective held
     breakAt: 0.3, // a platoon below this share of its soldiers breaks and routs
+    rallyLine: 70, // broken platoons fall back to this far from their own edge...
+    rallyZone: 160, // ...and once all are within this distance of it, they regroup
+    rallySec: 25, // for this long, then rejoin the fight (once per battle)
+    rallyBreakShare: 0.5, // a rallied platoon breaks for good after losing half of what was left
     margin: { narrow: 0.2, clear: 0.6 }, // score gap as a share of total score: below narrow = narrow win, below clear = clear win, else crushing
   },
 
@@ -70,6 +74,7 @@ export const CONFIG = {
   soldiersPerSquad: 5,
 
   combat: {
+    damageMult: 0.8, // scales every bullet's damage: lower = longer battles where objectives matter more
     rangeFalloff: 0.65, // hit chance drops by this share at maximum range
     pinnedAccuracy: 0.6,
     pinnedFireSlow: 1.8,

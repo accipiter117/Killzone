@@ -138,7 +138,7 @@ export function fireShot(state, from, t, w, range, shooterPinned, source) {
   const hit = next(state) < p;
   let ix = t.x, iy = t.y;
   if (hit) {
-    const dmg = w.closeRange && d < w.closeRange ? w.damage * w.closeMult : w.damage;
+    const dmg = (w.closeRange && d < w.closeRange ? w.damage * w.closeMult : w.damage) * state.cfg.combat.damageMult;
     damageSoldier(state, t, dmg);
   } else {
     // Stray rounds land near the target and might find a petrusite tank.

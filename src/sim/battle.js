@@ -5,7 +5,7 @@ import { seedFrom, range } from './rng.js';
 import { generateMap } from './map.js';
 import { updateVision, updateFiring, updateSuppression } from './combat.js';
 import { updateSites, updateEmplacements, updateStrikes, updateSmokes } from './features.js';
-import { thinkSquad, moveSoldiers } from './squads.js';
+import { thinkSquad, moveSoldiers, resetPlans } from './squads.js';
 import { updateThrows } from './abilities.js';
 import { platoonAlive, feed, sideName } from './util.js';
 
@@ -41,7 +41,7 @@ export function createBattle(seed, options = {}) {
     cfg.platoons.forEach((roles, pi) => {
       const pl = {
         id: state.platoons.length, side, index: pi, name: PLATOON_NAMES[pi],
-        squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, size: roles.length * cfg.soldiersPerSquad,
+        squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, breakBase: 0, size: roles.length * cfg.soldiersPerSquad,
       };
       state.platoons.push(pl);
       const baseY = H * cfg.deploy.spreadY[pi];
@@ -122,14 +122,44 @@ export function step(state) {
   checkEnd(state);
 }
 
+// Morale. A platoon that falls below its break point routs to its own edge.
+// The first time, the survivors regroup there and come back into the fight
+// after a while (a chance to recover); a platoon that breaks a second time
+// runs off the field for good.
 function checkMorale(state) {
-  const breakAt = state.cfg.battle.breakAt;
+  const b = state.cfg.battle;
+  const W = state.map.width;
+  const label = (pl) => (pl.side === 0 ? pl.name : `Helghast ${pl.name}`);
   for (const pl of state.platoons) {
-    if (pl.broken) continue;
-    if (platoonAlive(state, pl) / pl.size < breakAt) {
+    const alive = platoonAlive(state, pl);
+    if (pl.broken) {
+      if (pl.rallied || alive === 0) continue;
+      if (pl.rallyAt < 0) {
+        // Start the clock once everyone left has reached the rally zone.
+        const home = pl.squads.every((id) => state.squads[id].soldiers.every((sid) => {
+          const s = state.soldiers[sid];
+          return !s.alive || s.fled || (pl.side === 0 ? s.x < b.rallyZone : s.x > W - b.rallyZone);
+        }));
+        if (home) pl.rallyAt = state.tick + Math.round(b.rallySec * state.cfg.tickRate);
+      } else if (state.tick >= pl.rallyAt) {
+        pl.broken = false;
+        pl.rallied = true;
+        pl.breakBase = alive;
+        pl.order = { type: 'hold' };
+        pl.orderTick = state.tick;
+        resetPlans(state, pl);
+        for (const id of pl.squads) { const sq = state.squads[id]; sq.supp = 0; sq.pinned = false; sq.mode = 'hold'; }
+        feed(state, `${label(pl)} has rallied`, pl.side);
+        state.events.push({ type: 'rallied', platoon: pl.id, side: pl.side });
+      }
+      continue;
+    }
+    const breaking = pl.rallied ? alive < pl.breakBase * b.rallyBreakShare : alive / pl.size < b.breakAt;
+    if (breaking) {
       pl.broken = true;
+      pl.rallyAt = -1;
       pl.order = { type: 'rout' };
-      feed(state, pl.side === 0 ? `${pl.name} has broken` : `Helghast ${pl.name} has broken`, pl.side);
+      feed(state, pl.rallied ? `${label(pl)} has broken again and is running` : `${label(pl)} has broken`, pl.side);
       state.events.push({ type: 'broken', platoon: pl.id, side: pl.side });
     }
   }

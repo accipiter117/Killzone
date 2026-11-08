@@ -182,14 +182,26 @@ test('owning the comms post refills order points faster', () => {
   assert.ok(b.sides[0].op > a.sides[0].op * 1.5);
 });
 
-test('a platoon below its break point routs and leaves the field', () => {
+test('a broken platoon regroups at its edge, rallies once, then runs for good', () => {
   const s = quietBattle();
   const pl = s.platoons[0];
   const all = pl.squads.flatMap((id) => squadSoldiers(s, id));
   all.slice(0, 11).forEach((m) => { m.alive = false; });
   run(s, 30);
   assert.ok(pl.broken);
-  assert.equal(s.squads[pl.squads[2]].status, 'Routing');
+  assert.match(s.squads[pl.squads[2]].status, /Routing|Regrouping/);
+  // They are already near their edge, so the regroup clock starts.
+  run(s, 30 * 10);
+  assert.ok(pl.rallyAt > 0, 'regrouping should have started');
+  assert.ok(all.filter((m) => m.alive).every((m) => !m.fled), 'nobody leaves the field the first time');
+  run(s, 30 * (s.cfg.battle.rallySec + 2));
+  assert.equal(pl.broken, false);
+  assert.ok(pl.rallied);
+  assert.equal(pl.order.type, 'hold');
+  // Break again: this time they run off the field.
+  all.filter((m) => m.alive).slice(0, 3).forEach((m) => { m.alive = false; });
+  run(s, 30);
+  assert.ok(pl.broken);
   run(s, 30 * 30);
   assert.ok(all.filter((m) => m.alive).every((m) => m.fled));
 });

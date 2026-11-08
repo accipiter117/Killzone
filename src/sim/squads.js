@@ -133,8 +133,16 @@ export function thinkSquad(state, sq) {
 
   if (pl.broken) {
     sq.mode = 'rout';
-    sq.status = 'Routing';
-    formUp(state, sq, list, nextStep(state, sq, c, { x: sq.side === 0 ? 1 : state.map.width - 1, y: c.y }), false);
+    // First time: fall back to the rally line and regroup. Second time: run.
+    const edge = pl.rallied ? 1 : cfg.battle.rallyLine;
+    const dest = { x: sq.side === 0 ? edge : state.map.width - edge, y: c.y };
+    if (pl.rallyAt >= 0) {
+      sq.status = `Regrouping (${Math.max(0, Math.ceil((pl.rallyAt - state.tick) / cfg.tickRate))}s)`;
+      stopAll(list);
+    } else {
+      sq.status = pl.rallied ? 'Running' : 'Routing';
+      formUp(state, sq, list, nextStep(state, sq, c, dest), false);
+    }
     return;
   }
   const order = pl.order;
@@ -439,7 +447,7 @@ export function moveSoldiers(state, dt) {
     if (canStep(state.map, from, cellIndex(state.map, nx, ny))) { s.x = nx; s.y = ny; }
     else if (canStep(state.map, from, cellIndex(state.map, nx, s.y))) s.x = nx;
     else if (canStep(state.map, from, cellIndex(state.map, s.x, ny))) s.y = ny;
-    if (sq.mode === 'rout' && (s.x < 35 || s.x > W - 35)) {
+    if (sq.mode === 'rout' && pl.rallied && (s.x < 35 || s.x > W - 35)) {
       s.fled = true;
       state.sides[s.side].fled++;
     }
@@ -448,7 +456,7 @@ export function moveSoldiers(state, dt) {
 
 // One line that sums up a platoon for its card.
 export function platoonHeadline(state, pl) {
-  if (pl.broken) return 'Routing';
+  if (pl.broken) return state.squads[pl.squads[0]].status.startsWith('Regrouping') ? state.squads[pl.squads[0]].status : pl.rallied ? 'Running' : 'Routing';
   const sqs = pl.squads.map((id) => state.squads[id]).filter((sq) => sq.mode !== 'dead');
   if (!sqs.length) return 'Wiped out';
   const pinned = sqs.find((sq) => sq.pinned);
