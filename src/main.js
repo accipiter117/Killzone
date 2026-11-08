@@ -31,7 +31,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), labelsAll: store.get('labels', false), view: store.get('view', '25d'), lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), labelsAll: store.get('labels', false), view: store.get('soldierStyle', 'pixel'), lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, armed: null, marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -149,7 +149,9 @@ function focusPlatoon(pl) {
 
 // In 2.5D a soldier's body is drawn above their feet, so aim taps at the chest.
 function bodyLift() {
-  return game.view === 'top' ? 0 : 9 * Math.max(1, 0.7 / game.cam.z);
+  if (game.view === 'top') return 0;
+  if (game.view === 'pixel') return 30 * Math.max(0.42, 0.3 / game.cam.z);
+  return 9 * Math.max(1, 0.7 / game.cam.z);
 }
 
 function siteAt(state, w) {
@@ -271,7 +273,7 @@ document.getElementById('watch-toggle').addEventListener('change', (e) => {
 });
 document.getElementById('view-select').addEventListener('change', (e) => {
   game.view = e.target.value;
-  store.set('view', game.view);
+  store.set('soldierStyle', game.view);
 });
 document.getElementById('labels-toggle').addEventListener('change', (e) => {
   game.labelsAll = e.target.checked;

@@ -6,6 +6,16 @@ import { toScreen } from './camera.js';
 import { sideColours, drawSmoke, drawEffects } from './effects.js';
 import { getSprite, dirIndex, SPRITE_SIZE } from './sprites.js';
 import { getSprite25, W25, H25, ANCHOR_X, ANCHOR_Y } from './sprites25d.js';
+import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './pixel-troopers.js';
+
+// Detailed troopers: every role uses the faction's rifleman for now.
+const FACTION = ['isa', 'hgh'];
+export const spriteScalePixel = (px) => Math.max(0.42, 0.3 * px);
+function drawTrooper(g, side, frame, ang, x, y, ps) {
+  const facing = Math.cos(ang) >= 0 ? 1 : -1;
+  const fx = facing === 1 ? PT_FOOT[0] : PT_W - 1 - PT_FOOT[0];
+  g.drawImage(getPixelTrooper(FACTION[side], frame, facing), x - fx * ps, y - PT_FOOT[1] * ps, PT_W * ps, PT_H * ps);
+}
 
 export const OWNER = { 0: '#7fb6ff', 1: '#ff6a2a', null: '#d8d2c0' };
 const ownerColour = (o) => OWNER[o === null || o === undefined ? 'null' : o];
@@ -216,7 +226,7 @@ function animate(r, state, opts) {
     if (sq.pinned && sq.mode !== 'rout') frame = sq.mode === 'crawl' && moved > 0.01 && Math.floor(stride / 3) % 2 ? 'prone2' : 'prone1';
     else if (opts.now - (lastShot.get(s.id) ?? -9) < 0.09) frame = 'fire';
     else if (moved > 0.01) frame = top ? WALK[Math.floor(stride / 3.5) % 4] : WALK25[Math.floor(stride / 3) % 4];
-    out.push({ s, sq, frame, dir: dirIndex(ang) });
+    out.push({ s, sq, frame, dir: dirIndex(ang), ang });
   }
   return out;
 }
@@ -243,23 +253,26 @@ function drawSoldiers(g, r, state, opts, px) {
   }
   // 2.5D: soldiers stand up off the ground, so draw the ones further up the
   // screen first and let nearer ones overlap them. Feet sit on the position.
-  const ps = spriteScale25(px);
+  const pixel = opts.view === 'pixel';
+  const ps = pixel ? spriteScalePixel(px) : spriteScale25(px);
+  const foot = pixel ? 2.4 : 1; // shadows and rings scale with the figure
   list.sort((a, b) => a.s.y - b.s.y || a.s.id - b.s.id);
   for (const { s, sq } of list) {
     g.fillStyle = 'rgba(15,12,8,0.35)';
     g.beginPath();
-    g.ellipse(s.x, s.y + 0.5 * ps, 6 * ps, 2.6 * ps, 0, 0, Math.PI * 2);
+    g.ellipse(s.x, s.y + 0.5 * ps, 6 * ps * foot, 2.6 * ps * foot, 0, 0, Math.PI * 2);
     g.fill();
     if (sel === sq.platoon) {
       g.strokeStyle = 'rgba(255,240,170,0.9)';
       g.lineWidth = 1.6 * px;
       g.beginPath();
-      g.ellipse(s.x, s.y + 0.5 * ps, 8 * ps, 3.6 * ps, 0, 0, Math.PI * 2);
+      g.ellipse(s.x, s.y + 0.5 * ps, 8 * ps * foot, 3.6 * ps * foot, 0, 0, Math.PI * 2);
       g.stroke();
     }
   }
-  for (const { s, sq, frame, dir } of list) {
+  for (const { s, sq, frame, dir, ang } of list) {
     g.globalAlpha = sq.mode === 'rout' ? 0.6 : 1;
+    if (pixel) { drawTrooper(g, s.side, frame, ang, s.x, s.y, ps); continue; }
     g.drawImage(getSprite25(s.side, s.role, frame, dir), s.x - ANCHOR_X * ps, s.y - ANCHOR_Y * ps, W25 * ps, H25 * ps);
   }
   g.globalAlpha = 1;
@@ -272,11 +285,15 @@ function drawBodies(g, r, state, fxs, now, px, view) {
   const ps = spriteScale25(px);
   g.imageSmoothingEnabled = false;
   for (const b of fxs.bodies) {
-    if (b.dir === null) b.dir = dirIndex(r.facing[b.id] ?? (b.side === 0 ? 0 : Math.PI));
+    if (b.dir === null) {
+      b.ang = r.facing[b.id] ?? (b.side === 0 ? 0 : Math.PI);
+      b.dir = dirIndex(b.ang);
+    }
     const t = now - b.t0;
     const frame = t < 0.12 ? 'fall1' : t < 0.26 ? 'fall2' : 'dead';
     const role = state.soldiers[b.id].role;
     if (top) g.drawImage(getSprite(b.side, role, frame, b.dir), b.x - size / 2, b.y - size / 2, size, size);
+    else if (view === 'pixel') drawTrooper(g, b.side, frame, b.ang, b.x, b.y, spriteScalePixel(px));
     else g.drawImage(getSprite25(b.side, role, frame, b.dir), b.x - ANCHOR_X * ps, b.y - ANCHOR_Y * ps, W25 * ps, H25 * ps);
   }
 }

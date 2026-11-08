@@ -101,6 +101,11 @@ export const CONFIG = {
     slotSpacing: 75,
     arriveDist: 28,
     routSpeedMult: 1.25,
+    stallSec: 8, // no headway for this long and a squad pushes straight on...
+    pushSec: 4, // ...for this long, ignoring cover, wire detours and waiting
+    platoonLead: 170, // a squad this far ahead of its platoon's slowest squad waits for it
+    paceAhead: 18, // soldiers this far in front of their squad's centre slow down
+    paceBehind: 22, // soldiers this far behind it speed up
   },
 
   capture: { objectiveSec: 14, featureSec: 8, decaySec: 30 },

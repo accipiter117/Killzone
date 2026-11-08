@@ -48,6 +48,7 @@ export function createBattle(seed, options = {}) {
           id: state.squads.length, platoon: pl.id, side, role, soldiers: [],
           supp: 0, pinned: false, lastHitTick: -9999, lastFiredTick: -9999, tally: {},
           mode: 'idle', status: 'Awaiting orders', bound: null, pauseUntil: 0, holdSpot: null, flankDone: false, waitSince: -1, cx: 0, cy: 0,
+          bestD: Infinity, bestTick: 0, pushUntil: 0,
         };
         state.squads.push(sq);
         pl.squads.push(sq.id);
@@ -65,6 +66,12 @@ export function createBattle(seed, options = {}) {
     });
   }
   for (const sd of state.sides) sd.spotted = new Array(state.soldiers.length).fill(0);
+  // Squad centres start where the squads deploy (used for platoon pacing).
+  for (const sq of state.squads) {
+    const ms = sq.soldiers.map((id) => state.soldiers[id]);
+    sq.cx = ms.reduce((a, m) => a + m.x, 0) / ms.length;
+    sq.cy = ms.reduce((a, m) => a + m.y, 0) / ms.length;
+  }
   state.durationTicks = Math.round(cfg.battle.durationSec * cfg.tickRate);
   updateVision(state);
   return state;

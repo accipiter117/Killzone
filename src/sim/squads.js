@@ -18,6 +18,9 @@ export function resetPlans(state, pl) {
     sq.holdSpot = null;
     sq.flankDone = false;
     sq.waitSince = -1;
+    sq.bestD = Infinity;
+    sq.bestTick = state.tick;
+    sq.pushUntil = 0;
   }
 }
 
@@ -219,9 +222,35 @@ function advance(state, sq, pl, list, c, firing) {
   }
 
   const towards = label ? `to ${label}` : 'up';
+  const tick = state.tick;
+
+  // Stall check: if a squad that should be advancing has made no headway for
+  // a while (stuck on wire, waiting, or hugging cover under fire), it pushes
+  // straight on for a few seconds. This is the safety net that stops units
+  // getting parked behind cover for the rest of the battle.
+  if (d < sq.bestD - 10) { sq.bestD = d; sq.bestTick = tick; }
+  if (tick >= sq.pushUntil && tick - sq.bestTick > sc.stallSec * cfg.tickRate) {
+    sq.pushUntil = tick + Math.round(sc.pushSec * cfg.tickRate);
+    sq.bestTick = tick;
+    sq.bestD = d;
+  }
+  const pushing = tick < sq.pushUntil;
+
+  // Assault squads swing wide and come in from the side: their route goes
+  // through a flanking waypoint first.
+  let target = goal;
+  let flanking = false;
+  if (sq.role === 'assault' && !sq.flankDone && d > 260) {
+    const k = pl.squads.indexOf(sq.id) - 1;
+    const sign = k !== 0 ? Math.sign(k) * dir : goal.y < state.map.height / 2 ? 1 : -1;
+    const wp = { x: goal.x - dir * 120, y: clamp(goal.y + sign * sc.flankOffset, 30, state.map.height - 30) };
+    if (dist(c, wp) < 45) sq.flankDone = true;
+    else { target = wp; flanking = true; }
+  }
+
   // Engineers deal with wire on their way; they do not detour round it.
-  if (sq.role === 'engineer') {
-    const w = wireOnLine(state, c, goal);
+  if (sq.role === 'engineer' && !pushing) {
+    const w = wireOnLine(state, c, target);
     if (w) {
       if (dist(c, w) > 34) {
         sq.mode = 'move';
@@ -230,12 +259,46 @@ function advance(state, sq, pl, list, c, firing) {
       } else {
         sq.mode = 'cut';
         sq.status = 'Cutting wire';
+        sq.bestTick = tick; // cutting is progress, not a stall
         stopAll(list);
         const amount = (role.cutRate * sc.thinkEveryTicks / cfg.tickRate) * (list.length / cfg.soldiersPerSquad);
         cutWire(state, w.x + dir * 6, w.y, role.cutRadius, amount);
       }
       return;
     }
+  }
+
+  // Wire in the way: go to the nearest gap and then through it, or wait for
+  // the engineers. (Aiming only at the near side of a gap used to leave
+  // squads standing at the wire for good.)
+  let next = target;
+  let crossing = false;
+  const w = sq.role !== 'engineer' && !pushing ? wireOnLine(state, c, target, 160) : null;
+  if (w) {
+    const gap = findGap(state, w);
+    if (gap) {
+      const before = dir * (gap.x - c.x);
+      next = before > 25 ? { x: gap.x - dir * 20, y: gap.y } : { x: gap.x + dir * 45, y: gap.y };
+      crossing = true;
+    } else {
+      const hasEngineers = pl.squads.some((id) => state.squads[id].role === 'engineer' && members(state, state.squads[id]).length);
+      if (sq.waitSince < 0) sq.waitSince = tick;
+      const waited = (tick - sq.waitSince) / cfg.tickRate;
+      if (hasEngineers && pl.stance !== 'aggressive' && waited < 12 && dist(c, w) < 60) {
+        sq.mode = 'wait';
+        sq.status = 'Waiting for wire to be cut';
+        stopAll(list);
+        return;
+      }
+      crossing = dist(c, w) < 40;
+    }
+  } else sq.waitSince = -1;
+
+  if (pushing) {
+    sq.mode = 'move';
+    sq.status = crossing ? 'Pushing through the wire' : `Pushing on ${towards}`;
+    formUp(state, sq, list, next, false);
+    return;
   }
 
   // Under fire, cautious squads drop into cover before carrying on.
@@ -249,29 +312,27 @@ function advance(state, sq, pl, list, c, firing) {
     }
   }
 
-  // Wire in the way: head for the nearest gap, or wait for the engineers.
-  let next = goal;
-  let crossing = false;
-  const w = sq.role !== 'engineer' ? wireOnLine(state, c, goal, 160) : null;
-  if (w) {
-    const gap = findGap(state, w);
-    if (gap && Math.abs(gap.y - w.y) > 4) next = { x: gap.x - dir * 10, y: gap.y };
-    else if (!gap) {
-      const hasEngineers = pl.squads.some((id) => state.squads[id].role === 'engineer' && members(state, state.squads[id]).length);
-      if (sq.waitSince < 0) sq.waitSince = state.tick;
-      const waited = (state.tick - sq.waitSince) / cfg.tickRate;
-      if (hasEngineers && pl.stance !== 'aggressive' && waited < 12 && dist(c, w) < 60) {
-        sq.mode = 'wait';
-        sq.status = 'Waiting for wire to be cut';
-        stopAll(list);
-        return;
-      }
-      crossing = dist(c, w) < 40;
+  // Keep the platoon together: a squad that has got well ahead of the
+  // slowest squad in its platoon waits in cover for it to catch up.
+  if (sq.role !== 'recon' && d > 140) {
+    let slowest = Infinity;
+    for (const id of pl.squads) {
+      const o = state.squads[id];
+      if (o === sq || o.role === 'recon' || o.mode === 'dead' || o.mode === 'arrived' || o.mode === 'rout') continue;
+      slowest = Math.min(slowest, dir * o.cx);
     }
-  } else sq.waitSince = -1;
+    if (slowest < Infinity && dir * c.x - slowest > sc.platoonLead) {
+      sq.mode = 'wait';
+      sq.status = 'Waiting for the platoon';
+      const cv = findCover(state.map, c.x, c.y, 40, (x, y) => -Math.hypot(x - c.x, y - c.y));
+      if (cv) formUp(state, sq, list, cv, true); else stopAll(list);
+      return;
+    }
+  }
 
   if (sq.role === 'heavy' && threat && threat.d < weaponRange(state, list[0]) * 0.9 && d > 80) {
-    // Heavies stop at range and pour fire in, ideally from cover.
+    // Heavies stop at range and pour fire in, ideally from cover. The stall
+    // check moves them up a bound now and then so they keep pace.
     sq.mode = 'suppress';
     sq.status = 'Suppressing';
     const cv = findCover(state.map, c.x, c.y, 50, (x, y) => -Math.hypot(x - c.x, y - c.y));
@@ -279,21 +340,14 @@ function advance(state, sq, pl, list, c, firing) {
     return;
   }
 
-  if (sq.role === 'assault' && !sq.flankDone && d > 260) {
-    // Assault squads swing wide and come in from the side.
-    const k = pl.squads.indexOf(sq.id) - 1;
-    const sign = k !== 0 ? Math.sign(k) * dir : goal.y < state.map.height / 2 ? 1 : -1;
-    const wp = { x: goal.x - dir * 120, y: clamp(goal.y + sign * sc.flankOffset, 30, state.map.height - 30) };
-    if (dist(c, wp) < 45) sq.flankDone = true;
-    else {
-      sq.mode = 'move';
-      sq.status = label ? `Flanking toward ${label}` : 'Flanking';
-      formUp(state, sq, list, next === goal ? wp : next, false);
-      return;
-    }
+  if (flanking) {
+    sq.mode = 'move';
+    sq.status = crossing ? 'Heading for a gap in the wire' : label ? `Flanking toward ${label}` : 'Flanking';
+    formUp(state, sq, list, next, false);
+    return;
   }
 
-  if (sq.role === 'rifle' && threat) {
+  if (sq.role === 'rifle' && threat && !crossing) {
     // Rifles bound from cover to cover while the enemy is in sight.
     if (sq.bound && dist(c, sq.bound) > sc.arriveDist) {
       sq.mode = 'move';
@@ -302,8 +356,8 @@ function advance(state, sq, pl, list, c, firing) {
       return;
     }
     if (sq.bound) {
-      if (!sq.pauseUntil) sq.pauseUntil = state.tick + Math.round(st.pause * cfg.tickRate);
-      if (state.tick < sq.pauseUntil) {
+      if (!sq.pauseUntil) sq.pauseUntil = tick + Math.round(st.pause * cfg.tickRate);
+      if (tick < sq.pauseUntil) {
         sq.mode = 'cover';
         sq.status = firing ? 'In cover, returning fire' : 'In cover';
         formUp(state, sq, list, sq.bound, true);
@@ -327,7 +381,7 @@ function advance(state, sq, pl, list, c, firing) {
   }
 
   sq.mode = 'move';
-  if (crossing) sq.status = 'Crossing wire';
+  if (crossing) sq.status = 'Heading for a gap in the wire';
   else if (sq.role === 'recon') sq.status = 'Moving to overwatch';
   else sq.status = sq.role === 'assault' && sq.flankDone && label ? `Assaulting ${label}` : `Advancing ${towards}`;
   formUp(state, sq, list, next, false);
@@ -347,6 +401,12 @@ export function moveSoldiers(state, dt) {
     const d = Math.hypot(dx, dy);
     if (d < 0.5) continue;
     let speed = cfg.roles[s.role].speed * cfg.stances[pl.stance].speedMult;
+    if (sq.mode === 'move') {
+      // Squad cohesion: soldiers out in front ease off, stragglers hurry.
+      const ahead = ((s.x - sq.cx) * dx + (s.y - sq.cy) * dy) / d;
+      if (ahead > cfg.squad.paceAhead) speed *= 0.55;
+      else if (ahead < -cfg.squad.paceBehind) speed *= 1.25;
+    }
     speed *= cfg.cover[coverName(state, s.x, s.y)].speed;
     if (wireAt(state.map, s.x, s.y) > 0) speed *= cfg.wire.speedMult;
     if (sq.mode === 'rout') speed *= cfg.squad.routSpeedMult;
