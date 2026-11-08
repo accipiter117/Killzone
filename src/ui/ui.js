@@ -4,7 +4,8 @@
 
 import { platoonStrength } from '../sim/util.js';
 import { platoonHeadline } from '../sim/squads.js';
-import { ABILITY_OF, abilityHasTarget } from '../sim/abilities.js';
+import { abilityKey, abilityHasTarget } from '../sim/abilities.js';
+import { mainGunTarget } from '../sim/vehicles.js';
 import { amendWindow } from '../sim/commands.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -26,9 +27,9 @@ export function createUI(handlers) {
   };
   const e = ui.els;
   for (let i = 0; i < 6; i++) e.opPips.appendChild(document.createElement('i')).appendChild(document.createElement('b'));
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const b = document.createElement('button');
-    b.className = 'card';
+    b.className = i === 3 ? 'card tank' : 'card';
     b.innerHTML = '<div class="name"><span></span><em></em></div><div class="bar"><i></i></div><div class="status"></div>';
     b.addEventListener('click', () => handlers.selectCard(i));
     e.cards.appendChild(b);
@@ -132,11 +133,29 @@ export function updateUI(ui, state, view) {
     st.classList.toggle('pinned', free <= 0 && (head.startsWith('Pinned') || head === 'Routing'));
   });
 
+  // The tank's card.
+  const tank = state.vehicles.find((v) => v.side === view.playerSide);
+  if (tank) {
+    const card = ui.cards[3];
+    card.classList.toggle('sel', !!view.vehicle);
+    card.classList.toggle('broken', !tank.alive);
+    card.querySelector('.name span').textContent = 'Tank';
+    const ow = Math.ceil((tank.abilityReady - state.tick) / state.cfg.tickRate);
+    card.querySelector('.name em').textContent = !tank.alive ? 'Wrecked' : ow > 0 ? `Overwatch ${ow}s` : 'Overwatch ready';
+    const bar = card.querySelector('.bar i');
+    bar.style.width = `${Math.round((100 * tank.hp) / tank.maxHp)}%`;
+    bar.classList.toggle('low', tank.hp < tank.maxHp * 0.5);
+    const free = view.replay || view.watch || !tank.alive ? 0 : Math.ceil(amendWindow(state, tank) / state.cfg.tickRate);
+    const st = card.querySelector('.status');
+    st.textContent = !tank.alive ? 'Knocked out' : free > 0 ? `Tap the map to change (${free}s)` : tank.status;
+    st.classList.toggle('amend', free > 0);
+  }
+
   // Squad lines for the selected platoon, each with its ability button.
   // Rows are built once per selection and then only updated, so a tap on a
   // button is never lost to a rebuild.
   const sel = view.selected !== null ? state.platoons[view.selected] : null;
-  const key = sel ? `p${sel.id}` : view.replay ? 'replay' : view.watch ? 'watch' : 'none';
+  const key = sel ? `p${sel.id}` : view.vehicle ? 'tank' : view.replay ? 'replay' : view.watch ? 'watch' : 'none';
   if (ui.rowsFor !== key) {
     ui.rowsFor = key;
     e.squads.innerHTML = '';
@@ -155,20 +174,42 @@ export function updateUI(ui, state, view) {
         e.squads.appendChild(row);
         ui.rows.push({ sq, row, s, btn });
       }
+    } else if (view.vehicle && tank) {
+      const row = document.createElement('div');
+      const b = document.createElement('b');
+      b.textContent = 'Tank';
+      const s = document.createElement('span');
+      const btn = document.createElement('button');
+      btn.className = 'ab';
+      btn.addEventListener('click', () => ui.handlers.tankAbility());
+      row.append(b, s, btn);
+      e.squads.appendChild(row);
+      ui.rows.push({ tank, row, s, btn });
     } else {
       const d = document.createElement('div');
       d.className = 'empty';
-      d.textContent = view.replay ? 'Watching the replay.' : view.watch ? 'Watch mode: the AI is commanding both sides.' : 'Select a platoon card, then tap the map to give it an order.';
+      d.textContent = view.replay ? 'Watching the replay.' : view.watch ? 'Watch mode: the AI is commanding both sides.' : 'Select a platoon or the tank, then tap the map to give it an order.';
       e.squads.appendChild(d);
     }
   }
   e.stanceLabel.textContent = sel ? state.cfg.stances[sel.stance].label : '-';
   for (const r of ui.rows || []) {
+    if (r.tank) {
+      const v = r.tank, o = state.cfg.tank.overwatch;
+      const wait = Math.ceil((v.abilityReady - state.tick) / state.cfg.tickRate);
+      r.row.className = v.alive ? '' : 'dead';
+      r.s.textContent = v.alive ? v.status : 'Knocked out';
+      r.btn.textContent = wait > 0 ? `${o.label} ${wait}s` : o.label;
+      r.btn.disabled = !v.alive || wait > 0 || view.replay || view.watch;
+      r.btn.classList.toggle('ready', !r.btn.disabled && !!mainGunTarget(state, v));
+      continue;
+    }
     const { sq } = r;
     const dead = sq.mode === 'dead';
     r.row.className = sq.pinned ? 'pinned' : dead ? 'dead' : '';
     r.s.textContent = sq.status;
-    const ab = state.cfg.abilities[ABILITY_OF[sq.role]];
+    const k = abilityKey(state, sq);
+    const ab = k === 'breach' ? state.cfg.breach : state.cfg.abilities[k];
     const wait = Math.ceil((sq.abilityReady - state.tick) / state.cfg.tickRate);
     r.btn.textContent = wait > 0 ? `${ab.label} ${wait}s` : ab.label;
     r.btn.disabled = dead || wait > 0 || view.replay || view.watch || sq.mode === 'rout';
@@ -222,6 +263,7 @@ export function showEnd(ui, state, playerSide, replayCheck) {
     ['Objectives held', r.held[0].join(' ') || 'none', r.held[1].join(' ') || 'none'],
     ['Objectives and posts taken', r.captures[0], r.captures[1]],
     ['Abilities used', r.abilities[0], r.abilities[1]],
+    ['Tanks lost', r.tanksLost?.[0] ?? 0, r.tanksLost?.[1] ?? 0],
     ['Platoons rallied', r.rallies[0], r.rallies[1]],
     ['Reinforcements called', r.reinforcements[0], r.reinforcements[1]],
     ['Battle length', fmtTime(r.durationSec), ''],

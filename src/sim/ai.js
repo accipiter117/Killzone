@@ -4,7 +4,8 @@
 // battle always gets the same decisions.
 
 import { members, centroid, dist, platoonStrength, platoonAlive, isActive } from './util.js';
-import { abilityHasTarget } from './abilities.js';
+import { abilityHasTarget, abilityKey } from './abilities.js';
+import { mainGunTarget } from './vehicles.js';
 import { heightAt } from './map.js';
 
 const PROFILES = {
@@ -157,11 +158,37 @@ function decide(state, side, prof, memory) {
       if (sq.role === 'assault' && platoonStrength(state, pl) < 0.4) continue;
       // Infiltrators only vanish once they have given themselves away.
       if (sq.role === 'infiltrator' && !list.some((x) => state.tick - x.lastShotTick < cfg.roles.infiltrator.revealSec * cfg.tickRate)) continue;
-      if (sq.role === 'engineer') {
+      if (sq.role === 'engineer' && abilityKey(state, sq) !== 'breach') {
         const c = centroid(list);
         if (!seenFoes.some((e) => dist(e, c) < 400)) continue;
       } else if (!abilityHasTarget(state, sq)) continue;
       cmds.push({ side, type: 'ability', params: { platoon: pl.id, role: sq.role } });
+    }
+  }
+
+  // The tank: fire Overwatch whenever it has a worthwhile target, back off
+  // to repair distance when badly hurt, otherwise roll in just behind the
+  // strongest platoon so the infantry lead and the tank covers them.
+  const tank = state.vehicles.find((v) => v.side === side && v.alive);
+  if (tank) {
+    if (state.tick >= tank.abilityReady) {
+      const t = mainGunTarget(state, tank);
+      if (t && (t.tank || t.n >= 3)) cmds.push({ side, type: 'vability', params: {} });
+    }
+    const W = state.map.width;
+    const back = side === 0 ? -1 : 1;
+    let goal = null;
+    if (tank.hp < tank.maxHp * ai.tankRetreatHp) goal = { x: side === 0 ? ai.tankRetreatX : W - ai.tankRetreatX, y: tank.y };
+    else {
+      const lead = mine.filter((pl) => pl.order.type === 'take' || pl.order.type === 'move' || pl.order.type === 'hold')
+        .sort((a, b) => platoonAlive(state, b) - platoonAlive(state, a) || a.id - b.id)[0];
+      const c = lead && centres.get(lead.id);
+      const to = lead && (lead.order.type === 'take' || lead.order.type === 'move') ? { x: lead.order.x, y: lead.order.y } : c;
+      if (to && c) goal = { x: Math.round(to.x + back * ai.tankBehind), y: Math.round(to.y) };
+    }
+    const cur = tank.order.type === 'move' ? tank.order : tank;
+    if (goal && dist(goal, cur) > ai.tankReorderDist && op >= cost.vmove + prof.reserve && orders < 3) {
+      spend({ type: 'vmove', params: goal }, cost.vmove);
     }
   }
 

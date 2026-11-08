@@ -161,6 +161,16 @@ export function playEvents(a, events, cam, playerSide) {
         SOUNDS.boom(a, g, e.type === 'tankBlast');
         a.budget -= 2;
         break;
+      case 'tankShot':
+        g = Math.max(0.3, nearness(cam, e.x1, e.y1));
+        SOUNDS.boom(a, g, false);
+        a.budget -= 2;
+        break;
+      case 'vehicleDestroyed':
+        SOUNDS.boom(a, Math.max(0.4, nearness(cam, e.x, e.y)), true);
+        SOUNDS.horn(a, 1, e.side !== playerSide);
+        a.budget -= 2;
+        break;
       case 'zap': SOUNDS.zap(a, Math.max(0.2, nearness(cam, e.x1, e.y1))); a.budget--; break;
       case 'throw': SOUNDS.thump(a, nearness(cam, e.x1, e.y1)); break;
       case 'smoke': SOUNDS.smoke(a, Math.max(0.3, nearness(cam, e.x, e.y))); break;

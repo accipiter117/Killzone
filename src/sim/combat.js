@@ -5,6 +5,7 @@ import { T } from './map.js';
 import { terrainAt, heightAt, cellIndex } from './map.js';
 import { coverAt, isActive, dist, feed, sideName } from './util.js';
 import { explodeTank } from './features.js';
+import { infantryVsTank, behindTank } from './vehicles.js';
 
 // Is the line between two points blocked by smoke, or by raised ground
 // higher than both ends (you cannot see through a hill)?
@@ -112,6 +113,8 @@ export function hitChance(state, accuracy, d, range, target, shooterPinned, shoo
     // Firing down from higher ground is easier; firing up at it is harder.
     const diff = heightAt(state.map, shooter.x, shooter.y) - heightAt(state.map, target.x, target.y);
     p *= Math.max(0.4, 1 + state.cfg.height.hitPerLevel * diff);
+    // Rolling cover: sheltering close behind your own tank.
+    if (target.role && state.vehicles.length && behindTank(state, target, shooter)) p *= 1 - state.cfg.tank.coverHit;
   }
   return p;
 }
@@ -136,9 +139,17 @@ export function updateFiring(state, dt) {
       s.retarget = cfg.combat.retargetSec;
       t = s.target >= 0 ? state.soldiers[s.target] : null;
     }
-    if (!t) { s.cd = 0.2; continue; }
     const barrage = sq.barrageUntil > state.tick;
     let base = cfg.roles[s.role];
+    // Heavies are the anti-armour weapon: they turn on a tank in range first.
+    // Everyone else only shoots at it when there is no soldier to shoot.
+    if ((s.role === 'heavy' || !t) && infantryVsTank(state, s, base, range, sq.pinned && !barrage)) {
+      s.lastShotTick = state.tick;
+      s.cd = base.fireInterval * (0.85 + 0.3 * next(state));
+      sq.lastFiredTick = state.tick;
+      continue;
+    }
+    if (!t) { s.cd = 0.2; continue; }
     // An infiltrator firing from hiding: the first shots hit much harder.
     if (base.hidden && state.tick - s.lastShotTick > base.revealSec * cfg.tickRate) base = { ...base, damage: base.damage * base.ambushMult };
     s.lastShotTick = state.tick;

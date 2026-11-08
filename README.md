@@ -65,6 +65,14 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 | Mark | Recon | Tags an enemy group for ten seconds: everyone can see them and hits them more often. |
 | Dive | Jetpack | Leaps onto the nearest enemy group and lands with a stomp that hurts and pins them. |
 | Vanish | Infiltrator | Goes fully hidden for eight seconds, even up close, to slip away or set up the next ambush. |
+| Breach | Engineer | Replaces Sandbags while an enemy tank is within reach: the squad sprints to the tank and plants a charge that goes off a few seconds later for heavy damage. |
+| Overwatch | Tank | An aimed heavy shell at the best target in range (the enemy tank first). |
+
+### Tanks
+
+Each side has one tank from the start, with the same numbers for both (only the look differs: the ISA tank is low and angular, the Helghast tank tall, riveted and lit by orange vents). It has its own card: tap it, then tap the ground to drive there (1 order point, free to change for 5 seconds). It cannot enter ruins and slows on ramps. Its main gun reloads slowly and bursts on groups of infantry or hits the enemy tank; its machine gun sprays anyone close. Infantry close behind their own tank are covered from fire coming the other way, and it crushes wire as it goes. It cannot take objectives.
+
+Counters: rifles barely scratch it. Heavies turn their fire on it first and hurt it properly, blasts (grenades, artillery, petrusite, jetpack landings) and the arc tower hurt it more, engineers can breach it, and the other tank duels it. A knocked out tank stays on the field as a burnt wreck that infantry use as cover. The AI drives its tank behind its strongest platoon, pulls it back when badly damaged, and breaches yours with its engineers. Numbers live in `tank` and `breach` in `src/config.js`.
 
 Platoon mixes: 1st (Rifle, Heavy, Engineer), 2nd (Jetpack, Assault, Engineer), 3rd (Infiltrator, Heavy, Recon). Both sides have the same mix; change `platoons` in `src/config.js` to try others. Each role has its own look: Heavies carry machine guns and ammo packs, Assault troops are armoured with short guns, Engineers carry tool packs, Recon carry sniper rifles (the Helghast scout is hooded and cloaked), Jetpack troopers wear twin-thruster packs, Infiltrators wear hoods or soft caps and carry suppressed rifles.
 
@@ -115,7 +123,7 @@ Every number is in [`src/config.js`](src/config.js). Change one, push, reload on
 
 - Vanilla JavaScript modules, no build step, no dependencies. Open `index.html` through any static server (for example `python3 -m http.server`).
 - `src/sim/` is the whole battle with no DOM: fixed 30 ticks per second, one seeded RNG, and every order is a command object passed through `applyCommand`. The AI issues the same commands with the same order point rules.
-- `npm test` runs the Node test suite (determinism and replays, AI vs AI battles finishing on time, capture and flipping, pinned squads not advancing, wire slowing until cut, petrusite tanks exploding once, order points, routing, map symmetry, cliffs, ramps and high ground, every ability).
+- `npm test` runs the Node test suite (determinism and replays, AI vs AI battles finishing on time, capture and flipping, pinned squads not advancing, wire slowing until cut, petrusite tanks exploding once, order points, tanks (driving, armour, breaching, Overwatch, wrecks, rolling cover), routing, map symmetry, cliffs, ramps and high ground, every ability).
 - `node tools/balance.mjs 10 standard aggressive` plays 10 seeds twice with the AI profiles swapped between sides and reports win rates by side and profile, average battle length and margins. 
 - `tools/balance.mjs` with the same profile on both sides plays every game on its own map. With both AIs on the standard profile, 200 battles on fresh maps came out 47/53 (within chance); battles average about six and a half minutes and roughly 40 percent go to time.
 - The AI has been checked against scripted player strategies (all-in rush on B, spreading out, with and without abilities): it wins most of them, and `test/ai.test.js` guards against the all-in rush becoming a sure win again.

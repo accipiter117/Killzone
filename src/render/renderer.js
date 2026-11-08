@@ -7,6 +7,7 @@ import { sideColours, drawSmoke, drawEffects } from './effects.js';
 import { getSprite, dirIndex, SPRITE_SIZE } from './sprites.js';
 import { getSprite25, W25, H25, ANCHOR_X, ANCHOR_Y } from './sprites25d.js';
 import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './pixel-troopers.js';
+import { getTank, TANK_W, TANK_H, TANK_FOOT } from './tanks.js';
 
 // Detailed troopers: each faction and role has its own sprite set.
 const FACTION = ['isa', 'hgh'];
@@ -25,7 +26,7 @@ export function createRenderer(map) {
   const wireCells = [];
   for (let i = 0; i < map.wire.length; i++) if (map.wire[i] > 0) wireCells.push(i);
   // facing, last drawn position and distance walked per soldier drive the animation.
-  return { wireCells, facing: [], lastX: [], lastY: [], stride: [], badges: [], thumb: null, thumbAt: -1 };
+  return { wireCells, facing: [], lastX: [], lastY: [], stride: [], badges: [], thumb: null, thumbAt: -1, vdist: [0, 0], vlast: [] };
 }
 
 const visible = (state, s, opts) => s.side === opts.playerSide || opts.reveal || state.sides[opts.playerSide].spotted[s.id];
@@ -247,6 +248,62 @@ const spriteScale25 = (px) => Math.max(1, 0.7 * px);
 
 // Work out each soldier's facing and animation frame. Bookkeeping runs for
 // everyone (seen or not) so animation stays in step when they come into view.
+const vehicleSeen = (state, v, opts) => v.side === opts.playerSide || opts.reveal || v.spotted[opts.playerSide];
+
+// One tank: sprite frame from how far it has driven, a firing frame just
+// after a shot, a burnt wreck once destroyed, smoke when badly damaged.
+function drawVehicle(g, r, state, v, ps, opts) {
+  const last = r.vlast[v.id];
+  if (last) r.vdist[v.id] += Math.hypot(v.x - last.x, v.y - last.y);
+  r.vlast[v.id] = { x: v.x, y: v.y };
+  const ticks = state.tick - v.lastFireTick;
+  let frame = 'idle';
+  if (!v.alive) frame = 'wreck';
+  else if (ticks >= 0 && ticks < 5) frame = 'fire';
+  else if (v.moved > 0) frame = 'move' + (1 + (Math.floor(r.vdist[v.id] / 4) % 4));
+  const fx = v.facing === 1 ? TANK_FOOT[0] : TANK_W - TANK_FOOT[0];
+  const x0 = v.x - fx * ps, y0 = v.y - TANK_FOOT[1] * ps;
+  g.fillStyle = 'rgba(15,12,8,0.35)';
+  g.beginPath();
+  g.ellipse(v.x, v.y - 2 * ps, 96 * ps, 16 * ps, 0, 0, Math.PI * 2);
+  g.fill();
+  if (v.alive && opts.vehicleSelected && v.side === opts.playerSide) {
+    g.strokeStyle = 'rgba(255,240,170,0.9)';
+    g.lineWidth = 1.6 / Math.max(0.2, 1 / ps);
+    g.beginPath();
+    g.ellipse(v.x, v.y, 110 * ps, 26 * ps, 0, 0, Math.PI * 2);
+    g.stroke();
+  }
+  g.drawImage(getTank(FACTION[v.side], frame, v.facing), x0, y0, TANK_W * ps, TANK_H * ps);
+  if (opts.now - (opts.fxs.lastVehicleHit?.get(v.id) ?? -9) < 0.1) {
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = 0.6;
+    g.drawImage(getTank(FACTION[v.side], frame, v.facing), x0, y0, TANK_W * ps, TANK_H * ps);
+    g.globalCompositeOperation = 'source-over';
+    g.globalAlpha = 1;
+  }
+  // Smoke from a damaged hull (thick and black from a wreck).
+  const hurt = v.alive ? 1 - v.hp / v.maxHp : 1;
+  if (hurt > 0.5) {
+    const n = v.alive ? 4 : 6;
+    for (let i = 0; i < n; i++) {
+      const k = ((opts.now * 0.45 + i / n) % 1);
+      g.fillStyle = `rgba(${v.alive ? '70,66,60' : '35,32,30'},${(v.alive ? 0.45 : 0.55) * (1 - k)})`;
+      g.beginPath();
+      g.arc(v.x + (i % 2 ? 8 : -6) * ps * 2 + k * 18, v.y - 70 * ps - k * 60, (6 + k * 16) * Math.max(1, ps * 2), 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  if (v.alive) {
+    // A slim health bar over the tank.
+    const w = 84 * ps, h = Math.max(2, 6 * ps), bx = v.x - w / 2, by = y0 + 12 * ps;
+    g.fillStyle = 'rgba(0,0,0,0.55)';
+    g.fillRect(bx - 1, by - 1, w + 2, h + 2);
+    g.fillStyle = v.hp / v.maxHp > 0.5 ? OWNER[v.side] : v.hp / v.maxHp > 0.25 ? '#e8c04a' : '#e0412a';
+    g.fillRect(bx, by, w * Math.max(0, v.hp / v.maxHp), h);
+  }
+}
+
 function animate(r, state, opts) {
   const out = [];
   const lastShot = opts.fxs.lastShot;
@@ -297,6 +354,7 @@ function drawSoldiers(g, r, state, opts, px) {
       g.drawImage(getSprite(s.side, s.role, frame, dir), s.x - size / 2, s.y - size / 2, size, size);
     }
     g.globalAlpha = 1;
+    for (const v of state.vehicles || []) if (vehicleSeen(state, v, opts)) drawVehicle(g, r, state, v, spriteScalePixel(px), opts);
     return;
   }
   // 2.5D: soldiers stand up off the ground, so draw the ones further up the
@@ -305,6 +363,7 @@ function drawSoldiers(g, r, state, opts, px) {
   const ps = pixel ? spriteScalePixel(px) : spriteScale25(px);
   const foot = pixel ? 2.4 : 1; // shadows and rings scale with the figure
   list.sort((a, b) => a.s.y - b.s.y || a.s.id - b.s.id);
+  const tanks = (state.vehicles || []).filter((v) => vehicleSeen(state, v, opts)).sort((a, b) => a.y - b.y);
   for (const { s, sq } of list) {
     g.fillStyle = 'rgba(15,12,8,0.35)';
     g.beginPath();
@@ -318,7 +377,9 @@ function drawSoldiers(g, r, state, opts, px) {
       g.stroke();
     }
   }
+  let ti = 0;
   for (const { s, sq, frame, dir, ang } of list) {
+    while (ti < tanks.length && tanks[ti].y <= s.y) drawVehicle(g, r, state, tanks[ti++], pixel ? ps : ps * 1.4, opts);
     g.globalAlpha = sq.mode === 'rout' ? 0.6 : 1;
     if (pixel) {
       // Jetpack troopers in the air are drawn above their shadow; infiltrators
@@ -342,6 +403,7 @@ function drawSoldiers(g, r, state, opts, px) {
     g.drawImage(getSprite25(s.side, s.role, frame, dir), s.x - ANCHOR_X * ps, s.y - ANCHOR_Y * ps, W25 * ps, H25 * ps);
   }
   g.globalAlpha = 1;
+  while (ti < tanks.length) drawVehicle(g, r, state, tanks[ti++], pixel ? ps : ps * 1.4, opts);
 }
 
 // The fallen: a quick topple, then they stay where they dropped.
@@ -536,6 +598,14 @@ export function drawMinimap(g, r, state, cam, opts) {
     if (!isActive(s) || !visible(state, s, opts)) continue;
     g.fillStyle = s.side === 0 ? '#bcd9ff' : '#ff7a3a';
     g.fillRect(s.x * sx - 1, s.y * sy - 1, 2, 2);
+  }
+  for (const v of state.vehicles || []) {
+    if (!vehicleSeen(state, v, opts)) continue;
+    g.fillStyle = v.alive ? (v.side === 0 ? '#bcd9ff' : '#ff7a3a') : '#555';
+    g.strokeStyle = '#000';
+    g.lineWidth = 1;
+    g.fillRect(v.x * sx - 3.5, v.y * sy - 2.5, 7, 5);
+    g.strokeRect(v.x * sx - 3.5, v.y * sy - 2.5, 7, 5);
   }
   for (const st of state.strikes) {
     g.strokeStyle = '#ff3b2a';

@@ -3,9 +3,11 @@
 // AI's decisions both arrive here, so they follow exactly the same rules.
 
 import { clamp } from './util.js';
+import { T, cellIndex } from './map.js';
 import { resetPlans, thinkSquad } from './squads.js';
 import { callArtillery, dropSmoke } from './features.js';
 import { useAbility } from './abilities.js';
+import { mainGunTarget, shell } from './vehicles.js';
 import { members, centroid, feed } from './util.js';
 
 // Fresh soldiers fill the dead places in the platoon's weakest squad. They
@@ -51,7 +53,7 @@ function reinforce(state, pl) {
   return { ok: true };
 }
 
-export const COMMAND_TYPES = ['move', 'take', 'hold', 'fallback', 'stance', 'artillery', 'smoke', 'ability', 'reinforce'];
+export const COMMAND_TYPES = ['move', 'take', 'hold', 'fallback', 'stance', 'artillery', 'smoke', 'ability', 'reinforce', 'vmove', 'vability'];
 
 const fail = (reason) => ({ ok: false, reason });
 
@@ -89,7 +91,12 @@ function applyInner(state, cmd) {
   // Changing your mind: a platoon's movement order can be replaced for free
   // within a few seconds of giving it (a misplaced tap is easy on a phone).
   const MOVES = ['move', 'take', 'hold', 'fallback'];
-  const amending = MOVES.includes(type) && amendWindow(state, pl) > 0;
+  let v = null;
+  if (type === 'vmove' || type === 'vability') {
+    v = state.vehicles.find((o) => o.side === side);
+    if (!v || !v.alive) return fail('Your tank has been destroyed');
+  }
+  const amending = (MOVES.includes(type) && amendWindow(state, pl) > 0) || (type === 'vmove' && amendWindow(state, v) > 0);
   if (amending) cost = 0;
   if (sd.op + 1e-9 < cost) return fail('Not enough order points');
   const W = state.map.width, H = state.map.height;
@@ -146,11 +153,53 @@ function applyInner(state, cmd) {
       if (!res.ok) return res;
       break;
     }
+    case 'vmove': {
+      const pt = point();
+      if (!pt) return fail('Bad position');
+      if (!amending) v.paidTick = state.tick;
+      v.order = { type: 'move', ...tankSpot(state, pt, side) };
+      v.path = null;
+      break;
+    }
+    case 'vability': {
+      // Overwatch: a heavy shell fired at once at the best target in range.
+      const o = cfg.tank.overwatch;
+      if (state.tick < v.abilityReady) return fail(`${o.label} is not ready yet`);
+      const t = mainGunTarget(state, v);
+      if (!t) return fail('No target in sight for the main gun');
+      shell(state, v, t, { vsTank: o.vsTank, blastDamage: o.blastDamage, accuracy: 0.95 });
+      v.abilityReady = state.tick + Math.round(o.cooldownSec * cfg.tickRate);
+      v.gunReady = Math.max(v.gunReady, state.tick + Math.round(cfg.tank.mainGun.reloadSec * cfg.tickRate));
+      sd.abilities++;
+      break;
+    }
     default:
       return fail('Unknown order');
   }
   sd.op -= cost;
   return { ok: true };
+}
+
+// A tank cannot park inside a ruin: move its goal to the nearest open spot
+// with a little room round it (searched in rings, always in the same order).
+function tankSpot(state, pt, side) {
+  const map = state.map, B = T.building;
+  const roomy = (x, y) => {
+    for (const [dx, dy] of [[0, 0], [12, 0], [-12, 0], [0, 12], [0, -12]]) {
+      const i = cellIndex(map, x + dx, y + dy);
+      if (i < 0 || map.grid[i] === B) return false;
+    }
+    return true;
+  };
+  if (roomy(pt.x, pt.y)) return pt;
+  for (let r = 10; r <= 200; r += 10) {
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2 + (side === 1 ? Math.PI : 0); // mirror image search for the Helghast
+      const x = Math.round(pt.x + Math.cos(a) * r), y = Math.round(pt.y + Math.sin(a) * r);
+      if (roomy(x, y)) return { x, y };
+    }
+  }
+  return pt;
 }
 
 // Ticks left in which this platoon's last paid order can be changed free.

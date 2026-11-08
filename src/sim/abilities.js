@@ -5,6 +5,7 @@
 import { T, cellIndex, forCells, heightAt } from './map.js';
 import { members, centroid, dist, isActive, sideDir, feed } from './util.js';
 import { blast } from './features.js';
+import { blastVehicles } from './vehicles.js';
 import { damageSoldier, suppress } from './combat.js';
 
 export const ABILITY_OF = { rifle: 'grenade', heavy: 'barrage', assault: 'charge', engineer: 'sandbags', recon: 'mark', jump: 'dive', infiltrator: 'vanish' };
@@ -22,9 +23,24 @@ function nearestSeenEnemy(state, side, p, maxD) {
   return best;
 }
 
-export function useAbility(state, sq) {
+// Engineers swap sandbags for a breaching charge when an enemy tank they can
+// see is close enough to reach.
+export function breachTarget(state, sq, c) {
+  if (sq.role !== 'engineer') return null;
+  const v = state.vehicles.find((o) => o.alive && o.side !== sq.side && o.spotted[sq.side]);
+  return v && dist(v, c) <= state.cfg.breach.range ? v : null;
+}
+
+export const abilityKey = (state, sq) => {
   const key = ABILITY_OF[sq.role];
-  const a = state.cfg.abilities[key];
+  if (key !== 'sandbags') return key;
+  const list = members(state, sq);
+  return list.length && breachTarget(state, sq, centroid(list)) ? 'breach' : key;
+};
+
+export function useAbility(state, sq) {
+  const key = abilityKey(state, sq);
+  const a = key === 'breach' ? state.cfg.breach : state.cfg.abilities[key];
   const list = members(state, sq);
   if (!list.length) return fail('That squad is gone');
   if (sq.mode === 'rout') return fail('That squad is routing');
@@ -105,6 +121,14 @@ export function useAbility(state, sq) {
       state.events.push({ type: 'dive', side: sq.side, x: t.x, y: t.y });
       break;
     }
+    case 'breach': {
+      const v = breachTarget(state, sq, c);
+      sq.breachVehicle = v.id;
+      sq.breachUntil = state.tick + ticks(a.runSec);
+      sq.supp = 0;
+      sq.pinned = false;
+      break;
+    }
     case 'vanish': {
       sq.vanishUntil = state.tick + ticks(a.durationSec);
       for (const s of list) s.lastShotTick = -9999; // no longer given away by their last shots
@@ -123,8 +147,8 @@ export function useAbility(state, sq) {
 // Would this squad's ability find something to do right now? (For the
 // interface: buttons only light up when tapping them would work.)
 export function abilityHasTarget(state, sq) {
-  const key = ABILITY_OF[sq.role];
-  if (key === 'sandbags') return true;
+  const key = abilityKey(state, sq);
+  if (key === 'sandbags' || key === 'breach') return true;
   const list = members(state, sq);
   if (!list.length) return false;
   const c = centroid(list);
@@ -151,6 +175,7 @@ export function updateDives(state) {
       if (d <= a.radius) damageSoldier(state, s, a.damage * (1 - (0.5 * d) / a.radius));
     }
     for (const id of [...hit].sort((p, q) => p - q)) suppress(state, state.squads[id], a.suppress, 'blast');
+    blastVehicles(state, x, y, a.radius, a.damage, undefined, sq.side);
   }
 }
 

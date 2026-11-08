@@ -16,6 +16,7 @@ export function createEffects() {
     lastShot: new Map(), // soldier id -> time of their last shot (for the firing frame)
     throws: [], marks: [],
     lastHit: new Map(), // soldier id -> time they were last hit (for the hit flash)
+    lastVehicleHit: new Map(),
     shake: 0, reduced: false, terrain: null,
   };
 }
@@ -50,6 +51,24 @@ export function ingest(fxs, events, now) {
       case 'tankBlast':
         boom(fxs, e.x, e.y, 100, now, '255,120,40');
         fxs.shake = Math.max(fxs.shake, 10);
+        break;
+      case 'tankShot':
+        // A heavy tracer, a big muzzle flash and a burst where it lands.
+        fxs.tracers.push({ x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2, side: e.side, t0: now, life: 0.18, heavy: true, shell: true });
+        fxs.flashes.push({ x: e.x1, y: e.y1, side: e.side, t0: now, life: 0.12, big: true });
+        boom(fxs, e.x2, e.y2, 34, now, '255,190,110');
+        fxs.shake = Math.max(fxs.shake, 3);
+        break;
+      case 'vehicleHit':
+        fxs.lastVehicleHit.set(e.id, now);
+        for (let i = 0; i < 4; i++) fxs.puffs.push({ x: e.x + fx.range(-14, 14), y: e.y - 14 + fx.range(-8, 8), t0: now, life: 0.3, r: 4, colour: '255,210,140' });
+        break;
+      case 'vehicleDestroyed':
+        boom(fxs, e.x, e.y - 10, 90, now, '255,140,50');
+        fxs.shake = Math.max(fxs.shake, 9);
+        break;
+      case 'charge':
+        fxs.marks.push({ x: e.x, y: e.y, r: 30, t0: now, life: e.sec });
         break;
       case 'crater':
         if (fxs.terrain) fxs.terrain.addCrater({ x: e.x, y: e.y, r: e.r });
@@ -149,7 +168,7 @@ export function drawEffects(g, fxs, now, px) {
     const a = Math.max(0, k - 0.35), b = Math.min(1, k + 0.05);
     const c = sideColours(t.side);
     g.strokeStyle = c.tracer;
-    g.lineWidth = Math.max(1, (t.heavy ? 1.6 : 1.1) * px);
+    g.lineWidth = Math.max(t.shell ? 2.5 : 1, (t.shell ? 3 : t.heavy ? 1.6 : 1.1) * px);
     g.globalAlpha = 1 - k * 0.5;
     g.beginPath();
     g.moveTo(t.x1 + (t.x2 - t.x1) * a, t.y1 + (t.y2 - t.y1) * a);
@@ -163,7 +182,7 @@ export function drawEffects(g, fxs, now, px) {
       g.fillStyle = sideColours(f.side).flash;
       g.globalAlpha = 1 - k;
       g.beginPath();
-      g.arc(f.x, f.y, Math.max(2.5, 2.2 * px), 0, Math.PI * 2);
+      g.arc(f.x, f.y, f.big ? Math.max(7, 5 * px) : Math.max(2.5, 2.2 * px), 0, Math.PI * 2);
       g.fill();
     }
     g.globalAlpha = 1;

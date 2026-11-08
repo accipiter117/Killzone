@@ -3,7 +3,7 @@
 // wire over wading through it. Weighted A*: slightly greedy so it stays quick
 // on open ground, always deterministic.
 
-import { cellIndex, canStep } from './map.js';
+import { cellIndex, canStep, T } from './map.js';
 
 // Cost of entering a wire cell, in cells of open ground. Engineers cut wire,
 // so it costs them little.
@@ -50,12 +50,18 @@ const NB = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [1
 // Returns a list of world points from a to b (not including a), or null.
 // mirror: the Helghast search their neighbours and break ties in mirror
 // image order, so equal routes are chosen the same way by both sides.
-export function findPath(map, a, b, { engineer = false, maxNodes = 12000, mirror = false } = {}) {
+export function findPath(map, a, b, { engineer = false, maxNodes = 12000, mirror = false, vehicle = false } = {}) {
   const cols = map.cols, rows = map.rows;
   const start = cellIndex(map, a.x, a.y), goal = cellIndex(map, b.x, b.y);
   if (start < 0 || goal < 0) return null;
   if (start === goal) return [{ x: b.x, y: b.y }];
-  const wireCost = engineer ? ENGINEER_WIRE_COST : WIRE_COST;
+  // Tanks crush wire but cannot enter ruins, and would rather keep a cell
+  // clear of them (squeezing past is allowed, just expensive, so a tank that
+  // has ended up in a tight spot can always drive out again).
+  const wireCost = vehicle ? 1 : engineer ? ENGINEER_WIRE_COST : WIRE_COST;
+  const B = T.building, grid = map.grid;
+  const blocked = vehicle ? (j) => grid[j] === B : null;
+  const tight = vehicle ? (j, x, y) => (x > 0 && grid[j - 1] === B) || (x < cols - 1 && grid[j + 1] === B) || (y > 0 && grid[j - cols] === B) || (y < rows - 1 && grid[j + cols] === B) : null;
   const gx = goal % cols, gy = (goal / cols) | 0;
   const g = new Float32Array(cols * rows).fill(Infinity);
   const from = new Int32Array(cols * rows).fill(-1);
@@ -78,9 +84,10 @@ export function findPath(map, a, b, { engineer = false, maxNodes = 12000, mirror
       if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
       const j = ny * cols + nx;
       if (!canStep(map, i, j)) continue;
+      if (blocked && blocked(j)) continue;
       // No cutting corners past a cliff.
       if (dx && dy && (!canStep(map, i, y * cols + nx) || !canStep(map, i, ny * cols + x))) continue;
-      const cost = g[i] + step * (map.wire[j] > 0 ? wireCost : 1);
+      const cost = g[i] + step * (map.wire[j] > 0 ? wireCost : 1) * (tight && tight(j, nx, ny) ? 5 : 1);
       if (cost >= g[j]) continue;
       g[j] = cost;
       from[j] = i;
