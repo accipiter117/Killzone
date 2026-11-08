@@ -8,6 +8,7 @@ import { updateSites, updateEmplacements, updateStrikes, updateSmokes } from './
 import { thinkSquad, moveSoldiers, resetPlans } from './squads.js';
 import { updateThrows, updateDives } from './abilities.js';
 import { platoonAlive, feed, sideName } from './util.js';
+import { createVehicles, updateVehicles, updateCharges, updateVehicleVision } from './vehicles.js';
 
 // Deep merge so tests and the menu can override a few numbers.
 export function mergeConfig(base, over) {
@@ -31,7 +32,7 @@ export function createBattle(seed, options = {}) {
     tanks: map.tanks,
     sides: SIDE_NAMES.map((name, id) => ({ id, name, op: cfg.orders.start, score: 0, casualties: 0, fled: 0, artReadyTick: 0, spotted: null, captures: 0, abilities: 0, rallies: 0, reinforceReadyTick: 0, reinforcements: 0 })),
     platoons: [], squads: [], soldiers: [],
-    strikes: [], smokes: [], throws: [],
+    strikes: [], smokes: [], throws: [], charges: [], vehicles: [],
     events: [], feed: [],
     result: null,
   };
@@ -51,7 +52,7 @@ export function createBattle(seed, options = {}) {
           supp: 0, pinned: false, lastHitTick: -9999, lastFiredTick: -9999, tally: {},
           mode: 'idle', status: 'Awaiting orders', bound: null, pauseUntil: 0, holdSpot: null, flankDone: false, waitSince: -1, cx: 0, cy: 0,
           bestD: Infinity, bestTick: 0, pushUntil: 0, path: null, pathTo: null, pathTick: 0,
-          abilityReady: 0, barrageUntil: 0, chargeUntil: 0, chargeTarget: -1, diveUntil: 0, diveTarget: null, vanishUntil: 0,
+          abilityReady: 0, barrageUntil: 0, chargeUntil: 0, chargeTarget: -1, diveUntil: 0, diveTarget: null, vanishUntil: 0, breachUntil: 0, breachVehicle: -1,
         };
         state.squads.push(sq);
         pl.squads.push(sq.id);
@@ -79,8 +80,10 @@ export function createBattle(seed, options = {}) {
     sq.cx = ms.reduce((a, m) => a + m.x, 0) / ms.length;
     sq.cy = ms.reduce((a, m) => a + m.y, 0) / ms.length;
   }
+  createVehicles(state);
   state.durationTicks = Math.round(cfg.battle.durationSec * cfg.tickRate);
   updateVision(state);
+  updateVehicleVision(state);
   return state;
 }
 
@@ -97,14 +100,16 @@ export function step(state) {
     const comms = state.sites.some((s) => s.kind === 'comms' && s.owner === sd.id);
     sd.op = Math.min(cfg.orders.cap, sd.op + (dt / cfg.orders.regenSec) * (comms ? cfg.orders.commsRegenMult : 1));
   }
-  if (state.tick % cfg.combat.visionEveryTicks === 0) updateVision(state);
+  if (state.tick % cfg.combat.visionEveryTicks === 0) { updateVision(state); updateVehicleVision(state); }
   const thinkEvery = cfg.squad.thinkEveryTicks;
   const perSide = state.squads.length / 2;
   // Mirrored squads on both sides think on the same tick.
   for (const sq of state.squads) if ((state.tick + (sq.id % perSide)) % thinkEvery === 0) thinkSquad(state, sq);
 
   moveSoldiers(state, dt);
+  updateVehicles(state, dt);
   updateFiring(state, dt);
+  updateCharges(state);
   updateEmplacements(state, dt);
   updateStrikes(state);
   updateThrows(state);
@@ -204,6 +209,7 @@ function finish(state, winner, reason) {
     abilities: state.sides.map((s) => s.abilities),
     rallies: state.sides.map((s) => s.rallies),
     reinforcements: state.sides.map((s) => s.reinforcements),
+    tanksLost: state.sides.map((s) => (s.tankLost ? 1 : 0)),
     held: [0, 1].map((side) => state.sites.filter((s) => s.kind === 'objective' && s.owner === side).map((s) => s.id)),
   };
   const text = winner === null ? 'The battle ends in a stalemate' : `${sideName(winner)} victory (${margin})`;
@@ -219,6 +225,7 @@ export function fingerprint(state) {
     p: state.soldiers.map((s) => [+s.x.toFixed(4), +s.y.toFixed(4), +s.hp.toFixed(4), s.alive ? 1 : 0, s.fled ? 1 : 0]),
     o: state.sites.map((s) => [s.owner, s.capSide, +s.cap.toFixed(6)]),
     k: state.tanks.map((t) => (t.exploded ? 1 : 0)),
+    v: state.vehicles.map((v) => [+v.x.toFixed(4), +v.y.toFixed(4), +v.hp.toFixed(4)]),
     w: state.result,
   });
 }

@@ -105,7 +105,8 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 #squads button.ab { min-height: 30px; min-width: 88px; padding: 2px 8px; font-size: 12px; font-weight: 600; border-radius: 15px; flex: none; }
 #squads button.ab.ready { background: var(--accent); color: #fff; border-color: transparent; }
 #squads .empty { color: var(--muted); }
-#cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+#cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.card.tank .name span::before { content: '\25A0  '; font-size: 10px; color: var(--muted); }
 .card { text-align: left; padding: 6px 7px; border-radius: 10px; min-height: 64px; display: flex; flex-direction: column; gap: 3px; border: 2px solid var(--line); }
 .card.sel { border-color: var(--accent); background: var(--panel-2); }
 .card.broken { opacity: 0.5; }

@@ -181,6 +181,25 @@ export function thinkSquad(state, sq) {
     }
     sq.chargeUntil = 0;
   }
+  if (sq.breachUntil > state.tick) {
+    // Engineers sprinting in to plant a breaching charge on the enemy tank.
+    const v = state.vehicles[sq.breachVehicle];
+    if (v && v.alive) {
+      const b = cfg.breach;
+      const near = list.find((s) => dist(s, v) <= b.plantDist + v.radius);
+      if (near) {
+        state.charges.push({ vehicle: v.id, side: sq.side, x: v.x, y: v.y, at: state.tick + Math.round(b.fuseSec * cfg.tickRate) });
+        state.events.push({ type: 'charge', side: sq.side, x: v.x, y: v.y, sec: b.fuseSec });
+        sq.breachUntil = 0;
+      } else {
+        sq.mode = 'breach';
+        sq.status = 'Breaching the tank!';
+        sq.pinned = false;
+        formUp(state, sq, list, { x: v.x, y: v.y }, false);
+        return;
+      }
+    } else sq.breachUntil = 0;
+  }
   if (sq.barrageUntil > state.tick) {
     sq.mode = 'barrage';
     sq.status = 'Barrage!';
@@ -445,7 +464,7 @@ export function moveSoldiers(state, dt) {
     if (!isActive(s)) continue;
     const sq = state.squads[s.squad];
     const pl = state.platoons[sq.platoon];
-    if (sq.pinned && sq.mode !== 'rout' && sq.mode !== 'crawl' && sq.mode !== 'charge' && sq.mode !== 'dive') continue;
+    if (sq.pinned && sq.mode !== 'rout' && sq.mode !== 'crawl' && sq.mode !== 'charge' && sq.mode !== 'dive' && sq.mode !== 'breach') continue;
     const dx = s.tx - s.x, dy = s.ty - s.y;
     const d = Math.hypot(dx, dy);
     if (d < 0.5) continue;
@@ -465,6 +484,7 @@ export function moveSoldiers(state, dt) {
     if (sq.mode === 'crawl') speed *= 0.5;
     if (sq.mode === 'charge') speed *= cfg.abilities.charge.speedMult;
     if (sq.mode === 'dive') speed *= 3;
+    if (sq.mode === 'breach') speed *= cfg.breach.speedMult;
     // Fresh reinforcements run until they have caught up with their squad.
     if (s.joining) {
       if (Math.hypot(s.x - sq.cx, s.y - sq.cy) < 45) s.joining = false;

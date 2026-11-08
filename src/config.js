@@ -55,7 +55,7 @@ export const CONFIG = {
     regenSec: 6, // seconds per order point
     amendSec: 5, // a movement order can be changed free for this long after giving it
     commsRegenMult: 1.75, // owning the comms post speeds refill by this much
-    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2 },
+    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0 },
   },
 
   // Squad roles. range/sight in world units, fireInterval in seconds,
@@ -160,6 +160,23 @@ export const CONFIG = {
 
   smoke: { radius: 120, durationSec: 22 },
 
+  // The tank: one per side, deployed behind its own lines. Same numbers for
+  // both sides (only the look differs). damageFrom says how much of each
+  // kind of hit gets through its armour.
+  tank: {
+    hp: 1000, speed: 26, radius: 28, sight: 380, rampSpeed: 0.6, deployX: 110,
+    mainGun: { range: 430, reloadSec: 5.5, accuracy: 0.7, vsTank: 160, blastRadius: 34, blastDamage: 70, suppress: 30 },
+    mg: { range: 280, fireInterval: 0.25, damage: 7, accuracy: 0.28, suppress: 7 },
+    damageFrom: { rifle: 0.04, heavy: 0.35, other: 0.06, blast: 1.6, arc: 1.2 },
+    overwatch: { label: 'Overwatch', cooldownSec: 20, vsTank: 280, blastDamage: 110 },
+    coverRadius: 55, // infantry this close to their own tank, with it between them and the shooter, are covered
+    coverHit: 0.5,
+    crushRadius: 22, // wire this close under the tank is flattened
+    wreckRadius: 26, // the burnt-out wreck becomes cover
+  },
+  // Engineers' ability becomes a breaching charge when an enemy tank is close.
+  breach: { label: 'Breach', range: 220, plantDist: 40, fuseSec: 2.5, damage: 380, cooldownSec: 25, runSec: 14, speedMult: 1.3 },
+
   // Reinforcements: refill the weakest squad of a platoon with fresh
   // soldiers who arrive from your own lines. Cooldown is per side.
   reinforce: { soldiers: 5, cooldownSec: 35, nearSiteReach: 600, joinSpeedMult: 1.7 },
@@ -186,7 +203,7 @@ export const CONFIG = {
     siteValue: { objective: 10, comms: 4, mg: 3, arc: 3 },
     threatRadius: 320, // enemies seen this close to a site count as massing on it
     threatValue: 0.6, // extra value per enemy soldier massing on a site
-    reinforceBelow: 0.65, // the AI reinforces a platoon below this strength
+    reinforceBelow: 0.65, tankRetreatHp: 0.35, tankRetreatX: 200, tankBehind: 90, tankReorderDist: 120, // the AI reinforces a platoon below this strength
     highGroundValue: 0.35, // extra value per level of high ground a site sits on
     garrison: 10, // soldiers an objective needs before the AI sends others elsewhere...
     garrisonPerLevel: 11, // ...plus this many per level of high ground it sits on
@@ -210,6 +227,8 @@ export const RULES = {
   arc: ['Arc tower', 'Capture it and it zaps nearby enemies every few seconds.'],
   comms: ['Comms post', 'Capture it and your order points refill faster.'],
   sandbag: ['Sandbags', 'Cover built by engineers: as good as a trench.'],
+  armour: ['Tank', 'Heavily armoured: rifles barely scratch it. Heavies, grenades, artillery, arc towers, dives, engineer charges and the other tank hurt it. Infantry close behind it are covered.'],
+  wreck: ['Tank wreck', 'A burnt-out tank: cover for infantry.'],
   tank: ['Petrusite tank', 'Explodes when hit by stray fire or shells, hurting everyone nearby.'],
 };
 
@@ -217,7 +236,9 @@ export const ABILITY_HELP = {
   grenade: 'Rifle squad throws a grenade at the nearest enemy in range. Hurts anyone near the blast.',
   barrage: 'Heavy squad holds still and pours out fire for six seconds, pinning whoever it hits.',
   charge: 'Assault squad shakes off suppression and sprints at the nearest enemy.',
-  sandbags: 'Engineers throw up a sandbag wall facing the enemy: instant cover.',
+  sandbags: 'Engineers throw up a sandbag wall facing the enemy: instant cover. With an enemy tank close by, they plant a breaching charge on it instead.',
+  breach: 'Engineers run up to the enemy tank and plant a breaching charge: it goes off after a few seconds for heavy damage.',
+  overwatch: 'The tank fires an aimed heavy shell at the best target in range (the enemy tank first).',
   mark: 'Recon marks an enemy group for ten seconds: everyone can see them and hits them more often.',
   dive: 'Jetpack squad leaps onto the nearest enemy group and lands with a stomp that hurts and pins them.',
   vanish: 'Infiltrators go fully hidden for eight seconds, even up close: slip away or set up the next ambush.',
