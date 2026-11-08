@@ -149,6 +149,19 @@ export function thinkSquad(state, sq) {
   }
   const firing = state.tick - sq.lastFiredTick < cfg.tickRate * 1.5;
 
+  // Any squad that can still move gets out from under a marked barrage.
+  const art = cfg.artillery;
+  for (const st of state.strikes) {
+    const d = dist(c, st);
+    if (d > art.radius + 25) continue;
+    const ux = d > 1 ? (c.x - st.x) / d : -dir, uy = d > 1 ? (c.y - st.y) / d : 0;
+    sq.mode = 'evade';
+    sq.status = 'Clearing the barrage area';
+    formUp(state, sq, list, { x: clamp(st.x + ux * (art.radius + 60), 20, state.map.width - 20), y: clamp(st.y + uy * (art.radius + 60), 20, H - 20) }, false);
+    sq.bound = null;
+    return;
+  }
+
   if (order.type === 'idle') {
     sq.mode = 'idle';
     sq.status = firing ? 'Returning fire' : 'Awaiting orders';

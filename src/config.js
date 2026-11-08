@@ -8,7 +8,7 @@ export const CONFIG = {
     durationSec: 600, // default battle length (10 minutes)
     scorePerObjectiveSec: 1, // points per second for each objective held
     breakAt: 0.3, // a platoon below this share of its soldiers breaks and routs
-    margin: { narrow: 0.15, clear: 0.4 }, // score gap (share of total) for narrow / clear, else crushing
+    margin: { narrow: 0.2, clear: 0.6 }, // score gap as a share of total score: below narrow = narrow win, below clear = clear win, else crushing
   },
 
   world: { width: 3000, height: 1100, cell: 10 },
@@ -117,7 +117,7 @@ export const CONFIG = {
     spreadSec: 2.4,
     radius: 115,
     blastRadius: 42,
-    damage: 110,
+    damage: 85,
     suppressRadius: 95,
     suppress: 45,
     craterRadius: [14, 22],
