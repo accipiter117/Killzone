@@ -6,26 +6,73 @@
 import { fx } from './fx-random.js';
 
 export function createAudio() {
-  const a = { ctx: null, master: null, noise: null, enabled: true, budget: 0, lastWhistle: 0 };
+  const a = { ctx: null, master: null, noise: null, enabled: true, budget: 0, lastWhistle: 0, played: 0 };
   return a;
 }
 
 // Browsers only allow sound after the player has touched the page.
+// Called on every touch, tap and key press until sound is running.
+// iPhones need three things: the audio started from a real tap (touchend or
+// click count, pointerdown alone may not), a silent sound played straight
+// away, and the page's audio treated as media playback so the silent switch
+// does not mute it (done with a looping silent <audio> element, plus the
+// newer audioSession setting where the browser has it).
 export function unlockAudio(a) {
-  if (a.ctx) { if (a.ctx.state === 'suspended') a.ctx.resume(); return; }
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
-  a.ctx = new AC();
-  a.master = a.ctx.createGain();
-  a.master.gain.value = 0.55;
-  a.master.connect(a.ctx.destination);
-  const len = a.ctx.sampleRate;
-  a.noise = a.ctx.createBuffer(1, len, a.ctx.sampleRate);
-  const d = a.noise.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = fx() * 2 - 1;
+  try {
+    if (!a.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+      a.ctx = new AC();
+      a.master = a.ctx.createGain();
+      a.master.gain.value = 0.8;
+      a.master.connect(a.ctx.destination);
+      const len = a.ctx.sampleRate;
+      a.noise = a.ctx.createBuffer(1, len, a.ctx.sampleRate);
+      const d = a.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = fx() * 2 - 1;
+    }
+    if (a.ctx.state !== 'running') a.ctx.resume();
+    if (!a.primed) {
+      const b = a.ctx.createBuffer(1, 1, 22050);
+      const src = a.ctx.createBufferSource();
+      src.buffer = b;
+      src.connect(a.ctx.destination);
+      src.start(0);
+      a.primed = true;
+    }
+    if (!a.mediaEl) {
+      a.mediaEl = document.createElement('audio');
+      a.mediaEl.setAttribute('playsinline', '');
+      a.mediaEl.loop = true;
+      a.mediaEl.src = silentWav();
+      a.mediaEl.volume = 0.01;
+      const p = a.mediaEl.play();
+      if (p && p.catch) p.catch(() => { a.mediaEl = null; });
+    }
+  } catch { /* sound is a nicety; never break the game over it */ }
 }
 
+// A tiny silent WAV file built in code (no audio files are shipped).
+function silentWav() {
+  const rate = 8000, n = 800;
+  const buf = new ArrayBuffer(44 + n);
+  const v = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVE'); str(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  str(36, 'data'); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+  let bin = '';
+  new Uint8Array(buf).forEach((b) => { bin += String.fromCharCode(b); });
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
+
+export const audioRunning = (a) => !!(a.ctx && a.ctx.state === 'running');
+
 function env(a, gain, attack, decay) {
+  a.played++; // counted so tests can confirm sounds are being made
   const g = a.ctx.createGain();
   const t = a.ctx.currentTime;
   g.gain.setValueAtTime(0.0001, t);
@@ -97,7 +144,8 @@ export function newFrame(a) { a.budget = 7; }
 
 // Play the sounds for one tick's events. playerSide tells good news from bad.
 export function playEvents(a, events, cam, playerSide) {
-  if (!a.enabled || !a.ctx || a.ctx.state !== 'running') return;
+  if (!a.enabled || !a.ctx) return;
+  if (a.ctx.state !== 'running') { a.ctx.resume(); return; }
   for (const e of events) {
     if (a.budget <= 0) return;
     let g;

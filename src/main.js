@@ -40,8 +40,9 @@ const game = {
 window.__kz = game; // handy for debugging and browser tests
 const audio = createAudio();
 audio.enabled = store.get('sound', true);
+game.audio = audio; // for browser tests
 // Sound can only start after a touch; buttons click.
-document.addEventListener('pointerdown', () => unlockAudio(audio));
+for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(ev, () => unlockAudio(audio), { passive: true });
 document.addEventListener('click', (e) => { if (e.target.closest('button')) uiClick(audio); });
 
 const ui = createUI({
@@ -299,6 +300,8 @@ document.getElementById('watch-toggle').addEventListener('change', (e) => {
 document.getElementById('sound-toggle').addEventListener('change', (e) => {
   audio.enabled = e.target.checked;
   store.set('sound', audio.enabled);
+  unlockAudio(audio);
+  uiClick(audio); // a click to confirm sound works
 });
 document.getElementById('slowmo-toggle').addEventListener('change', (e) => {
   game.slowMo = e.target.checked;
