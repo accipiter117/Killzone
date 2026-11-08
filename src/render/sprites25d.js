@@ -36,7 +36,7 @@ const BUILD = {
 
 // ---- Building the model ------------------------------------------------------
 
-function box(v, x0, x1, y0, y1, z0, z1, k) {
+export function box(v, x0, x1, y0, y1, z0, z1, k) {
   for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) v.push({ x, y, z, k });
 }
 
@@ -87,7 +87,7 @@ function soldier(role, pose = {}) {
 }
 
 // Tip the whole model about the feet: +90 = flat on the face, -90 = on the back.
-function tip(v, deg, lift = 0) {
+export function tip(v, deg, lift = 0) {
   const a = (deg * Math.PI) / 180, ca = Math.cos(a), sa = Math.sin(a);
   return v.map((p) => ({ ...p, x: p.x * ca + p.z * sa, z: -p.x * sa + p.z * ca + lift }));
 }
@@ -139,10 +139,13 @@ const FACES = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -
 const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const RGB = PAL.map((p) => Object.fromEntries(Object.entries(p).map(([k, c]) => [k, hex(c)])));
 
-function render(voxels, side, angle, dim) {
+// Draw a posed block model into a pixel sprite. rgb is a palette of
+// [r, g, b] by letter; size gives the canvas and where the feet sit.
+export function drawVoxels(voxels, rgb, angle, dim, size = { w: W25, h: H25, ax: ANCHOR_X, ay: ANCHOR_Y }) {
+  const { w: W, h: H, ax, ay } = size;
   const ca = Math.cos(angle), sa = Math.sin(angle);
   const solid = new Set(voxels.map((p) => `${Math.round(p.x)},${Math.round(p.y)},${Math.round(p.z)}`));
-  const n = W25 * H25;
+  const n = W * H;
   const depth = new Float32Array(n).fill(-1e9);
   const col = new Array(n).fill(null);
   for (const p of voxels) {
@@ -156,42 +159,47 @@ function render(voxels, side, angle, dim) {
       lit = Math.max(lit, 0.62 + 0.48 * Math.max(0, d) + (wy > 0.5 ? 0.04 : 0));
     }
     const glow = GLOW.has(p.k);
-    const base = RGB[side][p.k];
+    const base = rgb[p.k];
     const m = glow ? 1 : lit * (p.k === 'r' ? 1 : dim);
-    const rgb = [Math.min(255, base[0] * m), Math.min(255, base[1] * m), Math.min(255, base[2] * m)];
+    const c = [Math.min(255, base[0] * m), Math.min(255, base[1] * m), Math.min(255, base[2] * m)];
     // Each block is sampled at 8 points so turned models have no gaps.
     for (const ox of [-0.25, 0.25]) for (const oy of [-0.25, 0.25]) for (const oz of [-0.25, 0.25]) {
       const x = p.x + ox, y = p.y + oy, z = p.z + oz;
       const wx = x * ca - y * sa, wy = x * sa + y * ca;
-      const px = Math.floor(wx + ANCHOR_X), py = Math.floor(wy * 0.5 - z + ANCHOR_Y);
-      if (px < 0 || py < 0 || px >= W25 || py >= H25) continue;
+      const px = Math.floor(wx + ax), py = Math.floor(wy * 0.5 - z + ay);
+      if (px < 0 || py < 0 || px >= W || py >= H) continue;
       const d = wy + z * 1.2; // nearer the viewer and higher up wins
-      const i = py * W25 + px;
-      if (d > depth[i]) { depth[i] = d; col[i] = { rgb, k: p.k }; }
+      const i = py * W + px;
+      if (d > depth[i]) { depth[i] = d; col[i] = { rgb: c, k: p.k }; }
     }
   }
   // Dark outline round the figure so it reads on mud.
   const out = col.slice();
-  const o = RGB[side].o;
-  for (let y = 0; y < H25; y++) {
-    for (let x = 0; x < W25; x++) {
-      if (col[y * W25 + x]) continue;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (col[y * W + x]) continue;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const nx = x + dx, ny = y + dy;
-        const c = nx >= 0 && ny >= 0 && nx < W25 && ny < H25 ? col[ny * W25 + nx] : null;
-        if (c && !NO_OUTLINE.has(c.k)) { out[y * W25 + x] = { rgb: o, k: 'o' }; break; }
+        const c = nx >= 0 && ny >= 0 && nx < W && ny < H ? col[ny * W + nx] : null;
+        if (c && !NO_OUTLINE.has(c.k)) { out[y * W + x] = { rgb: rgb.o, k: 'o' }; break; }
       }
     }
   }
   const canvas = document.createElement('canvas');
-  canvas.width = W25;
-  canvas.height = H25;
+  canvas.width = W;
+  canvas.height = H;
   const ctx = canvas.getContext('2d');
-  const img = ctx.createImageData(W25, H25);
+  const img = ctx.createImageData(W, H);
   out.forEach((c, i) => { if (c) img.data.set([c.rgb[0], c.rgb[1], c.rgb[2], 255], i * 4); });
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
+
+function render(voxels, side, angle, dim) {
+  return drawVoxels(voxels, RGB[side], angle, dim);
+}
+
+export const paletteRGB = (pal) => Object.fromEntries(Object.entries(pal).map(([k, c]) => [k, hex(c)]));
 
 const cache = new Map();
 
