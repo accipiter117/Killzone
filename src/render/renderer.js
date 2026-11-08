@@ -272,6 +272,8 @@ function animate(r, state, opts) {
     if (sq.pinned && sq.mode !== 'rout') frame = sq.mode === 'crawl' && moved > 0.01 && Math.floor(stride / 3) % 2 ? 'prone2' : 'prone1';
     else if (opts.now - (lastShot.get(s.id) ?? -9) < 0.09) frame = 'fire';
     else if (moved > 0.01) frame = top ? WALK[Math.floor(stride / 3.5) % 4] : WALK25[Math.floor(stride / 3) % 4];
+    // Jetpack troopers fly when moving (or diving): jets on, held aloft.
+    if (!top && state.cfg.roles[s.role].flies && (moved > 0.01 || sq.mode === 'dive') && !frame.startsWith('prone')) frame = (Math.floor(opts.now * 12) % 2) ? 'fly2' : 'fly1';
     out.push({ s, sq, frame, dir: dirIndex(ang), ang });
   }
   return out;
@@ -319,12 +321,19 @@ function drawSoldiers(g, r, state, opts, px) {
   for (const { s, sq, frame, dir, ang } of list) {
     g.globalAlpha = sq.mode === 'rout' ? 0.6 : 1;
     if (pixel) {
-      drawTrooper(g, s.side, frame, ang, s.x, s.y, ps, s.role);
+      // Jetpack troopers in the air are drawn above their shadow; infiltrators
+      // still hidden from the enemy are drawn faded on their own side.
+      const lift = frame.startsWith('fly') ? (sq.mode === 'dive' ? 34 : 16) * ps : 0;
+      const role = state.cfg.roles[s.role];
+      const hidden = role.hidden && (sq.vanishUntil > state.tick || state.tick - s.lastShotTick > role.revealSec * state.cfg.tickRate);
+      if (hidden) g.globalAlpha = 0.5;
+      drawTrooper(g, s.side, frame, ang, s.x, s.y - lift, ps, s.role);
+      if (hidden) g.globalAlpha = 1;
       // Hit flash: draw the soldier again, added on top, for a split second.
       if (opts.now - (opts.fxs.lastHit.get(s.id) ?? -9) < 0.1) {
         g.globalCompositeOperation = 'lighter';
         g.globalAlpha = 0.7;
-        drawTrooper(g, s.side, frame, ang, s.x, s.y, ps, s.role);
+        drawTrooper(g, s.side, frame, ang, s.x, s.y - lift, ps, s.role);
         g.globalCompositeOperation = 'source-over';
         g.globalAlpha = 1;
       }

@@ -122,6 +122,7 @@ export function straightClear(map, a, b, allowWire = false) {
 // every few seconds, or when the squad has wandered off them.
 export function nextStep(state, sq, from, to) {
   const map = state.map;
+  if (state.cfg.roles[sq.role].flies) { sq.path = null; return to; } // jetpacks fly straight
   const engineer = sq.role === 'engineer';
   // Straight there if nothing is in the way (the common case on open ground).
   if (straightClear(map, from, to, engineer)) { sq.path = null; return to; }
