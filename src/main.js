@@ -407,6 +407,14 @@ function frame(t) {
   requestAnimationFrame(frame);
 }
 
+// Portrait: suggest turning sideways (once dismissed, never again).
+const rotateHint = document.getElementById('rotate-hint');
+const portrait = window.matchMedia('(orientation: portrait)');
+const showRotateHint = () => { rotateHint.hidden = !portrait.matches || store.get('uprightOk', false); };
+document.getElementById('rotate-ok').addEventListener('click', () => { store.set('uprightOk', true); showRotateHint(); });
+portrait.addEventListener('change', showRotateHint);
+showRotateHint();
+
 const urlSeed = new URLSearchParams(location.search).get('seed');
 startBattle(urlSeed || newSeed());
 if (!store.get('seenHelp', false)) {
