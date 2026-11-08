@@ -22,6 +22,7 @@
           <span data-obj="A">A</span><span data-obj="B">B</span><span data-obj="C">C</span>
         </div>
         <div id="score" aria-label="Score"><span class="isa">0</span><span class="sep">:</span><span class="hgh">0</span></div>
+        <div id="strength" aria-label="Troops left on each side"><i class="s0"></i><i class="s1"></i></div>
       </div>
 
       <div id="hud-tr">
@@ -89,6 +90,7 @@
         <li>While a platoon is selected a faint <b>grid</b> shows; move orders snap to a tile, and its three squads take that tile and the ones above and below.</li>
         <li><b>Reinforce</b> (2 points) sends up to five fresh soldiers from your lines to refill the selected platoon's weakest squad.</li>
         <li>A platoon that loses too many men <b>breaks</b> and runs back to its own lines. The first time, it regroups there and rejoins the fight; break it again and it is gone.</li>
+        <li><b>Reading the fight:</b> the bar by the score is troops left on each side. A red arc on your squad points at who is shooting it. Red arrows at the screen edge point to your platoons in trouble off screen: tap one to look. Tap a message with › to jump to where it happened.</li>
         <li>Drag to pan, pinch to zoom, tap the minimap to jump. Press and hold anything to see what it does.</li>
       </ul>
       <button class="primary" data-close>Got it</button>
@@ -134,7 +136,12 @@
     <div class="sheet">
       <h2 id="end-title">Victory</h2>
       <p id="end-margin"></p>
-      <table id="end-table"></table>
+      <h3 class="end-h">Troops on the field</h3>
+      <canvas id="end-chart" aria-label="Troops left on each side over the battle"></canvas>
+      <h3 class="end-h">What caused the losses</h3>
+      <table id="end-causes" class="end-tbl"></table>
+      <h3 class="end-h">The battle in numbers</h3>
+      <table id="end-table" class="end-tbl"></table>
       <p id="end-replay-check" class="small"></p>
       <div class="buttons">
         <button class="primary" id="btn-replay">Watch replay</button>

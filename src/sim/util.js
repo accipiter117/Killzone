@@ -59,8 +59,10 @@ export function nearObjective(state, p, maxD = 320) {
   return best;
 }
 
-export function feed(state, text, side = null) {
-  state.feed.push({ tick: state.tick, text, side });
+// pos (optional) is where it happened, so the player can tap the message
+// to look there.
+export function feed(state, text, side = null, pos = null) {
+  state.feed.push({ tick: state.tick, text, side, x: pos ? Math.round(pos.x) : null, y: pos ? Math.round(pos.y) : null });
   state.events.push({ type: 'feed', text, side });
 }
 

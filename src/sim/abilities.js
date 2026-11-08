@@ -172,9 +172,9 @@ export function updateDives(state) {
       const d = Math.hypot(s.x - x, s.y - y);
       if (d > a.radius * 1.6) continue;
       hit.add(s.squad);
-      if (d <= a.radius) damageSoldier(state, s, a.damage * (1 - (0.5 * d) / a.radius));
+      if (d <= a.radius) damageSoldier(state, s, a.damage * (1 - (0.5 * d) / a.radius), 'dive');
     }
-    for (const id of [...hit].sort((p, q) => p - q)) suppress(state, state.squads[id], a.suppress, 'blast');
+    for (const id of [...hit].sort((p, q) => p - q)) suppress(state, state.squads[id], a.suppress, 'blast', { x, y });
     blastVehicles(state, x, y, a.radius, a.damage, undefined, sq.side);
   }
 }
@@ -186,7 +186,7 @@ export function updateThrows(state) {
   for (const g of state.throws) {
     if (state.tick < g.at) continue;
     state.events.push({ type: 'grenadeBlast', x: g.x, y: g.y });
-    blast(state, g.x, g.y, a.radius, a.damage, a.radius * 1.6, a.suppress, 'blast');
+    blast(state, g.x, g.y, a.radius, a.damage, a.radius * 1.6, a.suppress, 'blast', 1, 'grenade');
   }
   state.throws = state.throws.filter((g) => state.tick < g.at);
 }

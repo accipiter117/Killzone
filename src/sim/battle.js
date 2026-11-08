@@ -30,10 +30,10 @@ export function createBattle(seed, options = {}) {
     map,
     sites: map.sites,
     tanks: map.tanks,
-    sides: SIDE_NAMES.map((name, id) => ({ id, name, op: cfg.orders.start, score: 0, casualties: 0, fled: 0, artReadyTick: 0, spotted: null, captures: 0, abilities: 0, rallies: 0, reinforceReadyTick: 0, reinforcements: 0 })),
+    sides: SIDE_NAMES.map((name, id) => ({ id, name, op: cfg.orders.start, score: 0, casualties: 0, fled: 0, artReadyTick: 0, spotted: null, captures: 0, abilities: 0, rallies: 0, reinforceReadyTick: 0, reinforcements: 0, lossBy: {} })),
     platoons: [], squads: [], soldiers: [],
     strikes: [], smokes: [], throws: [], charges: [], vehicles: [],
-    events: [], feed: [],
+    events: [], feed: [], history: [],
     result: null,
   };
   const W = map.width, H = map.height;
@@ -49,7 +49,7 @@ export function createBattle(seed, options = {}) {
       roles.forEach((role, k) => {
         const sq = {
           id: state.squads.length, platoon: pl.id, side, role, soldiers: [],
-          supp: 0, pinned: false, lastHitTick: -9999, lastFiredTick: -9999, tally: {},
+          supp: 0, pinned: false, lastHitTick: -9999, lastFiredTick: -9999, tally: {}, lossBy: {}, hitFrom: null,
           mode: 'idle', status: 'Awaiting orders', bound: null, pauseUntil: 0, holdSpot: null, flankDone: false, waitSince: -1, cx: 0, cy: 0,
           bestD: Infinity, bestTick: 0, pushUntil: 0, path: null, pathTo: null, pathTick: 0,
           order: null, paidTick: -1, abilityReady: 0, barrageUntil: 0, chargeUntil: 0, chargeTarget: -1, diveUntil: 0, diveTarget: null, vanishUntil: 0, breachUntil: 0, breachVehicle: -1,
@@ -120,6 +120,12 @@ export function step(state) {
   checkMorale(state);
 
   state.tick++;
+  // Strength over time, for the end screen's chart.
+  if (state.tick % Math.round(cfg.historyEverySec * cfg.tickRate) === 0) {
+    const alive = [0, 0];
+    for (const s of state.soldiers) if (s.alive && !s.fled) alive[s.side]++;
+    state.history.push([state.tick, alive[0], alive[1], state.sides[0].score, state.sides[1].score]);
+  }
   if (state.tick % cfg.tickRate === 0) {
     for (const site of state.sites) {
       if (site.kind === 'objective' && site.owner !== null) state.sides[site.owner].score += cfg.battle.scorePerObjectiveSec;
@@ -162,7 +168,7 @@ function checkMorale(state) {
         resetPlans(state, pl);
         for (const id of pl.squads) { const sq = state.squads[id]; sq.supp = 0; sq.pinned = false; sq.mode = 'hold'; }
         state.sides[pl.side].rallies++;
-        feed(state, `${label(pl)} has rallied`, pl.side);
+        feed(state, `${label(pl)} has rallied`, pl.side, platoonPos(state, pl));
         state.events.push({ type: 'rallied', platoon: pl.id, side: pl.side });
       }
       continue;
@@ -173,10 +179,21 @@ function checkMorale(state) {
       pl.rallyAt = -1;
       pl.brokeTick = state.tick;
       pl.order = { type: 'rout' };
-      feed(state, pl.rallied ? `${label(pl)} has broken again and is running` : `${label(pl)} has broken`, pl.side);
+      feed(state, pl.rallied ? `${label(pl)} has broken again and is running` : `${label(pl)} has broken`, pl.side, platoonPos(state, pl));
       state.events.push({ type: 'broken', platoon: pl.id, side: pl.side });
     }
   }
+}
+
+// Where a platoon is (the middle of its active soldiers), for the feed.
+function platoonPos(state, pl) {
+  let x = 0, y = 0, n = 0;
+  for (const id of pl.squads) for (const sid of state.squads[id].soldiers) {
+    const s = state.soldiers[sid];
+    if (!s.alive || s.fled) continue;
+    x += s.x; y += s.y; n++;
+  }
+  return n ? { x: x / n, y: y / n } : null;
 }
 
 export const sideBroken = (state, side) => state.platoons.every((pl) => pl.side !== side || pl.broken);
@@ -210,6 +227,8 @@ function finish(state, winner, reason) {
     rallies: state.sides.map((s) => s.rallies),
     reinforcements: state.sides.map((s) => s.reinforcements),
     tanksLost: state.sides.map((s) => (s.tankLost ? 1 : 0)),
+    lossBy: state.sides.map((s) => ({ ...s.lossBy })),
+    history: state.history.slice(),
     held: [0, 1].map((side) => state.sites.filter((s) => s.kind === 'objective' && s.owner === side).map((s) => s.id)),
   };
   const text = winner === null ? 'The battle ends in a stalemate' : `${sideName(winner)} victory (${margin})`;

@@ -43,7 +43,7 @@ export function updateSites(state, dt) {
       state.sides[present].captures++;
       site.cap = 0;
       site.capSide = null;
-      feed(state, `${sideName(present)} took ${describe(site)}`, present);
+      feed(state, `${sideName(present)} took ${describe(site)}`, present, site);
       state.events.push({ type: 'capture', site: site.id, side: present });
     }
   }
@@ -64,8 +64,8 @@ export function updateEmplacements(state, dt) {
       site.fireCd = w.fireInterval;
     } else {
       for (const t of targets) {
-        damageSoldier(state, t, w.damage);
-        suppress(state, state.squads[t.squad], w.suppress * coverAt(state, t.x, t.y).supp, 'arc');
+        damageSoldier(state, t, w.damage, 'arc');
+        suppress(state, state.squads[t.squad], w.suppress * coverAt(state, t.x, t.y).supp, 'arc', site);
         state.events.push({ type: 'zap', x1: site.x, y1: site.y - 30, x2: t.x, y2: t.y, side: site.owner });
       }
       // The arc also jumps to an enemy tank close enough.
@@ -91,7 +91,7 @@ function nearestEnemies(state, p, side, range, n) {
 }
 
 // Damage everyone in a radius (friend and foe), with falloff from the centre.
-export function blast(state, x, y, radius, damage, suppRadius, suppAmount, source, buildingMult = 1) {
+export function blast(state, x, y, radius, damage, suppRadius, suppAmount, source, buildingMult = 1, cause = source) {
   blastVehicles(state, x, y, radius, damage);
   const hitSquads = new Set();
   for (const s of state.soldiers) {
@@ -100,12 +100,12 @@ export function blast(state, x, y, radius, damage, suppRadius, suppAmount, sourc
     if (d <= suppRadius) hitSquads.add(s.squad);
     if (d > radius) continue;
     const mult = terrainAt(state.map, s.x, s.y) === T.building ? buildingMult : 1;
-    damageSoldier(state, s, damage * (1 - (0.7 * d) / radius) * mult);
+    damageSoldier(state, s, damage * (1 - (0.7 * d) / radius) * mult, cause);
   }
   for (const id of [...hitSquads].sort((a, b) => a - b)) {
     const sq = state.squads[id];
     const lead = state.soldiers[sq.soldiers[0]];
-    suppress(state, sq, suppAmount * coverAt(state, lead.x, lead.y).supp, source);
+    suppress(state, sq, suppAmount * coverAt(state, lead.x, lead.y).supp, source, { x, y });
   }
 }
 
@@ -121,9 +121,9 @@ export function explodeTank(state, tank) {
   const t = state.cfg.features.tank;
   state.events.push({ type: 'tankBlast', x: tank.x, y: tank.y });
   const near = nearObjective(state, tank);
-  feed(state, `A petrusite tank exploded${near ? ' near ' + near.id : ''}`);
+  feed(state, `A petrusite tank exploded${near ? ' near ' + near.id : ''}`, null, tank);
   addCrater(state, tank.x, tank.y, 26);
-  blast(state, tank.x, tank.y, t.blastRadius, t.damage, t.blastRadius * 1.3, t.suppress, 'blast');
+  blast(state, tank.x, tank.y, t.blastRadius, t.damage, t.blastRadius * 1.3, t.suppress, 'blast', 1, 'petrusite');
   for (const other of state.tanks) {
     if (!other.exploded && dist(other, tank) < t.blastRadius) explodeTank(state, other);
   }
@@ -135,7 +135,7 @@ export function callArtillery(state, side, x, y) {
   state.strikes.push({ side, x, y, start, shellsLeft: a.shells, nextTick: start });
   state.events.push({ type: 'strike', side, x, y });
   const near = nearObjective(state, { x, y }, 400);
-  feed(state, `${sideName(side)} artillery incoming${near ? ' near ' + near.id : ''}`, side);
+  feed(state, `${sideName(side)} artillery incoming${near ? ' near ' + near.id : ''}`, side, { x, y });
 }
 
 export function updateStrikes(state) {

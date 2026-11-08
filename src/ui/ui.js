@@ -24,7 +24,7 @@ export function createUI(handlers) {
       opNum: $('#op-num'), opPips: $('#op-pips'), op: $('#op'), pause: $('#btn-pause'), speed: $('#btn-speed'),
       cards: $('#cards'), squads: $('#squads'), feed: $('#feed'), hint: $('#hint'), toast: $('#toast'), banner: $('#banner'),
       actions: Object.fromEntries([...document.querySelectorAll('#stage button[data-act]')].map((b) => [b.dataset.act, b])),
-      stanceLabel: $('#stance-label'), stage: $('#stage'),
+      stanceLabel: $('#stance-label'), stage: $('#stage'), strength: $('#strength'), strength0: $('#strength .s0'), strength1: $('#strength .s1'),
       tray: $('#tray'), trayTitle: $('#tray-title'), traySub: $('#tray-sub'), trayHint: $('#tray-hint'), trayCmds: $('#tray-cmds'), trayScope: $('#tray-scope'), trayRejoin: $('#tray-rejoin'),
     },
   };
@@ -117,6 +117,12 @@ export function updateUI(ui, state, view) {
   });
   e.score0.textContent = state.sides[0].score;
   e.score1.textContent = state.sides[1].score;
+  const alive = [0, 0];
+  for (const s of state.soldiers) if (s.alive && !s.fled) alive[s.side]++;
+  const tot = Math.max(1, alive[0] + alive[1]);
+  e.strength0.style.width = `${(100 * alive[0]) / tot}%`;
+  e.strength1.style.width = `${(100 * alive[1]) / tot}%`;
+  e.strength.title = `Troops left: ISA ${alive[0]}, Helghast ${alive[1]}`;
   const pauseHtml = view.paused ? '&#9654;' : '&#10074;&#10074;';
   if (e.pause.dataset.p !== pauseHtml) { e.pause.innerHTML = pauseHtml; e.pause.dataset.p = pauseHtml; }
   e.speed.textContent = `${view.speed}x`;
@@ -259,6 +265,11 @@ export function updateUI(ui, state, view) {
     const div = document.createElement('div');
     div.textContent = f.text;
     if (f.side !== null && f.side !== undefined) div.className = `s${f.side}`;
+    // Messages with a place can be tapped to look there.
+    if (f.x !== null && f.x !== undefined) {
+      div.classList.add('go');
+      div.addEventListener('click', () => ui.handlers.jump(f.x, f.y));
+    }
     e.feed.prepend(div);
     setTimeout(() => div.classList.add('old'), 6000);
     setTimeout(() => div.remove(), 6800);
@@ -321,6 +332,57 @@ export function showEnd(ui, state, playerSide, replayCheck) {
     });
     table.appendChild(tr);
   });
+  // What did the killing: the biggest causes on either side.
+  const causes = $('#end-causes');
+  causes.innerHTML = '';
+  const lb = r.lossBy || [{}, {}];
+  const keys = [...new Set([...Object.keys(lb[0]), ...Object.keys(lb[1])])]
+    .sort((a, b) => ((lb[0][b] || 0) + (lb[1][b] || 0)) - ((lb[0][a] || 0) + (lb[1][a] || 0))).slice(0, 6);
+  const head = document.createElement('tr');
+  for (const t of ['Killed by', 'ISA lost', 'Helghast lost']) head.appendChild(document.createElement('th')).textContent = t;
+  causes.appendChild(head);
+  for (const k of keys) {
+    const tr = document.createElement('tr');
+    const label = state.cfg.causes[k] || k;
+    for (const t of [label[0].toUpperCase() + label.slice(1), lb[0][k] || 0, lb[1][k] || 0]) tr.appendChild(document.createElement('td')).textContent = t;
+    causes.appendChild(tr);
+  }
   $('#end-replay-check').textContent = replayCheck || '';
   openOverlay('overlay-end');
+  drawEndChart($('#end-chart'), r.history || [], state);
+}
+
+// Troops still fighting on each side through the battle: where it turned.
+function drawEndChart(c, hist, state) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = c.clientWidth || 300, h = c.clientHeight || 120;
+  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+  const g = c.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  if (hist.length < 2) return;
+  const max = state.soldiers.length / 2;
+  const t1 = hist[hist.length - 1][0];
+  const X = (t) => 28 + ((w - 34) * t) / t1, Y = (n) => 8 + (h - 26) * (1 - n / max);
+  const css = getComputedStyle(document.documentElement);
+  g.strokeStyle = css.getPropertyValue('--line') || '#888';
+  g.fillStyle = css.getPropertyValue('--muted') || '#888';
+  g.lineWidth = 1;
+  g.font = '10px system-ui, sans-serif';
+  g.beginPath(); g.moveTo(28, Y(0)); g.lineTo(w - 6, Y(0)); g.moveTo(28, Y(max)); g.lineTo(w - 6, Y(max)); g.stroke();
+  g.textAlign = 'right';
+  g.fillText(String(max), 24, Y(max) + 3);
+  g.fillText('0', 24, Y(0) + 3);
+  g.textAlign = 'left';
+  g.fillText('0:00', 28, h - 4);
+  g.textAlign = 'right';
+  g.fillText(fmtTime(t1 / state.cfg.tickRate), w - 6, h - 4);
+  for (const [side, col] of [[0, css.getPropertyValue('--isa') || '#3f7fd0'], [1, css.getPropertyValue('--hgh') || '#d9531c']]) {
+    g.strokeStyle = col.trim();
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(X(0), Y(max));
+    for (const row of hist) g.lineTo(X(row[0]), Y(row[1 + side]));
+    g.stroke();
+  }
 }

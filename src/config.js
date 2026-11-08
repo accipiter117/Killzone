@@ -174,6 +174,13 @@ export const CONFIG = {
     crushRadius: 36, // wire this close under the tank is flattened (a lane a squad can walk through)
     wreckRadius: 26, // the burnt-out wreck becomes cover
   },
+  // What killed a soldier, in plain words (for the feed and the end screen).
+  causes: {
+    rifle: 'rifle fire', heavy: 'heavy machine guns', assault: 'assault squads', engineer: 'engineer fire', recon: 'snipers',
+    jump: 'jetpack troopers', infiltrator: 'infiltrators', mg: 'an MG nest', tankmg: 'the tank machine gun', tankgun: 'tank shells',
+    artillery: 'artillery', grenade: 'grenades', petrusite: 'a petrusite explosion', arc: 'the arc tower', dive: 'jetpack landings', charge: 'a breaching charge',
+  },
+  historyEverySec: 5,
   // Focus fire: a platoon's squads shoot one chosen enemy squad first.
   focus: { durationSec: 40 },
   // Engineers' ability becomes a breaching charge when an enemy tank is close.

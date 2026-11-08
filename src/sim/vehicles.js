@@ -168,11 +168,11 @@ export function shell(state, v, t, { vsTank, blastDamage, accuracy }) {
     for (const s of state.soldiers) {
       if (!isActive(s) || s.side === v.side) continue;
       const d = Math.hypot(s.x - x, s.y - y);
-      if (d <= g.blastRadius) damageSoldier(state, s, blastDamage * (1 - (0.6 * d) / g.blastRadius));
+      if (d <= g.blastRadius) damageSoldier(state, s, blastDamage * (1 - (0.6 * d) / g.blastRadius), 'tankgun');
     }
     const hit = new Set();
     for (const s of state.soldiers) if (isActive(s) && s.side !== v.side && Math.hypot(s.x - x, s.y - y) < g.blastRadius * 1.8) hit.add(s.squad);
-    for (const id of [...hit].sort((a, b) => a - b)) suppress(state, state.squads[id], g.suppress, 'blast');
+    for (const id of [...hit].sort((a, b) => a - b)) suppress(state, state.squads[id], g.suppress, 'blast', v);
   }
   state.events.push({ type: 'tankShot', side: v.side, x1: v.x + v.facing * 40, y1: v.y - 22, x2: x, y2: y });
 }
@@ -189,7 +189,7 @@ function fireMachineGun(state, v, dt) {
     if (d < bd && losClear(state, v.x, v.y, e.x, e.y)) { bd = d; best = e; }
   }
   if (!best) { v.mgCd = 0.3; return; }
-  fireShot(state, { x: v.x + v.facing * 20, y: v.y - 16, side: v.side }, best, m, m.range, false, 'mg');
+  fireShot(state, { x: v.x + v.facing * 20, y: v.y - 16, side: v.side }, best, m, m.range, false, 'tankmg');
   v.mgCd = m.fireInterval;
 }
 
@@ -208,7 +208,7 @@ export function damageVehicle(state, v, amount, source) {
   });
   state.events.push({ type: 'vehicleDestroyed', id: v.id, side: v.side, x: v.x, y: v.y });
   const near = nearObjective(state, v, 400);
-  feed(state, `${sideName(v.side)} tank destroyed${near ? ' near ' + near.id : ''}`, v.side);
+  feed(state, `${sideName(v.side)} tank destroyed${near ? ' near ' + near.id : ''}`, v.side, v);
 }
 
 // Blasts (artillery, grenades, petrusite, dives) hurt tanks caught in them.
