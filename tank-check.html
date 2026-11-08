@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tank Style Check</title>
+  <style>
+    /* Field manual plate: mud swatches on a parchment page, stencilled labels. */
+    :root {
+      --page: #ece6d6; --ink: #221e17; --muted: #6d6656; --mud: #4d4836;
+      --isa: #3f7fd0; --hgh: #d9531c;
+      --display: "Black Ops One", "Impact", "Arial Narrow", sans-serif;
+      --body: "IBM Plex Sans", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+    }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #15130f; --ink: #ece6d6; --muted: #a39b88; --isa: #7fb6ff; --hgh: #ff7a3a; color-scheme: dark; } }
+    :root[data-theme="dark"] { --page: #15130f; --ink: #ece6d6; --muted: #a39b88; --isa: #7fb6ff; --hgh: #ff7a3a; color-scheme: dark; }
+    body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.5 var(--body); padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+    main { max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+    h1 { font: 400 30px/1.1 var(--display); letter-spacing: 0.04em; margin: 0; text-wrap: balance; }
+    h2 { font: 400 20px/1.2 var(--display); letter-spacing: 0.05em; margin: 0 0 4px; }
+    .lede { color: var(--muted); max-width: 62ch; margin: 6px 0 0; }
+    .factions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+    .plate { border-top: 3px solid var(--isa); padding-top: 10px; min-width: 0; }
+    .plate.hgh { border-top-color: var(--hgh); }
+    .plate p { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+    .hero { background: #8a8a8a; border-radius: 6px; padding: 6px 0; }
+    canvas { image-rendering: pixelated; display: block; max-width: 100%; height: auto; }
+    .strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    figure canvas { background: var(--mud); border-radius: 4px; }
+    figcaption { font: 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .field { background: #3f3b2d; border-radius: 6px; overflow: hidden; }
+    .field canvas { width: 100%; }
+    .note { font-size: 14px; color: var(--muted); max-width: 62ch; }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;600&display=swap">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Tank style check</h1>
+      <p class="lede">One tank per side, drawn in code in the same style as the troopers. Same job and stats for both (so the battle stays fair), a distinct look for each faction. Approve the look here and the gameplay gets built next.</p>
+    </header>
+
+    <section class="factions">
+      <div class="plate">
+        <h2>ISA tank</h2>
+        <p>Low and angular: a long sloped wedge hull with side skirts over the tracks, a clean low turret with a sensor block and hatch, a smooth gun with a fume extractor and muzzle brake, a yellow unit marking and blue running lights.</p>
+        <div class="hero"><canvas id="hero0"></canvas></div>
+        <div class="strip" id="strip0"></div>
+      </div>
+      <div class="plate hgh">
+        <h2>Helghast tank</h2>
+        <p>Tall and hunched: riveted charcoal plates with rust, exhaust stacks at the back, a row of glowing orange vents, a slatted front grille with two glowing eyes like the gas masks, a heavy mantlet and a long ringed cannon.</p>
+        <div class="hero"><canvas id="hero1"></canvas></div>
+        <div class="strip" id="strip1"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Face to face</h2>
+      <div class="field"><canvas id="duel"></canvas></div>
+    </section>
+
+    <section>
+      <h2>At game size</h2>
+      <p class="note">Each tank with a squad of its troopers on the mud, at the same scale the battle uses.</p>
+      <div class="field"><canvas id="scene"></canvas></div>
+    </section>
+
+    <p class="note">In battle the barrel will tilt to aim, damaged tanks will smoke (shown above), and a knocked out tank stays on the field as a burnt wreck that infantry can hide behind.</p>
+  </main>
+
+  <script type="module">
+    import { getTank, TANK_W, TANK_H, TANK_FOOT } from './src/render/tanks.js';
+    import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './src/render/pixel-troopers.js';
+    const SIDES = ['isa', 'hgh'];
+    const MOVE = ['move1', 'move2', 'move3', 'move4'];
+    const ctx = (c) => { const g = c.getContext('2d'); g.imageSmoothingEnabled = false; return g; };
+
+    // Cosmetic smoke puffs for the "damaged" tiles (page only).
+    const puffs = Array.from({ length: 8 }, (_, i) => ({ x: 60 + (i * 37) % 80, y: 30, ph: i * 0.8 }));
+    function smoke(g, scale, t) {
+      for (const p of puffs) {
+        const k = ((t / 1000 + p.ph) % 2.4) / 2.4;
+        g.fillStyle = `rgba(60,58,55,${0.55 * (1 - k)})`;
+        g.beginPath();
+        g.arc((p.x + k * 20) * scale, (p.y - k * 40) * scale, (5 + k * 12) * scale, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+
+    const HERO = 3;
+    const heroes = SIDES.map((side, i) => {
+      const c = document.getElementById('hero' + i);
+      c.width = TANK_W * HERO; c.height = TANK_H * HERO;
+      return { side, c, g: ctx(c) };
+    });
+    const SMALL = 1.5;
+    const tiles = [];
+    for (const [i, side] of SIDES.entries()) {
+      for (const [label, frames, extra] of [['driving', MOVE], ['firing', ['idle', 'idle', 'fire', 'idle']], ['damaged', MOVE, 'smoke'], ['wreck', ['wreck']]]) {
+        const fig = document.createElement('figure');
+        const c = document.createElement('canvas');
+        c.width = TANK_W * SMALL; c.height = TANK_H * SMALL;
+        const cap = document.createElement('figcaption'); cap.textContent = label;
+        fig.append(c, cap); document.getElementById('strip' + i).append(fig);
+        tiles.push({ side, c, g: ctx(c), frames, extra });
+      }
+    }
+
+    const duel = document.getElementById('duel');
+    const DW = 460, DH = 130, DS = 2;
+    duel.width = DW * DS; duel.height = DH * DS;
+    const dg = ctx(duel);
+
+    const scene = document.getElementById('scene');
+    const SW = 460, SH = 180;
+    scene.width = SW * 2; scene.height = SH * 2;
+    const sg = ctx(scene);
+    const mud = document.createElement('canvas'); mud.width = SW; mud.height = SH;
+    { const m = mud.getContext('2d'); m.fillStyle = '#595747'; m.fillRect(0, 0, SW, SH);
+      for (let i = 0; i < 90; i++) { m.globalAlpha = 0.45; m.fillStyle = i % 2 ? '#5e5c4b' : '#555343'; m.beginPath(); m.ellipse((i * 97) % SW, (i * 53) % SH, 30 + (i % 7) * 8, 20 + (i % 5) * 6, 0, 0, 7); m.fill(); } }
+    const S = 0.42; // the battle's sprite scale for both troopers and tanks
+
+    let n = 0;
+    function draw(t) {
+      n++;
+      for (const h of heroes) {
+        h.g.clearRect(0, 0, h.c.width, h.c.height);
+        const k = n % 12;
+        const frame = k < 8 ? MOVE[k % 4] : k === 9 ? 'fire' : 'idle';
+        h.g.drawImage(getTank(h.side, frame), 0, 0, h.c.width, h.c.height);
+      }
+      for (const tl of tiles) {
+        tl.g.clearRect(0, 0, tl.c.width, tl.c.height);
+        tl.g.drawImage(getTank(tl.side, tl.frames[n % tl.frames.length]), 0, 0, tl.c.width, tl.c.height);
+        if (tl.extra === 'smoke') smoke(tl.g, SMALL, t);
+      }
+      dg.fillStyle = '#8a8a8a'; dg.fillRect(0, 0, duel.width, duel.height);
+      dg.drawImage(getTank('isa', n % 10 === 0 ? 'fire' : 'idle', 1), 0, 0, TANK_W * DS, TANK_H * DS);
+      dg.drawImage(getTank('hgh', n % 10 === 5 ? 'fire' : 'idle', -1), (DW - TANK_W) * DS, 0, TANK_W * DS, TANK_H * DS);
+
+      sg.setTransform(2, 0, 0, 2, 0, 0);
+      sg.drawImage(mud, 0, 0);
+      const things = [];
+      things.push({ y: 95, draw: () => sg.drawImage(getTank('isa', MOVE[n % 4], 1), 110 - TANK_FOOT[0] * S, 95 - TANK_FOOT[1] * S, TANK_W * S, TANK_H * S) });
+      things.push({ y: 105, draw: () => sg.drawImage(getTank('hgh', MOVE[n % 4], -1), 350 - (TANK_W - TANK_FOOT[0]) * S, 105 - TANK_FOOT[1] * S, TANK_W * S, TANK_H * S) });
+      for (let i = 0; i < 5; i++) {
+        const y1 = 120 + i * 11, y2 = 125 + i * 10;
+        things.push({ y: y1, draw: () => sg.drawImage(getPixelTrooper('isa', ['walk1', 'walk2', 'walk3', 'walk4'][(n + i) % 4], 1), 60 + i * 9 - PT_FOOT[0] * S, y1 - PT_FOOT[1] * S, PT_W * S, PT_H * S) });
+        things.push({ y: y2, draw: () => sg.drawImage(getPixelTrooper('hgh', ['walk1', 'walk2', 'walk3', 'walk4'][(n + i) % 4], -1), 400 - i * 9 - (PT_W - PT_FOOT[0]) * S, y2 - PT_FOOT[1] * S, PT_W * S, PT_H * S) });
+      }
+      things.sort((a, b) => a.y - b.y).forEach((th) => th.draw());
+    }
+    let last = 0;
+    function loop(t) { if (t - last > 140) { last = t; draw(t); } requestAnimationFrame(loop); }
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
