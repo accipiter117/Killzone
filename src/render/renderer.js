@@ -291,7 +291,18 @@ function drawSoldiers(g, r, state, opts, px) {
   }
   for (const { s, sq, frame, dir, ang } of list) {
     g.globalAlpha = sq.mode === 'rout' ? 0.6 : 1;
-    if (pixel) { drawTrooper(g, s.side, frame, ang, s.x, s.y, ps, s.role); continue; }
+    if (pixel) {
+      drawTrooper(g, s.side, frame, ang, s.x, s.y, ps, s.role);
+      // Hit flash: draw the soldier again, added on top, for a split second.
+      if (opts.now - (opts.fxs.lastHit.get(s.id) ?? -9) < 0.1) {
+        g.globalCompositeOperation = 'lighter';
+        g.globalAlpha = 0.7;
+        drawTrooper(g, s.side, frame, ang, s.x, s.y, ps, s.role);
+        g.globalCompositeOperation = 'source-over';
+        g.globalAlpha = 1;
+      }
+      continue;
+    }
     g.drawImage(getSprite25(s.side, s.role, frame, dir), s.x - ANCHOR_X * ps, s.y - ANCHOR_Y * ps, W25 * ps, H25 * ps);
   }
   g.globalAlpha = 1;
@@ -412,14 +423,26 @@ function drawBadges(g, state, cam, opts) {
     const isSel = opts.selected === pl.id;
     const w = 20, h = 16;
     g.fillStyle = pl.broken ? 'rgba(40,36,30,0.85)' : pl.side === 0 ? '#2b4a70' : '#2a1d18';
-    g.strokeStyle = isSel ? '#fff0a8' : pl.side === 0 ? col.light : col.light;
+    const pinned = !pl.broken && pl.squads.some((id) => state.squads[id].pinned);
+    g.strokeStyle = isSel ? '#fff0a8' : pinned ? '#ff5a4a' : col.light;
     g.lineWidth = isSel ? 2.5 : 1.5;
     g.beginPath();
     g.roundRect(p.x - w / 2, p.y - h / 2, w, h, 4);
     g.fill();
     g.stroke();
     g.fillStyle = pl.side === 0 ? '#e6f1ff' : '#ffb08a';
-    g.fillText(pl.broken ? '✖' : String(pl.index + 1), p.x, p.y + 0.5);
+    g.fillText(pl.broken ? '\u2716' : String(pl.index + 1), p.x, p.y + 0.5);
+    if (pinned) {
+      // A small red warning tab: one of this platoon's squads is pinned.
+      g.fillStyle = '#d93a2b';
+      g.beginPath();
+      g.arc(p.x + w / 2 + 1, p.y - h / 2, 5, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#ffffff';
+      g.font = 'bold 9px system-ui, sans-serif';
+      g.fillText('!', p.x + w / 2 + 1, p.y - h / 2 + 0.5);
+      g.font = 'bold 11px system-ui, sans-serif';
+    }
     out.push({ platoon: pl.id, side: pl.side, x: p.x, y: p.y });
   }
   return out;

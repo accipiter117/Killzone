@@ -168,7 +168,7 @@ export function suppress(state, sq, amount, source) {
 export function damageSoldier(state, s, dmg) {
   if (!isActive(s)) return;
   s.hp -= dmg;
-  state.events.push({ type: 'hit', x: s.x, y: s.y, side: s.side });
+  state.events.push({ type: 'hit', id: s.id, x: s.x, y: s.y, side: s.side });
   if (s.hp > 0) return;
   s.alive = false;
   s.hp = 0;

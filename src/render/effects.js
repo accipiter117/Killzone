@@ -15,6 +15,7 @@ export function createEffects() {
     tracers: [], flashes: [], puffs: [], booms: [], zaps: [], bodies: [], smokes: new Map(), rings: [],
     lastShot: new Map(), // soldier id -> time of their last shot (for the firing frame)
     throws: [], marks: [],
+    lastHit: new Map(), // soldier id -> time they were last hit (for the hit flash)
     shake: 0, reduced: false, terrain: null,
   };
 }
@@ -35,6 +36,7 @@ export function ingest(fxs, events, now) {
         break;
       }
       case 'hit':
+        if (e.id !== undefined) fxs.lastHit.set(e.id, now);
         if (fxs.puffs.length < MAX) fxs.puffs.push({ x: e.x + fx.range(-3, 3), y: e.y + fx.range(-3, 3), t0: now, life: 0.35, r: 4, colour: '120,30,20' });
         break;
       case 'death':
