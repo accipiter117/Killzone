@@ -62,7 +62,7 @@ const ui = createUI({
       toast(ui, st.cfg.abilities[key].label, ABILITY_HELP[key]);
     }
   },
-  togglePause() { game.paused = !game.paused; },
+  togglePause() { game.paused = !game.paused; game.planning = false; },
   cycleSpeed() {
     const opts = game.watch || game.replay ? [1, 2, 4] : [1, 2];
     game.speed = opts[(opts.indexOf(game.speed) + 1) % opts.length] || 1;
@@ -94,7 +94,10 @@ function startBattle(seed, { replayLog = null } = {}) {
   game.armed = null;
   game.marker = null;
   game.endShown = false;
-  game.paused = false;
+  // Battles open paused for planning (not replays or watch mode): give your
+  // opening orders, then press play.
+  game.planning = !replayLog && !game.watch;
+  game.paused = game.planning;
   game.acc = 0;
   if (!game.replay) game.speed = 1;
   resetFeed(ui);
@@ -171,12 +174,15 @@ function bodyLift() {
   return 9 * Math.max(1, 0.7 / game.cam.z);
 }
 
+// The objective or post under a tap, measured on screen: each one can be hit
+// within its ring or a finger-sized circle round its icon, and when icons
+// overlap (zoomed right out) the one nearest the finger wins.
 function siteAt(state, w) {
-  const px = 1 / game.cam.z;
+  const z = game.cam.z;
   let best = null, bd = Infinity;
   for (const s of state.sites) {
-    const d = dist(s, w);
-    const reach = s.kind === 'objective' ? s.r : Math.max(s.r, 26 * px);
+    const d = dist(s, w) * z; // screen pixels
+    const reach = Math.max(s.r * z, s.kind === 'objective' ? 22 : 18);
     if (d <= reach && d < bd) { bd = d; best = s; }
   }
   return best;
@@ -343,6 +349,7 @@ document.addEventListener('pointerdown', () => { if (game.match && !game.match.s
 
 function hintText() {
   if (game.replay || game.watch) return '';
+  if (game.planning && game.selected === null && !game.armed) return 'Plan your opening: give your platoons orders, then press \u25B6 (top right) to begin.';
   if (game.armed === 'artillery') return 'Tap where the shells should land. They hit everyone, yours too.';
   if (game.armed === 'smoke') return 'Tap where to drop smoke. It blocks sight for a while.';
   if (game.selected !== null) return `${game.match.state.platoons[game.selected].name}: tap an objective to take it, or ground to move (slowed while you decide)`;
@@ -392,7 +399,7 @@ function frame(t) {
   updateUI(ui, st, {
     now, playerSide: PLAYER, selected: game.selected, armed: game.armed, paused: game.paused, speed: game.speed,
     replay: game.replay, watch: game.watch, hint: hintText(),
-    banner: game.replay ? 'REPLAY' : game.watch ? 'WATCH MODE' : game.paused ? 'PAUSED' : '',
+    banner: game.replay ? 'REPLAY' : game.watch ? 'WATCH MODE' : game.planning ? 'PLANNING' : game.paused ? 'PAUSED' : '',
   });
   requestAnimationFrame(frame);
 }
@@ -400,7 +407,7 @@ function frame(t) {
 const urlSeed = new URLSearchParams(location.search).get('seed');
 startBattle(urlSeed || newSeed());
 if (!store.get('seenHelp', false)) {
-  pausedBeforeMenu = false;
+  pausedBeforeMenu = game.paused; // stay in planning after the help closes
   game.paused = true;
   openOverlay('overlay-help');
 }
