@@ -31,6 +31,9 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 - **Artillery** (3 points, 25 second reload): tap the button, then the target. After a 3 second warning, shells land in a circle and hit **everyone**, your troops included. The craters they leave become cover. Squads that can still move will try to scramble out of the warning circle.
 - **Smoke** (2 points): blocks sight through an area for about 20 seconds. Good for crossing open ground.
 - Hold objectives to score a point per second each. The higher score when the timer ends wins, or break every enemy platoon for an immediate win.
+- **Slow motion:** time slows to a quarter while a platoon is selected or a strike is being aimed, so you can think. Tap the card again to let go (switch it off in the menu).
+- **Abilities:** each squad has one, shown as a button on its line under the platoon cards. They are free but recharge. Grenade (Rifle), Barrage (Heavy), Charge (Assault), Sandbags (Engineer), Mark (Recon). A button turns blue when using it would work right now.
+- **High ground:** raised plateaus with cliffs you cannot climb; only ramps (lighter slopes) lead up. From higher ground soldiers see and shoot further and hit more often, and hills block sight between lower troops. B sits on top of a two tier hill.
 - **Press and hold** anything (ground, wire, a post, an enemy squad) to see its one rule or what that squad is doing.
 - Drag to pan, pinch to zoom, tap or drag the minimap to jump.
 
@@ -43,6 +46,14 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 | Assault | Fast, short range, deadly close up. Swings wide to flank the target. |
 | Engineer | Average fighter. Cuts wire on the way (other squads use the gap or wait for it). |
 | Recon | Long range and long sight. Hangs back and spots, so the whole side can see further. |
+
+| Ability | Squad | What it does |
+| --- | --- | --- |
+| Grenade | Rifle | Thrown at the nearest enemy within throwing range; after a short fuse it hurts everyone nearby. |
+| Barrage | Heavy | Six seconds of much faster, heavier fire that pins targets. |
+| Charge | Assault | Shakes off suppression and sprints at the nearest enemy. |
+| Sandbags | Engineer | Builds a sandbag wall facing the enemy: instant cover as good as a trench. |
+| Mark | Recon | Tags an enemy group for ten seconds: everyone can see them and hits them more often. |
 
 Platoon mixes: 1st (Rifle, Heavy, Engineer), 2nd (Rifle, Assault, Engineer), 3rd (Assault, Heavy, Recon).
 
@@ -80,11 +91,16 @@ Every number is in [`src/config.js`](src/config.js). Change one, push, reload on
 | Battle length | `battle.durationSec` (600) | 300 | Also selectable in the menu. |
 | Margin of victory | `battle.margin` (narrow 0.2, clear 0.6) | | Decides narrow / clear / crushing (and later, how far the front moves). |
 | Role stats | `roles.*` | | Range, speed, damage, accuracy and suppression per squad type. |
+| High ground | `height.rangePerLevel`, `height.hitPerLevel` (0.15 each) | 0.1 or 0.25 | How much holding the hill is worth. |
+| Hills | `map.hills` | | Size of the B hill, number and size of ridges, ramp width. |
+| Abilities | `abilities.*` | | Cooldowns, ranges and strength of each ability. |
+| Slow motion | `ui.slowMo` (0.25) | 0.1 or 0.5 | Game speed while you are giving orders. |
+| Squad pacing | `squad.stallSec`, `squad.platoonLead` | | How long a stuck squad waits before pushing on; how far a squad may get ahead of its platoon. |
 
 ## For developers
 
 - Vanilla JavaScript modules, no build step, no dependencies. Open `index.html` through any static server (for example `python3 -m http.server`).
 - `src/sim/` is the whole battle with no DOM: fixed 30 ticks per second, one seeded RNG, and every order is a command object passed through `applyCommand`. The AI issues the same commands with the same order point rules.
-- `npm test` runs the Node test suite (determinism and replays, AI vs AI battles finishing on time, capture and flipping, pinned squads not advancing, wire slowing until cut, petrusite tanks exploding once, order points, routing, map symmetry).
-- `node tools/balance.mjs 10 standard aggressive` plays 10 seeds twice with the AI profiles swapped between sides and reports win rates by side and profile, average battle length and margins. With the standard AI on both sides, the last 20 game run came out ISA 60 percent, Helghast 40 percent (noise at this sample size), average 9 minutes 7 seconds.
+- `npm test` runs the Node test suite (determinism and replays, AI vs AI battles finishing on time, capture and flipping, pinned squads not advancing, wire slowing until cut, petrusite tanks exploding once, order points, routing, map symmetry, cliffs, ramps and high ground, every ability).
+- `node tools/balance.mjs 10 standard aggressive` plays 10 seeds twice with the AI profiles swapped between sides and reports win rates by side and profile, average battle length and margins. With the standard AI on both sides, the last 80 game run came out ISA 45 percent, Helghast 55 percent (within noise), with most battles ending in one side breaking after about four minutes.
 - See [`CLAUDE.md`](CLAUDE.md) for the standing rules and file layout.

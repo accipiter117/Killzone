@@ -28,7 +28,10 @@ src/sim/                  pure simulation (no DOM, no Math.random)
   commands.js             applyCommand (the only way players and AI change a battle)
   match.js                runs a battle with controllers (AI) and records or replays the command log
   ai.js                   the AI commander (same commands as the player)
-src/render/               canvas drawing, camera, cosmetic effects
+  path.js                 route finding round cliffs and through wire gaps
+  abilities.js            squad abilities (grenade, barrage, charge, sandbags, mark)
+src/render/               canvas drawing, camera, cosmetic effects, terrain painter,
+                          puppet.js + pixel-troopers.js (the detailed soldier sprites)
 src/ui/                   DOM panels, input, overlays
 src/main.js               wires it together and owns the game loop
 test/                     node:test suites (npm test)

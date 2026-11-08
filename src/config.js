@@ -21,8 +21,8 @@ export const CONFIG = {
     wireHalfWidth: 10,
     wireGaps: [2, 3], // gaps per wire belt
     wireGapLength: [60, 100],
-    craters: [38, 52], // per half of the map
-    craterRadius: [10, 26],
+    craters: [18, 26], // per half of the map (fewer, so hills and ruins matter more)
+    craterRadius: [12, 28],
     tanksPerHalf: 3,
     objectiveRadius: 90,
     featureRadius: 45,
