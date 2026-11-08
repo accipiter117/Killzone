@@ -116,8 +116,8 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 .card .bar i.low { background: var(--danger); }
 .card .status { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .status.pinned { color: var(--danger); font-weight: 600; }
-#actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
-#actions button { display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; padding: 3px 2px; line-height: 1.1; }
+#actions { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+#actions button { display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; padding: 3px 1px; line-height: 1.1; min-width: 0; overflow: hidden; }
 #actions button small { font-weight: 400; font-size: 10px; color: var(--muted); margin-top: 2px; }
 #actions button.support { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
 #actions button.armed { background: var(--danger); color: #fff; border-color: transparent; }
@@ -162,4 +162,9 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Narrow phones: six action buttons need a slightly smaller label. */
+@media (max-width: 375px) {
+  #actions button { font-size: 11px; letter-spacing: -0.01em; }
 }

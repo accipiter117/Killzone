@@ -215,3 +215,24 @@ test('the map is the same for both sides (turned 180 degrees)', () => {
     assert.equal(m.wire[i], m.wire[mirror]);
   }
 });
+
+test('reinforcements refill the weakest squad from your own lines, at a price', () => {
+  const s = quietBattle();
+  const pl = s.platoons[0];
+  const sq = s.squads[pl.squads[1]];
+  const dead = squadSoldiers(s, sq.id).slice(0, 3);
+  dead.forEach((m) => { m.alive = false; m.hp = 0; });
+  s.sides[0].op = 6;
+  assert.ok(applyCommand(s, { tick: 0, side: 0, type: 'reinforce', params: { platoon: pl.id } }).ok);
+  assert.ok(dead.every((m) => m.alive && m.hp === m.maxHp && m.x < 250), 'back on their feet at the ISA lines');
+  assert.ok(Math.abs(s.sides[0].op - 2) < 1e-9, 'costs 4 order points');
+  // Cooldown, and nothing to do at full strength.
+  s.sides[0].op = 6;
+  const again = applyCommand(s, { tick: 0, side: 0, type: 'reinforce', params: { platoon: pl.id } });
+  assert.equal(again.ok, false);
+  assert.match(again.reason, /on their way back/);
+  s.sides[0].reinforceReadyTick = 0;
+  const full = applyCommand(s, { tick: 0, side: 0, type: 'reinforce', params: { platoon: pl.id } });
+  assert.equal(full.ok, false);
+  assert.match(full.reason, /full strength/);
+});

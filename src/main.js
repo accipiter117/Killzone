@@ -143,6 +143,7 @@ function action(act) {
   }
   if (!pl) { toast(ui, 'Select a platoon first', 'Tap one of the three platoon cards.'); return; }
   if (act === 'hold' || act === 'fallback') order(act, { platoon: pl.id });
+  if (act === 'reinforce' && order('reinforce', { platoon: pl.id })) toast(ui, 'Reinforcements', `Fresh soldiers are on their way to ${pl.name}'s weakest squad.`);
   if (act === 'stance') {
     const nextStance = STANCES[(STANCES.indexOf(pl.stance) + 1) % STANCES.length];
     if (order('stance', { platoon: pl.id, stance: nextStance })) {

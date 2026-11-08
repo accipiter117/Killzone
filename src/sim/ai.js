@@ -85,6 +85,17 @@ function decide(state, side, prof, memory) {
     }
   }
 
+  // Reinforce the weakest platoon still in the fight when there are points
+  // to spare.
+  if (state.tick >= sd.reinforceReadyTick && op >= cost.reinforce + prof.reserve) {
+    let weakest = null;
+    for (const pl of mine) if (platoonStrength(state, pl) < ai.reinforceBelow && (!weakest || platoonStrength(state, pl) < platoonStrength(state, weakest))) weakest = pl;
+    if (weakest) {
+      cmds.push({ side, type: 'reinforce', params: { platoon: weakest.id } });
+      op -= cost.reinforce;
+    }
+  }
+
   // Send each platoon to the site worth most to it, nearer sites preferred.
   const [myScore, theirScore] = [sd.score, state.sides[foe].score];
   const ownedObjectives = state.sites.filter((s) => s.kind === 'objective' && s.owner === side).length;

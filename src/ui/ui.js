@@ -86,9 +86,9 @@ export function updateUI(ui, state, view) {
   for (const [act, btn] of Object.entries(e.actions)) {
     btn.classList.toggle('armed', view.armed === act);
     const sel = view.selected !== null ? state.platoons[view.selected] : null;
-    const needsPlatoon = act === 'hold' || act === 'fallback' || act === 'stance';
+    const needsPlatoon = act === 'hold' || act === 'fallback' || act === 'stance' || act === 'reinforce';
     const cost = state.cfg.orders.cost[act];
-    btn.disabled = view.replay || view.watch || (needsPlatoon && (!sel || sel.broken)) || op + 1e-9 < cost || (act === 'artillery' && state.tick < me.artReadyTick);
+    btn.disabled = view.replay || view.watch || (needsPlatoon && (!sel || sel.broken)) || op + 1e-9 < cost || (act === 'artillery' && state.tick < me.artReadyTick) || (act === 'reinforce' && state.tick < me.reinforceReadyTick);
   }
 
   if (view.now - ui.lastText < 0.2) return;
@@ -108,6 +108,7 @@ export function updateUI(ui, state, view) {
   e.speed.textContent = `${view.speed}x`;
   const art = state.tick < me.artReadyTick ? `${Math.ceil((me.artReadyTick - state.tick) / state.cfg.tickRate)}s` : `${state.cfg.orders.cost.artillery} pts`;
   e.actions.artillery.querySelector('small').textContent = art;
+  e.actions.reinforce.querySelector('small').textContent = state.tick < me.reinforceReadyTick ? `${Math.ceil((me.reinforceReadyTick - state.tick) / state.cfg.tickRate)}s` : `${state.cfg.orders.cost.reinforce} pts`;
 
   // Platoon cards (the player's side, or ISA when watching).
   const mine = state.platoons.filter((p) => p.side === view.playerSide);
@@ -218,6 +219,7 @@ export function showEnd(ui, state, playerSide, replayCheck) {
     ['Objectives and posts taken', r.captures[0], r.captures[1]],
     ['Abilities used', r.abilities[0], r.abilities[1]],
     ['Platoons rallied', r.rallies[0], r.rallies[1]],
+    ['Reinforcements called', r.reinforcements[0], r.reinforcements[1]],
     ['Battle length', fmtTime(r.durationSec), ''],
   ];
   const table = $('#end-table');

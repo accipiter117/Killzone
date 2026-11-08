@@ -52,7 +52,7 @@ export const CONFIG = {
     cap: 6,
     regenSec: 9, // seconds per order point
     commsRegenMult: 1.75, // owning the comms post speeds refill by this much
-    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0 },
+    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 4 },
   },
 
   // Squad roles. range/sight in world units, fireInterval in seconds,
@@ -150,6 +150,10 @@ export const CONFIG = {
 
   smoke: { radius: 120, durationSec: 22 },
 
+  // Reinforcements: refill the weakest squad of a platoon with fresh
+  // soldiers who arrive from your own lines. Cooldown is per side.
+  reinforce: { soldiers: 5, cooldownSec: 75 },
+
   // Squad abilities: free, one per role, each on its own cooldown.
   abilities: {
     grenade: { label: 'Grenade', cooldownSec: 18, range: 190, fuseSec: 1.1, radius: 38, damage: 75, suppress: 40 },
@@ -168,6 +172,7 @@ export const CONFIG = {
     siteValue: { objective: 10, comms: 4, mg: 3, arc: 3 },
     threatRadius: 320, // enemies seen this close to a site count as massing on it
     threatValue: 0.6, // extra value per enemy soldier massing on a site
+    reinforceBelow: 0.65, // the AI reinforces a platoon below this strength
     highGroundValue: 0.35, // extra value per level of high ground a site sits on
     garrison: 10, // soldiers an objective needs before the AI sends others elsewhere...
     garrisonPerLevel: 11, // ...plus this many per level of high ground it sits on
