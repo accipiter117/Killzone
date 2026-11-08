@@ -30,10 +30,13 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 - Every order costs an **order point** (top right). They refill over time, faster if you hold the comms post. Stance changes are free.
 - **Artillery** (3 points, 25 second reload): tap the button, then the target. After a 3 second warning, shells land in a circle and hit **everyone**, your troops included. The craters they leave become cover. Squads that can still move will try to scramble out of the warning circle.
 - **Smoke** (2 points): blocks sight through an area for about 20 seconds. Good for crossing open ground.
-- Hold objectives to score a point per second each. The higher score when the timer ends wins, or break every enemy platoon for an immediate win.
+- Hold objectives to score a point per second each. The higher score when the timer ends wins, or break every enemy platoon at once for an immediate win.
+- **Breaking and rallying:** a platoon that loses too many men breaks and runs back to its own lines. The first time, the survivors regroup there for 25 seconds and then rejoin the fight (the card counts down). A rallied platoon that loses half of what was left breaks for good and leaves the field.
 - **Slow motion:** time slows to a quarter while a platoon is selected or a strike is being aimed, so you can think. Tap the card again to let go (switch it off in the menu).
 - **Abilities:** each squad has one, shown as a button on its line under the platoon cards. They are free but recharge. Grenade (Rifle), Barrage (Heavy), Charge (Assault), Sandbags (Engineer), Mark (Recon). A button turns blue when using it would work right now.
 - **High ground:** raised plateaus with cliffs you cannot climb; only ramps (lighter slopes) lead up. From higher ground soldiers see and shoot further and hit more often, and hills block sight between lower troops. B sits on top of a two tier hill.
+- **Sound** is synthesised in code: gunfire, explosions, the artillery whistle, a chime when an objective changes hands and a horn when a platoon breaks or rallies. It starts on your first tap and can be switched off in the menu.
+- **Reading the battle:** a platoon's badge turns red with a "!" when one of its squads is pinned; soldiers flash when hit; enemies marked by recon get red brackets.
 - **Press and hold** anything (ground, wire, a post, an enemy squad) to see its one rule or what that squad is doing.
 - Drag to pan, pinch to zoom, tap or drag the minimap to jump.
 
@@ -55,7 +58,7 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 | Sandbags | Engineer | Builds a sandbag wall facing the enemy: instant cover as good as a trench. |
 | Mark | Recon | Tags an enemy group for ten seconds: everyone can see them and hits them more often. |
 
-Platoon mixes: 1st (Rifle, Heavy, Engineer), 2nd (Rifle, Assault, Engineer), 3rd (Assault, Heavy, Recon).
+Platoon mixes: 1st (Rifle, Heavy, Engineer), 2nd (Rifle, Assault, Engineer), 3rd (Assault, Heavy, Recon). Each role has its own look: Heavies carry machine guns and ammo packs, Assault troops are armoured with short guns, Engineers carry tool packs, Recon carry sniper rifles (the Helghast scout is hooded and cloaked).
 
 ### The battlefield (one rule each)
 
@@ -89,6 +92,9 @@ Every number is in [`src/config.js`](src/config.js). Change one, push, reload on
 | Break point | `battle.breakAt` (0.3) | 0.4 | Higher = platoons run sooner, shorter battles. |
 | Capture time | `capture.objectiveSec` (14) | 8 or 20 | How quickly objectives change hands. |
 | Battle length | `battle.durationSec` (600) | 300 | Also selectable in the menu. |
+| Lethality | `combat.damageMult` (0.8) | 0.6 or 1 | Lower = longer fights where objectives matter more. |
+| Rallying | `battle.rallySec` (25), `battle.rallyBreakShare` (0.5) | 15 or 40 | How long broken platoons take to regroup, and how fragile they are afterwards. |
+| AI commitment | `ai.garrison`, `ai.garrisonPerLevel` | | How many soldiers the AI puts on an objective (and on high ground) before sending others elsewhere. |
 | Margin of victory | `battle.margin` (narrow 0.2, clear 0.6) | | Decides narrow / clear / crushing (and later, how far the front moves). |
 | Role stats | `roles.*` | | Range, speed, damage, accuracy and suppression per squad type. |
 | High ground | `height.rangePerLevel`, `height.hitPerLevel` (0.15 each) | 0.1 or 0.25 | How much holding the hill is worth. |
@@ -102,5 +108,7 @@ Every number is in [`src/config.js`](src/config.js). Change one, push, reload on
 - Vanilla JavaScript modules, no build step, no dependencies. Open `index.html` through any static server (for example `python3 -m http.server`).
 - `src/sim/` is the whole battle with no DOM: fixed 30 ticks per second, one seeded RNG, and every order is a command object passed through `applyCommand`. The AI issues the same commands with the same order point rules.
 - `npm test` runs the Node test suite (determinism and replays, AI vs AI battles finishing on time, capture and flipping, pinned squads not advancing, wire slowing until cut, petrusite tanks exploding once, order points, routing, map symmetry, cliffs, ramps and high ground, every ability).
-- `node tools/balance.mjs 10 standard aggressive` plays 10 seeds twice with the AI profiles swapped between sides and reports win rates by side and profile, average battle length and margins. With the standard AI on both sides, the last 80 game run came out ISA 45 percent, Helghast 55 percent (within noise), with most battles ending in one side breaking after about four minutes.
+- `node tools/balance.mjs 10 standard aggressive` plays 10 seeds twice with the AI profiles swapped between sides and reports win rates by side and profile, average battle length and margins. 
+- `tools/balance.mjs` with the same profile on both sides plays every game on its own map. With both AIs on the standard profile, 200 battles on fresh maps came out 47/53 (within chance); battles average about six and a half minutes and roughly 40 percent go to time.
+- The AI has been checked against scripted player strategies (all-in rush on B, spreading out, with and without abilities): it wins most of them, and `test/ai.test.js` guards against the all-in rush becoming a sure win again.
 - See [`CLAUDE.md`](CLAUDE.md) for the standing rules and file layout.

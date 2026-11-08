@@ -30,7 +30,7 @@ src/sim/                  pure simulation (no DOM, no Math.random)
   ai.js                   the AI commander (same commands as the player)
   path.js                 route finding round cliffs and through wire gaps
   abilities.js            squad abilities (grenade, barrage, charge, sandbags, mark)
-src/render/               canvas drawing, camera, cosmetic effects, terrain painter,
+src/render/               canvas drawing, camera, cosmetic effects, terrain painter, audio.js (synthesised sound),
                           puppet.js + pixel-troopers.js (the detailed soldier sprites)
 src/ui/                   DOM panels, input, overlays
 src/main.js               wires it together and owns the game loop
@@ -42,3 +42,4 @@ tools/balance.mjs         AI vs AI balance runs (node tools/balance.mjs [seeds])
 - `npm test` runs every suite in `test/`.
 - `node tools/balance.mjs 10` runs 10 seeds twice with AI profiles swapped and reports win rates and battle length.
 - Browser checks: Playwright from the scratchpad (Chromium is preinstalled), local server `python3 -m http.server 8765`.
+- Fairness: the map is mirrored, so mirrored AIs should split about 50/50. Any choice that breaks a tie (route search, cover search, flank side) must break it in mirror image order for the Helghast, and AI controllers decide from the same moment before orders apply. Check a new mechanic with the balance tool before committing.
