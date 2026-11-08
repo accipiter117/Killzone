@@ -149,7 +149,11 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 /* Landscape phones: a slimmer panel so the battlefield gets the height. */
 @media (orientation: landscape) and (max-height: 520px) {
   #panel { flex-direction: row; flex-wrap: wrap; align-items: stretch; gap: 5px; padding-top: 4px; }
-  #squads { display: none; }
+  /* Landscape: just the three ability buttons, in one compact row. */
+  #squads { order: 3; flex: 1 1 100%; display: flex; flex-direction: row; gap: 5px; min-height: 0; }
+  #squads div { flex: 1; min-width: 0; }
+  #squads div b, #squads div span, #squads .empty { display: none; }
+  #squads button.ab { width: 100%; min-height: 32px; }
   #cards { flex: 1 1 52%; }
   #actions { flex: 1 1 40%; }
   .card { min-height: 48px; padding: 3px 6px; }

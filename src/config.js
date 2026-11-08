@@ -124,6 +124,7 @@ export const CONFIG = {
     platoonLead: 170, // a squad this far ahead of its platoon's slowest squad waits for it
     paceAhead: 18, // soldiers this far in front of their squad's centre slow down
     paceBehind: 22, // soldiers this far behind it speed up
+    highCoverBonus: 25, // when settling into cover, a level of high ground is worth this many units of walking
   },
 
   capture: { objectiveSec: 14, featureSec: 8, decaySec: 30 },

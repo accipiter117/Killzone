@@ -1,7 +1,7 @@
 // Squad behaviour. The player orders platoons; each squad works out how to
 // carry the order out according to its role and the platoon's stance.
 
-import { findCover, wireAt, forCells, cellIndex, canStep, rampAt } from './map.js';
+import { findCover, wireAt, forCells, cellIndex, canStep, rampAt, heightAt } from './map.js';
 import { nextStep, straightClear, findPath } from './path.js';
 import {
   members, centroid, clamp, dist, sideDir, edgeX, siteLabel, nearObjective, isActive, coverName,
@@ -67,7 +67,8 @@ function formUp(state, sq, list, dest, snapCover) {
     let x = clamp(dest.x + ox * ca - oy * sa, 5, W - 5);
     let y = clamp(dest.y + ox * sa + oy * ca, 5, H - 5);
     if (snapCover && coverName(state, x, y) === 'open') {
-      const cv = findCover(state.map, x, y, 22, (cx, cy) => -Math.hypot(cx - x, cy - y));
+      // Nearby cover, preferring cover on higher ground.
+      const cv = findCover(state.map, x, y, 22, (cx, cy) => -Math.hypot(cx - x, cy - y) + state.cfg.squad.highCoverBonus * heightAt(state.map, cx, cy));
       if (cv) { x = cv.x; y = cv.y; }
     }
     // On broken ground a soldier's own spot can be across a cliff from
@@ -202,7 +203,7 @@ export function thinkSquad(state, sq) {
     return;
   }
   if (order.type === 'hold') {
-    if (!sq.holdSpot) sq.holdSpot = findCover(state.map, c.x, c.y, 90, (x, y) => -Math.hypot(x - c.x, y - c.y)) || c;
+    if (!sq.holdSpot) sq.holdSpot = findCover(state.map, c.x, c.y, 90, (x, y) => -Math.hypot(x - c.x, y - c.y) + 2.5 * state.cfg.squad.highCoverBonus * heightAt(state.map, x, y)) || c;
     const there = dist(c, sq.holdSpot) < cfg.squad.arriveDist * 1.5;
     sq.mode = 'hold';
     sq.status = there ? (firing ? 'Dug in, firing' : 'Dug in') : 'Moving to cover';
