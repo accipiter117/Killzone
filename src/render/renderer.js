@@ -3,7 +3,8 @@
 
 import { isActive, members, centroid } from '../sim/util.js';
 import { toScreen } from './camera.js';
-import { sideColours, drawBodies, drawSmoke, drawEffects } from './effects.js';
+import { sideColours, drawSmoke, drawEffects } from './effects.js';
+import { getSprite, dirIndex, SPRITE_SIZE } from './sprites.js';
 
 export const OWNER = { 0: '#7fb6ff', 1: '#ff6a2a', null: '#d8d2c0' };
 const ownerColour = (o) => OWNER[o === null || o === undefined ? 'null' : o];
@@ -12,7 +13,8 @@ export function createRenderer(map) {
   // Wire cells are few, so keep a list instead of scanning the whole grid.
   const wireCells = [];
   for (let i = 0; i < map.wire.length; i++) if (map.wire[i] > 0) wireCells.push(i);
-  return { wireCells, facing: [], badges: [], thumb: null, thumbAt: -1 };
+  // facing, last drawn position and distance walked per soldier drive the animation.
+  return { wireCells, facing: [], lastX: [], lastY: [], stride: [], badges: [], thumb: null, thumbAt: -1 };
 }
 
 const visible = (state, s, opts) => s.side === opts.playerSide || opts.reveal || state.sides[opts.playerSide].spotted[s.id];
@@ -30,7 +32,7 @@ export function drawFrame(g, r, state, cam, opts) {
   g.drawImage(terrain.canvas, 0, 0);
   drawWire(g, r, state, cam);
   drawSitesWorld(g, state, now, px, fxs);
-  drawBodies(g, fxs);
+  drawBodies(g, r, state, fxs, now, px);
   drawTanks(g, state, now);
   drawOrderLine(g, state, opts, px);
   drawSoldiers(g, r, state, opts, px);
@@ -177,13 +179,24 @@ function drawOrderLine(g, state, opts, px) {
   g.stroke();
 }
 
+// World units per sprite pixel: near true size close up, never smaller than
+// about 0.7 of a screen pixel per sprite pixel when zoomed out, so soldiers stay visible.
+const spriteScale = (px) => Math.max(1.1, 0.7 * px);
+const WALK = ['walk1', 'stand', 'walk2', 'stand'];
+
 function drawSoldiers(g, r, state, opts, px) {
-  const rr = Math.max(4.5, 3.2 * px);
+  const ps = spriteScale(px);
+  const size = SPRITE_SIZE * ps;
   const sel = opts.selected;
+  const lastShot = opts.fxs.lastShot;
+  g.imageSmoothingEnabled = false;
   for (const s of state.soldiers) {
-    if (!isActive(s) || !visible(state, s, opts)) continue;
-    const sq = state.squads[s.squad];
-    const c = sideColours(s.side);
+    if (!isActive(s)) continue;
+    // Animation bookkeeping happens for everyone, seen or not.
+    const moved = r.lastX[s.id] === undefined ? 0 : Math.hypot(s.x - r.lastX[s.id], s.y - r.lastY[s.id]);
+    r.lastX[s.id] = s.x;
+    r.lastY[s.id] = s.y;
+    r.stride[s.id] = (r.stride[s.id] || 0) + moved;
     // Face the target if shooting, otherwise the way they are walking.
     let ang = r.facing[s.id];
     if (s.target >= 0 && state.soldiers[s.target].alive) {
@@ -192,45 +205,38 @@ function drawSoldiers(g, r, state, opts, px) {
     } else if (Math.hypot(s.tx - s.x, s.ty - s.y) > 2) ang = Math.atan2(s.ty - s.y, s.tx - s.x);
     if (ang === undefined) ang = s.side === 0 ? 0 : Math.PI;
     r.facing[s.id] = ang;
-    const ca = Math.cos(ang), sa = Math.sin(ang);
-    g.globalAlpha = sq.mode === 'rout' ? 0.55 : 1;
+    if (!visible(state, s, opts)) continue;
+
+    const sq = state.squads[s.squad];
+    const stride = r.stride[s.id];
+    let frame = 'stand';
+    if (sq.pinned && sq.mode !== 'rout') frame = sq.mode === 'crawl' && moved > 0.01 && Math.floor(stride / 3) % 2 ? 'prone2' : 'prone1';
+    else if (opts.now - (lastShot.get(s.id) ?? -9) < 0.09) frame = 'fire';
+    else if (moved > 0.01) frame = WALK[Math.floor(stride / 3.5) % 4];
+
+    g.globalAlpha = sq.mode === 'rout' ? 0.6 : 1;
     if (sel === sq.platoon) {
       g.strokeStyle = 'rgba(255,240,170,0.9)';
       g.lineWidth = 1.6 * px;
       g.beginPath();
-      g.arc(s.x, s.y, rr + 3 * px, 0, Math.PI * 2);
+      g.arc(s.x, s.y, size * 0.42, 0, Math.PI * 2);
       g.stroke();
     }
-    // Rifle.
-    g.strokeStyle = c.dark;
-    g.lineWidth = Math.max(1.4, rr * 0.35);
-    g.beginPath();
-    g.moveTo(s.x, s.y);
-    g.lineTo(s.x + ca * rr * 1.7, s.y + sa * rr * 1.7);
-    g.stroke();
-    // Body.
-    g.fillStyle = c.body;
-    g.beginPath();
-    g.arc(s.x, s.y, rr, 0, Math.PI * 2);
-    g.fill();
-    g.strokeStyle = c.rim;
-    g.lineWidth = Math.max(0.9, rr * 0.24);
-    g.stroke();
-    // Helmet highlight (ISA) or glowing goggles (Helghast).
-    g.fillStyle = c.light;
-    const hx = s.x + ca * rr * 0.4, hy = s.y + sa * rr * 0.4;
-    if (s.side === 1) {
-      g.beginPath();
-      g.arc(hx - sa * rr * 0.32, hy + ca * rr * 0.32, rr * 0.22, 0, Math.PI * 2);
-      g.arc(hx + sa * rr * 0.32, hy - ca * rr * 0.32, rr * 0.22, 0, Math.PI * 2);
-      g.fill();
-    } else {
-      g.beginPath();
-      g.arc(s.x - rr * 0.2, s.y - rr * 0.25, rr * 0.38, 0, Math.PI * 2);
-      g.fill();
-    }
+    g.drawImage(getSprite(s.side, s.role, frame, dirIndex(ang)), s.x - size / 2, s.y - size / 2, size, size);
   }
   g.globalAlpha = 1;
+}
+
+// The fallen: a quick topple, then they stay where they dropped.
+function drawBodies(g, r, state, fxs, now, px) {
+  const size = SPRITE_SIZE * spriteScale(px);
+  g.imageSmoothingEnabled = false;
+  for (const b of fxs.bodies) {
+    if (b.dir === null) b.dir = dirIndex(r.facing[b.id] ?? (b.side === 0 ? 0 : Math.PI));
+    const t = now - b.t0;
+    const frame = t < 0.12 ? 'fall1' : t < 0.26 ? 'fall2' : 'dead';
+    g.drawImage(getSprite(b.side, state.soldiers[b.id].role, frame, b.dir), b.x - size / 2, b.y - size / 2, size, size);
+  }
 }
 
 function drawStrikes(g, state, now, px) {

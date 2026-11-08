@@ -13,6 +13,7 @@ export const sideColours = (side) => (side === 0 ? COLOURS.isa : COLOURS.hgh);
 export function createEffects() {
   return {
     tracers: [], flashes: [], puffs: [], booms: [], zaps: [], bodies: [], smokes: new Map(), rings: [],
+    lastShot: new Map(), // soldier id -> time of their last shot (for the firing frame)
     shake: 0, reduced: false, terrain: null,
   };
 }
@@ -26,7 +27,9 @@ export function ingest(fxs, events, now) {
       case 'shot': {
         if (fxs.tracers.length < MAX) {
           fxs.tracers.push({ x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2, side: e.side, t0: now, life: 0.12 + fx() * 0.05, heavy: e.src === 'mg' });
-          fxs.flashes.push({ x: e.x1, y: e.y1, side: e.side, t0: now, life: 0.06 });
+          // Soldiers show their own muzzle flash in the sprite; MG nests get a drawn one.
+          if (e.id >= 0) fxs.lastShot.set(e.id, now);
+          else fxs.flashes.push({ x: e.x1, y: e.y1, side: e.side, t0: now, life: 0.06 });
         }
         break;
       }
@@ -34,7 +37,7 @@ export function ingest(fxs, events, now) {
         if (fxs.puffs.length < MAX) fxs.puffs.push({ x: e.x + fx.range(-3, 3), y: e.y + fx.range(-3, 3), t0: now, life: 0.35, r: 4, colour: '120,30,20' });
         break;
       case 'death':
-        fxs.bodies.push({ x: e.x, y: e.y, side: e.side, a: fx() * Math.PI * 2 });
+        fxs.bodies.push({ id: e.id, x: e.x, y: e.y, side: e.side, t0: now, dir: null });
         if (fxs.bodies.length > 400) fxs.bodies.shift();
         break;
       case 'shell':
@@ -92,15 +95,6 @@ export function prune(fxs, now) {
   fxs.booms = fxs.booms.filter(alive);
   fxs.zaps = fxs.zaps.filter(alive);
   fxs.rings = fxs.rings.filter(alive);
-}
-
-export function drawBodies(g, fxs) {
-  for (const b of fxs.bodies) {
-    g.fillStyle = b.side === 0 ? 'rgba(60,80,105,0.75)' : 'rgba(30,30,32,0.8)';
-    g.beginPath();
-    g.ellipse(b.x, b.y, 5, 2.6, b.a, 0, Math.PI * 2);
-    g.fill();
-  }
 }
 
 export function drawSmoke(g, fxs, smokes, now, tickNow, tickRate) {

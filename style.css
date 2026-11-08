@@ -48,6 +48,7 @@ body { position: fixed; inset: 0; overflow: hidden; touch-action: none; user-sel
 button { font: inherit; color: var(--text); background: var(--btn); border: 1px solid var(--line); border-radius: 10px; min-height: 44px; min-width: 44px; padding: 4px 8px; cursor: pointer; touch-action: manipulation; }
 button:active { background: var(--btn-press); }
 button:disabled { opacity: 0.4; }
+a.button { display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text); background: var(--btn); border: 1px solid var(--line); border-radius: 10px; min-height: 44px; }
 button.primary { background: var(--accent); color: #fff; border-color: transparent; font-weight: 600; }
 
 #app { position: absolute; inset: 0; display: flex; flex-direction: column; padding: var(--safe-t) var(--safe-r) 0 var(--safe-l); }

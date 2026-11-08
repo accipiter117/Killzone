@@ -122,7 +122,7 @@ export function fireShot(state, from, t, w, range, shooterPinned, source) {
   }
   const cover = coverAt(state, t.x, t.y);
   suppress(state, state.squads[t.squad], w.suppress * cover.supp * (hit ? state.cfg.suppression.hitMult : 1), source);
-  state.events.push({ type: 'shot', side: from.side, x1: from.x, y1: from.y, x2: ix, y2: iy, hit, src: source });
+  state.events.push({ type: 'shot', id: from.id === undefined ? -1 : from.id, side: from.side, x1: from.x, y1: from.y, x2: ix, y2: iy, hit, src: source });
 }
 
 export function strayImpact(state, x, y) {
@@ -147,7 +147,7 @@ export function damageSoldier(state, s, dmg) {
   s.alive = false;
   s.hp = 0;
   state.sides[s.side].casualties++;
-  state.events.push({ type: 'death', x: s.x, y: s.y, side: s.side });
+  state.events.push({ type: 'death', id: s.id, x: s.x, y: s.y, side: s.side });
   const sq = state.squads[s.squad];
   if (sq.soldiers.every((id) => !state.soldiers[id].alive)) {
     const pl = state.platoons[sq.platoon];
