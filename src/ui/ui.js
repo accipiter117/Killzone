@@ -215,6 +215,9 @@ export function showEnd(ui, state, playerSide, replayCheck) {
     ['Killed', r.casualties[0], r.casualties[1]],
     ['Ran off the field', r.fled[0], r.fled[1]],
     ['Objectives held', r.held[0].join(' ') || 'none', r.held[1].join(' ') || 'none'],
+    ['Objectives and posts taken', r.captures[0], r.captures[1]],
+    ['Abilities used', r.abilities[0], r.abilities[1]],
+    ['Platoons rallied', r.rallies[0], r.rallies[1]],
     ['Battle length', fmtTime(r.durationSec), ''],
   ];
   const table = $('#end-table');

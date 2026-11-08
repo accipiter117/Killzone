@@ -29,7 +29,7 @@ export function createBattle(seed, options = {}) {
     map,
     sites: map.sites,
     tanks: map.tanks,
-    sides: SIDE_NAMES.map((name, id) => ({ id, name, op: cfg.orders.start, score: 0, casualties: 0, fled: 0, artReadyTick: 0, spotted: null })),
+    sides: SIDE_NAMES.map((name, id) => ({ id, name, op: cfg.orders.start, score: 0, casualties: 0, fled: 0, artReadyTick: 0, spotted: null, captures: 0, abilities: 0, rallies: 0 })),
     platoons: [], squads: [], soldiers: [],
     strikes: [], smokes: [], throws: [],
     events: [], feed: [],
@@ -149,6 +149,7 @@ function checkMorale(state) {
         pl.orderTick = state.tick;
         resetPlans(state, pl);
         for (const id of pl.squads) { const sq = state.squads[id]; sq.supp = 0; sq.pinned = false; sq.mode = 'hold'; }
+        state.sides[pl.side].rallies++;
         feed(state, `${label(pl)} has rallied`, pl.side);
         state.events.push({ type: 'rallied', platoon: pl.id, side: pl.side });
       }
@@ -191,6 +192,9 @@ function finish(state, winner, reason) {
     scores: [s0, s1],
     casualties: state.sides.map((s) => s.casualties),
     fled: state.sides.map((s) => s.fled),
+    captures: state.sides.map((s) => s.captures),
+    abilities: state.sides.map((s) => s.abilities),
+    rallies: state.sides.map((s) => s.rallies),
     held: [0, 1].map((side) => state.sites.filter((s) => s.kind === 'objective' && s.owner === side).map((s) => s.id)),
   };
   const text = winner === null ? 'The battle ends in a stalemate' : `${sideName(winner)} victory (${margin})`;

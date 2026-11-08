@@ -101,9 +101,10 @@ function startBattle(seed, { replayLog = null } = {}) {
   closeOverlay('overlay-end');
   resize();
   // Open on the ISA lines, a little zoomed in from the full height.
-  game.cam.z = Math.min(game.cam.maxZ, (game.cam.vh / st.map.height) * 1.35);
+  // Open close enough to see the troopers, on the ISA lines.
+  game.cam.z = Math.min(game.cam.maxZ, (game.cam.vh / st.map.height) * 2);
   clampCamera(game.cam);
-  centreOn(game.cam, 0, st.map.height / 2);
+  centreOn(game.cam, 260, st.map.height / 2);
   keepAwake(true);
   try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}`); } catch { /* file:// */ }
 }

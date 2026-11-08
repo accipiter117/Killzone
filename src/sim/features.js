@@ -39,6 +39,7 @@ export function updateSites(state, dt) {
     site.cap += dt / secs;
     if (site.cap >= 1) {
       site.owner = present;
+      state.sides[present].captures++;
       site.cap = 0;
       site.capSide = null;
       feed(state, `${sideName(present)} took ${describe(site)}`, present);

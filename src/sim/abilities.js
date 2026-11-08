@@ -96,6 +96,7 @@ export function useAbility(state, sq) {
       return fail('Unknown ability');
   }
   sq.abilityReady = state.tick + ticks(a.cooldownSec);
+  state.sides[sq.side].abilities++;
   sq.abilityUsed = key;
   return { ok: true };
 }
