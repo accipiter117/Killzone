@@ -33,7 +33,7 @@ export function createRenderer(map) {
   const wireCells = [];
   for (let i = 0; i < map.wire.length; i++) if (map.wire[i] > 0) wireCells.push(i);
   // facing, last drawn position and distance walked per soldier drive the animation.
-  return { wireCells, facing: [], lastX: [], lastY: [], stride: [], badges: [], thumb: null, thumbAt: -1, vdist: [0, 0], vlast: [] };
+  return { wireCells, facing: [], lastX: [], lastY: [], stride: [], badges: [], edges: [], thumb: null, thumbAt: -1, vdist: [0, 0], vlast: [] };
 }
 
 const visible = (state, s, opts) => s.side === opts.playerSide || opts.reveal || state.sides[opts.playerSide].spotted[s.id];
@@ -69,6 +69,90 @@ export function drawFrame(g, r, state, cam, opts) {
   drawSquadLabels(g, state, cam, opts);
   drawMarks(g, state, cam, opts);
   drawFocus(g, state, cam, opts);
+  drawIncoming(g, state, cam, opts);
+  r.edges = drawEdgeAlerts(g, state, cam, opts);
+}
+
+// Where the fire is coming from: a red arc on the side of each of your
+// squads facing whoever just shot at it or shelled it.
+function drawIncoming(g, state, cam, opts) {
+  if (opts.reveal) return;
+  for (const sq of state.squads) {
+    if (sq.side !== opts.playerSide || !sq.hitFrom || sq.mode === 'dead') continue;
+    const age = (state.tick - sq.hitFrom.tick) / state.cfg.tickRate;
+    if (age > 1.2 || sq.supp < 12) continue;
+    const list = members(state, sq);
+    if (!list.length) continue;
+    const c = centroid(list);
+    const p = toScreen(cam, c.x, LY(c.x, c.y) - 8);
+    const q = toScreen(cam, sq.hitFrom.x, LY(sq.hitFrom.x, sq.hitFrom.y));
+    const a = Math.atan2(q.y - p.y, q.x - p.x);
+    const r = 30;
+    g.strokeStyle = `rgba(255,70,50,${0.7 * (1 - age / 1.2)})`;
+    g.lineWidth = 2.5;
+    g.beginPath();
+    g.arc(p.x, p.y, r, a - 0.5, a + 0.5);
+    g.stroke();
+    g.beginPath();
+    g.moveTo(p.x + Math.cos(a) * (r + 7), p.y + Math.sin(a) * (r + 7));
+    g.lineTo(p.x + Math.cos(a - 0.22) * (r + 1), p.y + Math.sin(a - 0.22) * (r + 1));
+    g.lineTo(p.x + Math.cos(a + 0.22) * (r + 1), p.y + Math.sin(a + 0.22) * (r + 1));
+    g.closePath();
+    g.fillStyle = g.strokeStyle;
+    g.fill();
+  }
+}
+
+// Off screen trouble: an arrow at the edge of the screen pointing at one of
+// your platoons under heavy fire, or an objective the enemy is taking.
+// Returns their positions so a tap on one jumps the view there.
+function drawEdgeAlerts(g, state, cam, opts) {
+  const out = [];
+  if (opts.reveal) return out;
+  const L = 34, R = cam.vw - 34, T = 70, B = cam.vh - 90;
+  const add = (wx, wy, label, col) => {
+    const p = toScreen(cam, wx, LY(wx, wy));
+    if (p.x >= 0 && p.x <= cam.vw && p.y >= 0 && p.y <= cam.vh) return;
+    const cx = cam.vw / 2, cy = cam.vh / 2;
+    const dx = p.x - cx, dy = p.y - cy;
+    const k = Math.min(Math.abs((dx > 0 ? R - cx : L - cx) / (dx || 1e-6)), Math.abs((dy > 0 ? B - cy : T - cy) / (dy || 1e-6)));
+    let x = cx + dx * k, y = cy + dy * k;
+    const a = Math.atan2(dy, dx);
+    // Arrows pointing the same way are spread along the edge, not stacked.
+    for (let n = 0; n < 6 && out.some((o) => Math.hypot(o.x - x, o.y - y) < 38); n++) {
+      if (x <= L + 1 || x >= R - 1) y = Math.min(B, Math.max(T, y + (y > cy ? -38 : 38)));
+      else x = Math.min(R, Math.max(L, x + (x > cx ? -38 : 38)));
+    }
+    g.save();
+    g.translate(x, y);
+    g.fillStyle = 'rgba(18,17,14,0.82)';
+    g.beginPath(); g.arc(0, 0, 17, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = col; g.lineWidth = 2.5; g.stroke();
+    g.rotate(a);
+    g.fillStyle = col;
+    g.beginPath(); g.moveTo(25, 0); g.lineTo(16, -7); g.lineTo(16, 7); g.closePath(); g.fill();
+    g.restore();
+    g.fillStyle = col;
+    g.font = 'bold 13px system-ui, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(label, x, y + 0.5);
+    out.push({ x, y, wx, wy });
+  };
+  const pulse = 0.65 + 0.35 * Math.sin(opts.now * 6);
+  for (const pl of state.platoons) {
+    if (pl.side !== opts.playerSide || pl.broken) continue;
+    const sqs = pl.squads.map((id) => state.squads[id]);
+    const hot = sqs.some((q) => q.mode !== 'dead' && (q.pinned || (state.tick - q.lastHitTick < state.cfg.tickRate * 2 && q.supp > 25)));
+    if (!hot) continue;
+    const c = platoonCentre(state, pl);
+    if (c) add(c.x, c.y, String(pl.index + 1), `rgba(255,90,70,${pulse})`);
+  }
+  for (const s of state.sites) {
+    if (s.kind !== 'objective' || s.capSide === null || s.capSide === opts.playerSide || s.cap <= 0 || s.owner === s.capSide) continue;
+    add(s.x, s.y, s.id, `rgba(255,160,60,${pulse})`);
+  }
+  return out;
 }
 
 // Red brackets over enemies marked by recon.
@@ -103,7 +187,8 @@ function drawMarks(g, state, cam, opts) {
   g.strokeStyle = '#ff4a32';
   g.lineWidth = 2;
   for (const s of state.soldiers) {
-    if (!isActive(s) || !(s.markUntil > state.tick) || !visible(state, s, opts)) continue;
+    // Only enemies your recon has marked (your own marked troops would just be clutter).
+    if (!isActive(s) || !(s.markUntil > state.tick) || !visible(state, s, opts) || (s.side === opts.playerSide && !opts.reveal)) continue;
     const p = toScreen(cam, s.x, LY(s.x, s.y) - lift);
     const r = 5;
     g.beginPath();
@@ -513,6 +598,9 @@ function drawBodies(g, r, state, fxs, now, px, view) {
   const size = SPRITE_SIZE * spriteScale(px);
   const ps = spriteScale25(px);
   g.imageSmoothingEnabled = false;
+  // The fallen are drawn dimmed and greyed (and fade further with time) so
+  // they never read as living soldiers when zoomed out.
+  const canFilter = 'filter' in g;
   for (const b of fxs.bodies) {
     if (b.dir === null) {
       b.ang = r.facing[b.id] ?? (b.side === 0 ? 0 : Math.PI);
@@ -521,10 +609,15 @@ function drawBodies(g, r, state, fxs, now, px, view) {
     const t = now - b.t0;
     const frame = t < 0.12 ? 'fall1' : t < 0.26 ? 'fall2' : 'dead';
     const role = state.soldiers[b.id].role;
+    const age = now - b.t0;
+    g.globalAlpha = age < 0.3 ? 1 : Math.max(0.3, 0.62 - age / 90);
+    if (canFilter && age >= 0.3) g.filter = 'grayscale(0.75) brightness(0.7)';
     if (top) g.drawImage(getSprite(b.side, role, frame, b.dir), b.x - size / 2, b.y - size / 2, size, size);
     else if (view === 'pixel') drawTrooper(g, b.side, frame, b.ang, b.x, b.y, spriteScalePixel(px), role);
     else g.drawImage(getSprite25(b.side, role, frame, b.dir), b.x - ANCHOR_X * ps, b.y - ANCHOR_Y * ps, W25 * ps, H25 * ps);
+    if (canFilter) g.filter = 'none';
   }
+  g.globalAlpha = 1;
 }
 
 function drawStrikes(g, state, now, px) {

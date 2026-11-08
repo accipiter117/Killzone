@@ -82,6 +82,7 @@ const ui = createUI({
     }
   },
   closeTray() { deselect(); },
+  jump(x, y) { lookAt(x, y); },
   setScope(id) {
     game.scope = id;
     game.release = null;
@@ -227,6 +228,12 @@ function action(act) {
   }
 }
 
+// Centre the view on a ground point (drawn lifted in the tilted view).
+function lookAt(x, y) {
+  const lift = game.tilt ? liftAt(game.match.state.map, x, y) : 0;
+  centreOn(game.cam, x, y - lift);
+}
+
 function deselect() {
   game.selected = null;
   game.scope = null;
@@ -309,6 +316,9 @@ function onTap(sx, sy) {
   const st = game.match.state;
   const w = tapToGround(sx, sy);
   const px = 1 / game.cam.z;
+  // An off-screen alert arrow: jump there.
+  const edge = (game.renderer.edges || []).find((a) => Math.hypot(a.x - sx, a.y - sy) < 24);
+  if (edge) { lookAt(edge.wx, edge.wy); return; }
   if (!game.replay && !game.watch) {
     if (game.armed) {
       const type = game.armed;
@@ -523,7 +533,8 @@ function hintText() {
   if (game.armed === 'smoke') return 'Tap where to drop smoke. It blocks sight for a while.';
   if (game.selected !== null) return `${game.match.state.platoons[game.selected].name}: tap an objective to take it, or ground to move (slowed while you decide)`;
   if (game.vehicle) return 'Tank: tap the ground to drive there (it cannot enter ruins). Overwatch fires a heavy aimed shell.';
-  return 'Tap a unit (bottom left) to command it. Press and hold anything to learn what it does.';
+  // The general tip only for the opening of a battle; after that the map is left clear.
+  return game.match.state.tick < 40 * game.match.state.cfg.tickRate ? 'Tap a unit (bottom left) to command it. Press and hold anything to learn what it does.' : '';
 }
 
 function frame(t) {

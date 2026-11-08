@@ -190,7 +190,7 @@ export function fireShot(state, from, t, w, range, shooterPinned, source) {
   let ix = t.x, iy = t.y;
   if (hit) {
     const dmg = (w.closeRange && d < w.closeRange ? w.damage * w.closeMult : w.damage) * state.cfg.combat.damageMult;
-    damageSoldier(state, t, dmg);
+    damageSoldier(state, t, dmg, source === 'fire' ? from.role || 'rifle' : source);
   } else {
     // Stray rounds land near the target and might find a petrusite tank.
     const a = next(state) * Math.PI * 2, r = next(state) * state.cfg.combat.strayRadius;
@@ -198,7 +198,7 @@ export function fireShot(state, from, t, w, range, shooterPinned, source) {
     strayImpact(state, ix, iy);
   }
   const cover = coverOf(state, t);
-  suppress(state, state.squads[t.squad], w.suppress * cover.supp * (hit ? state.cfg.suppression.hitMult : 1), source);
+  suppress(state, state.squads[t.squad], w.suppress * cover.supp * (hit ? state.cfg.suppression.hitMult : 1), source, from);
   state.events.push({ type: 'shot', id: from.id === undefined ? -1 : from.id, side: from.side, x1: from.x, y1: from.y, x2: ix, y2: iy, hit, src: source });
 }
 
@@ -209,26 +209,36 @@ export function strayImpact(state, x, y) {
   }
 }
 
-export function suppress(state, sq, amount, source) {
+export function suppress(state, sq, amount, source, from = null) {
   const cfg = state.cfg.suppression;
+  if (from) sq.hitFrom = { x: from.x, y: from.y, tick: state.tick };
   sq.supp = Math.min(cfg.max, sq.supp + amount);
   sq.lastHitTick = state.tick;
   sq.tally[source] = (sq.tally[source] || 0) + amount;
 }
 
-export function damageSoldier(state, s, dmg) {
+export function damageSoldier(state, s, dmg, cause = 'rifle') {
   if (!isActive(s)) return;
   s.hp -= dmg;
+  s.lastCause = cause;
   state.events.push({ type: 'hit', id: s.id, x: s.x, y: s.y, side: s.side });
   if (s.hp > 0) return;
   s.alive = false;
   s.hp = 0;
   state.sides[s.side].casualties++;
+  const lb = state.sides[s.side].lossBy;
+  lb[cause] = (lb[cause] || 0) + 1;
+  const owner = state.squads[s.squad];
+  owner.lossBy[cause] = (owner.lossBy[cause] || 0) + 1;
   state.events.push({ type: 'death', id: s.id, x: s.x, y: s.y, side: s.side });
   const sq = state.squads[s.squad];
   if (sq.soldiers.every((id) => !state.soldiers[id].alive)) {
     const pl = state.platoons[sq.platoon];
-    feed(state, `${sideName(s.side)} ${state.cfg.roles[sq.role].label} squad (${pl.name}) wiped out`, s.side);
+    // Say what did most of the damage, so a loss can be understood.
+    let top = null;
+    for (const k in sq.lossBy) if (!top || sq.lossBy[k] > sq.lossBy[top]) top = k;
+    const by = top && state.cfg.causes[top] ? `, mostly by ${state.cfg.causes[top]}` : '';
+    feed(state, `${sideName(s.side)} ${state.cfg.roles[sq.role].label} squad (${pl.name}) wiped out${by}`, s.side, s);
   }
 }
 
