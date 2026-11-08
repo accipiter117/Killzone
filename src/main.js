@@ -33,15 +33,16 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), labelsAll: store.get('labels', false), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, armed: null, marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
 window.__kz = game; // handy for debugging and browser tests
 const audio = createAudio();
 audio.enabled = store.get('sound', true);
+game.audio = audio; // for browser tests
 // Sound can only start after a touch; buttons click.
-document.addEventListener('pointerdown', () => unlockAudio(audio));
+for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(ev, () => unlockAudio(audio), { passive: true });
 document.addEventListener('click', (e) => { if (e.target.closest('button')) uiClick(audio); });
 
 const ui = createUI({
@@ -215,7 +216,12 @@ function onTap(sx, sy) {
     if (game.selected !== null) {
       const pl = st.platoons[game.selected];
       const site = siteAt(st, w);
-      const ok = site ? order('take', { platoon: pl.id, site: site.id }) : order('move', { platoon: pl.id, x: w.x, y: w.y });
+      // Move orders snap to the centre of a grid tile (Bad North style), so
+      // where the platoon will stand is clear and taps land cleanly.
+      const t = CONFIG.ui.tile;
+      const snap = game.grid ? { x: Math.floor(w.x / t) * t + t / 2, y: Math.floor(w.y / t) * t + t / 2 } : w;
+      const ok = site ? order('take', { platoon: pl.id, site: site.id }) : order('move', { platoon: pl.id, x: snap.x, y: snap.y });
+      if (ok && !site) { game.marker = { x: snap.x, y: snap.y, t0: performance.now() / 1000, colour: '#aaffaa' }; return; }
       if (ok) game.marker = { x: site ? site.x : w.x, y: site ? site.y : w.y, t0: performance.now() / 1000, colour: site ? '#ffe078' : '#aaffaa' };
       return;
     }
@@ -277,6 +283,7 @@ function openMenu() {
   document.getElementById('view-select').value = game.view;
   document.getElementById('slowmo-toggle').checked = game.slowMo;
   document.getElementById('sound-toggle').checked = audio.enabled;
+  document.getElementById('grid-toggle').checked = game.grid;
   openOverlay('overlay-menu');
 }
 document.getElementById('overlay-menu').addEventListener('click', (e) => {
@@ -296,9 +303,15 @@ document.getElementById('watch-toggle').addEventListener('change', (e) => {
   game.selected = null;
   game.armed = null;
 });
+document.getElementById('grid-toggle').addEventListener('change', (e) => {
+  game.grid = e.target.checked;
+  store.set('grid', game.grid);
+});
 document.getElementById('sound-toggle').addEventListener('change', (e) => {
   audio.enabled = e.target.checked;
   store.set('sound', audio.enabled);
+  unlockAudio(audio);
+  uiClick(audio); // a click to confirm sound works
 });
 document.getElementById('slowmo-toggle').addEventListener('change', (e) => {
   game.slowMo = e.target.checked;
@@ -393,7 +406,7 @@ function frame(t) {
   prune(game.fxs, now);
   const shake = shakeOffset(game.fxs, dt);
   const reveal = game.watch || game.replay;
-  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view };
+  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.armed !== null) };
   drawFrame(g, game.renderer, st, game.cam, view);
   drawMinimap(mg, game.renderer, st, game.cam, view);
   updateUI(ui, st, {
@@ -403,6 +416,14 @@ function frame(t) {
   });
   requestAnimationFrame(frame);
 }
+
+// Portrait: suggest turning sideways (once dismissed, never again).
+const rotateHint = document.getElementById('rotate-hint');
+const portrait = window.matchMedia('(orientation: portrait)');
+const showRotateHint = () => { rotateHint.hidden = !portrait.matches || store.get('uprightOk', false); };
+document.getElementById('rotate-ok').addEventListener('click', () => { store.set('uprightOk', true); showRotateHint(); });
+portrait.addEventListener('change', showRotateHint);
+showRotateHint();
 
 const urlSeed = new URLSearchParams(location.search).get('seed');
 startBattle(urlSeed || newSeed());

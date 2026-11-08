@@ -32,6 +32,10 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 - **Smoke** (2 points): blocks sight through an area for about 20 seconds. Good for crossing open ground.
 - Hold objectives to score a point per second each. The higher score when the timer ends wins, or break every enemy platoon at once for an immediate win.
 - **Breaking and rallying:** a platoon that loses too many men breaks and runs back to its own lines. The first time, the survivors regroup there for 25 seconds and then rejoin the fight (the card counts down). A rallied platoon that loses half of what was left breaks for good and leaves the field.
+- **Changing your mind:** for 5 seconds after giving a platoon a movement order you can tap again to change it for free; the card counts down ("Tap the map to change (4s)"). After that the order is locked in.
+- **Grid:** while a platoon is selected a faint grid of tiles shows (as in Bad North). Move orders snap to the centre of a tile, and the platoon's three squads take that tile and the ones above and below (highlighted). Fighting is not limited to tiles: soldiers shoot, throw and charge at enemies nearby. The grid can be switched off in the menu.
+- **Reinforce** (2 points, 35 second cooldown): up to five fresh soldiers refill the selected platoon's weakest squad. They arrive at the nearest objective or post you hold (or your own lines) and run to rejoin. A platoon that is regrouping after breaking can be reinforced too.
+- **Landscape** is the main way to play: the battlefield takes the full height and the controls sit in a column on the right. Portrait works too.
 - **Slow motion:** time slows to a quarter while a platoon is selected or a strike is being aimed, so you can think. Tap the card again to let go (switch it off in the menu).
 - **Abilities:** each squad has one, shown as a button on its line under the platoon cards. They are free but recharge. Grenade (Rifle), Barrage (Heavy), Charge (Assault), Sandbags (Engineer), Mark (Recon). A button turns blue when using it would work right now.
 - **High ground:** raised plateaus with cliffs you cannot climb; only ramps (lighter slopes) lead up. From higher ground soldiers see and shoot further and hit more often, and hills block sight between lower troops. B sits on top of a two tier hill.
@@ -82,7 +86,7 @@ Every number is in [`src/config.js`](src/config.js). Change one, push, reload on
 
 | What | Where in config.js | Try | Effect on play |
 | --- | --- | --- | --- |
-| Order point refill | `orders.regenSec` (9) | 6 or 12 | Lower = more orders, more micro; higher = each order matters more. |
+| Order point refill | `orders.regenSec` (6) | 4 or 9 | Lower = more orders, more micro; higher = each order matters more. |
 | Order point cap | `orders.cap` (6) | 4 or 8 | How much you can save up for a big turn. |
 | Pinning threshold | `suppression.pinAt` (55) | 40 or 70 | Lower = squads hit the dirt sooner, battles slow down and heavies matter more. |
 | Cover strength | `cover.trench.hit` (0.6) | 0.4 or 0.75 | How much safer trenches are; high values make defending very strong. |

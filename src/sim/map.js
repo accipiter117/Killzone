@@ -148,8 +148,9 @@ function addHighGround(map, g, cfg, [A, B]) {
   const bx = B.x - hc.centreOffset;
   raise([{ x: bx, y: B.y, rx: hc.centre[0], ry: hc.centre[1] }], 1);
   raise([{ x: B.x - 20, y: B.y, rx: hc.top[0], ry: hc.top[1] }], 2);
-  for (const ang of [Math.PI, Math.PI * 0.62, -Math.PI * 0.62]) rampFrom(bx, B.y, ang, 1);
-  rampFrom(B.x - 20, B.y, Math.PI, 2);
+  // Plenty of ways on and off, so squads are not funnelled into one ramp.
+  for (const ang of [Math.PI, Math.PI * 0.75, -Math.PI * 0.75, Math.PI * 0.5, -Math.PI * 0.5]) rampFrom(bx, B.y, ang, 1);
+  for (const ang of [Math.PI, Math.PI * 0.6, -Math.PI * 0.6]) rampFrom(B.x - 20, B.y, ang, 2);
   // Ridges out in no man's land, kept away from the B hill and the trenches.
   const count = int(g, hc.ridges[0], hc.ridges[1]);
   for (let k = 0; k < count; k++) {
@@ -164,6 +165,7 @@ function addHighGround(map, g, cfg, [A, B]) {
     rampFrom(x, y, Math.PI + range(g, -0.4, 0.4), 1); // towards home
     rampFrom(x, y, range(g, -0.5, 0.5), 1); // towards the enemy
     rampFrom(x, y, y < H / 2 ? Math.PI / 2 : -Math.PI / 2, 1); // towards the middle
+    rampFrom(x, y, y < H / 2 ? -Math.PI / 2 : Math.PI / 2, 1); // and towards the edge
   }
   for (const r of ramps) {
     forCells(map, r.x - r.r, r.y - r.r, r.x + r.r, r.y + r.r, (i, x, y) => {

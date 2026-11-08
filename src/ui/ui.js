@@ -5,6 +5,7 @@
 import { platoonStrength } from '../sim/util.js';
 import { platoonHeadline } from '../sim/squads.js';
 import { ABILITY_OF, abilityHasTarget } from '../sim/abilities.js';
+import { amendWindow } from '../sim/commands.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -124,8 +125,11 @@ export function updateUI(ui, state, view) {
     bar.classList.toggle('low', str < 0.5);
     const head = platoonHeadline(state, pl);
     const st = card.querySelector('.status');
-    st.textContent = head;
-    st.classList.toggle('pinned', head.startsWith('Pinned') || head === 'Routing');
+    // While a new order can still be changed for free, say so.
+    const free = view.replay || view.watch ? 0 : Math.ceil(amendWindow(state, pl) / state.cfg.tickRate);
+    st.textContent = free > 0 ? `Tap the map to change (${free}s)` : head;
+    st.classList.toggle('amend', free > 0);
+    st.classList.toggle('pinned', free <= 0 && (head.startsWith('Pinned') || head === 'Routing'));
   });
 
   // Squad lines for the selected platoon, each with its ability button.

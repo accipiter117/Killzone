@@ -41,7 +41,7 @@ export function createBattle(seed, options = {}) {
     cfg.platoons.forEach((roles, pi) => {
       const pl = {
         id: state.platoons.length, side, index: pi, name: PLATOON_NAMES[pi],
-        squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, breakBase: 0, size: roles.length * cfg.soldiersPerSquad,
+        squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, breakBase: 0, paidTick: -1, brokeTick: 0, size: roles.length * cfg.soldiersPerSquad,
       };
       state.platoons.push(pl);
       const baseY = H * cfg.deploy.spreadY[pi];
@@ -135,12 +135,18 @@ function checkMorale(state) {
     if (pl.broken) {
       if (pl.rallied || alive === 0) continue;
       if (pl.rallyAt < 0) {
-        // Start the clock once everyone left has reached the rally zone.
-        const home = pl.squads.every((id) => state.squads[id].soldiers.every((sid) => {
+        // Start the clock once most survivors have reached the rally zone,
+        // or after a while regardless, so one straggler caught on the far
+        // side of a hill cannot hold the whole platoon up for good.
+        let total = 0, back = 0;
+        for (const id of pl.squads) for (const sid of state.squads[id].soldiers) {
           const s = state.soldiers[sid];
-          return !s.alive || s.fled || (pl.side === 0 ? s.x < b.rallyZone : s.x > W - b.rallyZone);
-        }));
-        if (home) pl.rallyAt = state.tick + Math.round(b.rallySec * state.cfg.tickRate);
+          if (!s.alive || s.fled) continue;
+          total++;
+          if (pl.side === 0 ? s.x < b.rallyZone : s.x > W - b.rallyZone) back++;
+        }
+        const waited = (state.tick - pl.brokeTick) / state.cfg.tickRate;
+        if (back >= total * b.rallyShareHome || waited > b.rallyMaxWaitSec) pl.rallyAt = state.tick + Math.round(b.rallySec * state.cfg.tickRate);
       } else if (state.tick >= pl.rallyAt) {
         pl.broken = false;
         pl.rallied = true;
@@ -159,6 +165,7 @@ function checkMorale(state) {
     if (breaking) {
       pl.broken = true;
       pl.rallyAt = -1;
+      pl.brokeTick = state.tick;
       pl.order = { type: 'rout' };
       feed(state, pl.rallied ? `${label(pl)} has broken again and is running` : `${label(pl)} has broken`, pl.side);
       state.events.push({ type: 'broken', platoon: pl.id, side: pl.side });

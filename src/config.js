@@ -11,6 +11,8 @@ export const CONFIG = {
     rallyLine: 70, // broken platoons fall back to this far from their own edge...
     rallyZone: 160, // ...and once all are within this distance of it, they regroup
     rallySec: 25, // for this long, then rejoin the fight (once per battle)
+    rallyShareHome: 0.7, // the regroup clock starts once this share of survivors are back...
+    rallyMaxWaitSec: 30, // ...or this long after breaking, whichever comes first
     rallyBreakShare: 0.5, // a rallied platoon breaks for good after losing half of what was left
     margin: { narrow: 0.2, clear: 0.6 }, // score gap as a share of total score: below narrow = narrow win, below clear = clear win, else crushing
   },
@@ -37,7 +39,7 @@ export const CONFIG = {
       top: [58, 52], // the second tier right on B
       ridges: [1, 2], // extra ridges per half of the map
       ridgeSize: [90, 150],
-      rampRadius: 30,
+      rampRadius: 36,
     },
   },
 
@@ -50,9 +52,10 @@ export const CONFIG = {
   orders: {
     start: 3,
     cap: 6,
-    regenSec: 9, // seconds per order point
+    regenSec: 6, // seconds per order point
+    amendSec: 5, // a movement order can be changed free for this long after giving it
     commsRegenMult: 1.75, // owning the comms post speeds refill by this much
-    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 4 },
+    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2 },
   },
 
   // Squad roles. range/sight in world units, fireInterval in seconds,
@@ -116,7 +119,7 @@ export const CONFIG = {
     boundMax: 170,
     flankOffset: 170,
     reconBackoff: 210,
-    slotSpacing: 75,
+    slotSpacing: 60, // squads of a platoon on a move order stand one tile apart
     arriveDist: 28,
     routSpeedMult: 1.25,
     stallSec: 8, // no headway for this long and a squad pushes straight on...
@@ -124,6 +127,7 @@ export const CONFIG = {
     platoonLead: 170, // a squad this far ahead of its platoon's slowest squad waits for it
     paceAhead: 18, // soldiers this far in front of their squad's centre slow down
     paceBehind: 22, // soldiers this far behind it speed up
+    nearEnough: 110, // a squad this close to its goal but stuck counts as arrived
     highCoverBonus: 25, // when settling into cover, a level of high ground is worth this many units of walking
   },
 
@@ -152,7 +156,7 @@ export const CONFIG = {
 
   // Reinforcements: refill the weakest squad of a platoon with fresh
   // soldiers who arrive from your own lines. Cooldown is per side.
-  reinforce: { soldiers: 5, cooldownSec: 75 },
+  reinforce: { soldiers: 5, cooldownSec: 35, nearSiteReach: 600, joinSpeedMult: 1.7 },
 
   // Squad abilities: free, one per role, each on its own cooldown.
   abilities: {
@@ -165,7 +169,9 @@ export const CONFIG = {
 
   // Interface pacing: game speed while a platoon is selected or a strike is
   // being aimed (slow motion, as in Bad North).
-  ui: { slowMo: 0.25 },
+  // grid: tile size for move orders (orders snap to tile centres; a
+  // platoon's three squads take the tile and the ones above and below).
+  ui: { slowMo: 0.25, tile: 60 },
 
   ai: {
     thinkSec: 4,
