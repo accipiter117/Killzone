@@ -8,10 +8,11 @@ import { amendWindow } from './sim/commands.js';
 import { createAI } from './sim/ai.js';
 import { fingerprint } from './sim/battle.js';
 import { seedFrom } from './sim/rng.js';
-import { wireAt } from './sim/map.js';
+import { wireAt, heightAt } from './sim/map.js';
 import { isActive, coverName, dist } from './sim/util.js';
 import { createCamera, setViewport, toWorld, centreOn, clampCamera } from './render/camera.js';
 import { buildTerrain } from './render/terrain.js';
+import { buildTiltTerrain, liftAt, LIFT } from './render/terrain-tilt.js';
 import { createRenderer, drawFrame, drawMinimap } from './render/renderer.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
 import { createAudio, unlockAudio, newFrame, playEvents, uiClick } from './render/audio.js';
@@ -34,7 +35,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tilt', true), lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, scope: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -122,10 +123,9 @@ function startBattle(seed, { replayLog = null } = {}) {
   game.replay = !!replayLog;
   game.match = createMatch({ seed, options: game.options, controllers: replayLog ? [] : controllersFor(game.watch), replayLog });
   const st = game.match.state;
-  game.terrain = buildTerrain(st.map, seedFrom(seed));
   game.renderer = createRenderer(st.map);
   game.fxs = createEffects();
-  game.fxs.terrain = game.terrain;
+  paintTerrain();
   game.fxs.reduced = reduceMotion.matches;
   game.cam = createCamera(st.map.width, st.map.height);
   game.selected = null;
@@ -151,6 +151,28 @@ function startBattle(seed, { replayLog = null } = {}) {
   centreOn(game.cam, 260, st.map.height / 2);
   keepAwake(true);
   try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}`); } catch { /* file:// */ }
+}
+
+// The battlefield picture: tilted three quarter view (default) or flat.
+function paintTerrain() {
+  const st = game.match.state;
+  game.terrain = (game.tilt ? buildTiltTerrain : buildTerrain)(st.map, seedFrom(game.seed));
+  game.fxs.terrain = game.terrain;
+  game.fxs.ly = game.tilt ? (x, y) => y - liftAt(st.map, x, y) : null;
+  if (game.renderer) game.renderer.thumb = null;
+}
+
+// A tap lands on the picture; in the tilted view raised ground is drawn
+// higher up the screen, so find the ground point that is drawn there.
+function tapToGround(sx, sy) {
+  const w = toWorld(game.cam, sx, sy);
+  if (!game.tilt) return w;
+  const map = game.match.state.map;
+  for (const k of [2, 1]) {
+    const y = w.y + LIFT * k;
+    if (heightAt(map, w.x, y) === k) return { x: w.x, y };
+  }
+  return w;
 }
 
 function resize() {
@@ -285,7 +307,7 @@ function enemyAt(st, w) {
 
 function onTap(sx, sy) {
   const st = game.match.state;
-  const w = toWorld(game.cam, sx, sy);
+  const w = tapToGround(sx, sy);
   const px = 1 / game.cam.z;
   if (!game.replay && !game.watch) {
     if (game.armed) {
@@ -354,7 +376,7 @@ function onTap(sx, sy) {
 // Explain whatever is under the finger: one clear rule per thing.
 function inspect(sx, sy) {
   const st = game.match.state;
-  const w = toWorld(game.cam, sx, sy);
+  const w = tapToGround(sx, sy);
   const px = 1 / game.cam.z;
   const reveal = game.watch || game.replay;
   let sol = null, sd = 16 * px;
@@ -409,6 +431,7 @@ function openMenu() {
   document.getElementById('watch-toggle').checked = game.watch;
   document.getElementById('labels-toggle').checked = game.labelsAll;
   document.getElementById('view-select').value = game.view;
+  document.getElementById('tilt-toggle').checked = game.tilt;
   document.getElementById('slowmo-toggle').checked = game.slowMo;
   document.getElementById('sound-toggle').checked = audio.enabled;
   document.getElementById('grid-toggle').checked = game.grid;
@@ -444,6 +467,11 @@ document.getElementById('sound-toggle').addEventListener('change', (e) => {
 document.getElementById('slowmo-toggle').addEventListener('change', (e) => {
   game.slowMo = e.target.checked;
   store.set('slowMo', game.slowMo);
+});
+document.getElementById('tilt-toggle').addEventListener('change', (e) => {
+  game.tilt = e.target.checked;
+  store.set('tilt', game.tilt);
+  paintTerrain();
 });
 document.getElementById('view-select').addEventListener('change', (e) => {
   game.view = e.target.value;
@@ -543,7 +571,7 @@ function frame(t) {
   prune(game.fxs, now);
   const shake = shakeOffset(game.fxs, dt);
   const reveal = game.watch || game.replay;
-  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, scope: game.scope, vehicleSelected: game.vehicle, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null) };
+  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, scope: game.scope, vehicleSelected: game.vehicle, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, tilt: game.tilt, grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null) };
   drawFrame(g, game.renderer, st, game.cam, view);
   if (game.minimap && miniCanvas.width > 0) drawMinimap(mg, game.renderer, st, game.cam, view);
   updateUI(ui, st, {

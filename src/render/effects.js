@@ -25,7 +25,17 @@ const MAX = 700;
 
 // Called after every sim tick with that tick's events.
 export function ingest(fxs, events, now) {
-  for (const e of events) {
+  for (const e0 of events) {
+    // In the tilted view, effects on raised ground are drawn higher up the
+    // screen (fxs.ly maps a ground point to its screen y). Craters and
+    // sandbags are painted by the terrain itself, so they stay as they are.
+    let e = e0;
+    if (fxs.ly && e.type !== 'crater' && e.type !== 'sandbags') {
+      e = { ...e0 };
+      if (e.y !== undefined) e.y = fxs.ly(e.x, e.y);
+      if (e.y1 !== undefined) e.y1 = fxs.ly(e.x1, e.y1);
+      if (e.y2 !== undefined) e.y2 = fxs.ly(e.x2, e.y2);
+    }
     switch (e.type) {
       case 'shot': {
         if (fxs.tracers.length < MAX) {
@@ -138,14 +148,15 @@ export function drawSmoke(g, fxs, smokes, now, tickNow, tickRate) {
   for (const sm of smokes) {
     const left = (sm.end - tickNow) / tickRate;
     const fade = Math.min(1, left / 3);
+    const sy = fxs.ly ? fxs.ly(sm.x, sm.y) : sm.y;
     for (const p of smokePuffs(fxs, sm)) {
       const wob = Math.sin(now * 0.6 + p.ph) * 6;
-      const grad = g.createRadialGradient(sm.x + p.dx + wob, sm.y + p.dy, 0, sm.x + p.dx + wob, sm.y + p.dy, p.r);
+      const grad = g.createRadialGradient(sm.x + p.dx + wob, sy + p.dy, 0, sm.x + p.dx + wob, sy + p.dy, p.r);
       grad.addColorStop(0, `rgba(200,200,195,${0.55 * fade})`);
       grad.addColorStop(1, 'rgba(200,200,195,0)');
       g.fillStyle = grad;
       g.beginPath();
-      g.arc(sm.x + p.dx + wob, sm.y + p.dy, p.r, 0, Math.PI * 2);
+      g.arc(sm.x + p.dx + wob, sy + p.dy, p.r, 0, Math.PI * 2);
       g.fill();
     }
   }

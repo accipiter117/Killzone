@@ -155,6 +155,10 @@ export function buildTiltTerrain(map, seedInt) {
       }
     }
   };
+  // Sandbags already built (when the picture is repainted mid-battle).
+  const built = [];
+  for (let i = 0; i < map.grid.length; i++) if (map.grid[i] === T.sandbag) built.push(i);
+  if (built.length) addSandbags(built);
   return { canvas, lift: LIFT, addCrater: (cr) => drawCrater(g, cr, liftAt(map, cr.x, cr.y)), addSandbags };
 }
 

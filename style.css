@@ -161,6 +161,13 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 #tray-row button.ab.dead { opacity: 0.35; }
 #tray-row .empty { font-size: 12px; color: #a39b88; align-self: center; padding: 0 4px; white-space: nowrap; }
 
+/* Short landscape screens: the tray drops its status line (the chips and
+   the map labels already show it) so it covers as little map as possible. */
+@media (orientation: landscape) and (max-height: 430px) {
+  #tray { padding-top: 5px; padding-bottom: 7px; gap: 5px; }
+  #tray-foot { display: none; }
+}
+
 /* Upright phones: the same pieces, packed a little tighter. */
 @media (orientation: portrait) {
   #hud-tr { top: calc(var(--hud-t) + 52px); }

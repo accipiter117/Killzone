@@ -22,6 +22,7 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 
 - You command the **ISA** (left, steel blue). The **Helghast** hold the right (dark grey, orange highlights).
 - You have three platoons, each of three squads of five soldiers. You give orders to **platoons**, never to single soldiers.
+- **Tilted view:** the battlefield is drawn tilted into a three quarter view: hills and ridges rise up the screen with cliff faces, ruins stand as walls, trenches and craters have depth, and anything on raised ground is drawn lifted with it (taps are mapped back to the ground). Switch it off in the menu for the flat view.
 - **Screen:** the map fills the screen. Clock, objectives and score sit top left; order points, minimap (hidden until you want it), pause and speed top right; your unit chips (three platoons and the tank, each with a strength bar) bottom left; smoke and artillery bottom right.
 - **Select** a unit by tapping its chip or its soldiers on the map: its order tray pops up above the chips (orders plus each squad's ability). Then **tap the map**:
   - tap an objective (A, B, C) or a capturable post (MG nest, arc tower, comms post) to **take** it;

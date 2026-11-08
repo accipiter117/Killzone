@@ -9,6 +9,12 @@ import { getSprite, dirIndex, SPRITE_SIZE } from './sprites.js';
 import { getSprite25, W25, H25, ANCHOR_X, ANCHOR_Y } from './sprites25d.js';
 import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './pixel-troopers.js';
 import { getTank, TANK_W, TANK_H, TANK_FOOT } from './tanks.js';
+import { liftAt } from './terrain-tilt.js';
+
+// In the tilted view, anything standing on raised ground is drawn higher up
+// the screen. LY gives the screen y for a ground point (unchanged when flat).
+let LY = (x, y) => y;
+const lifted = (o) => ({ ...o, y: LY(o.x, o.y) });
 
 // Detailed troopers: each faction and role has its own sprite set.
 const FACTION = ['isa', 'hgh'];
@@ -42,6 +48,7 @@ export function drawFrame(g, r, state, cam, opts) {
   const sh = opts.shake || { x: 0, y: 0 };
   g.setTransform(dpr * z, 0, 0, dpr * z, (-cam.x * z + sh.x) * dpr, (-cam.y * z + sh.y) * dpr);
 
+  LY = opts.tilt ? (x, y) => y - liftAt(state.map, x, y) : (x, y) => y;
   g.drawImage(terrain.canvas, 0, 0);
   drawWire(g, r, state, cam);
   drawSitesWorld(g, state, now, px, fxs);
@@ -74,7 +81,7 @@ function drawFocus(g, state, cam, opts) {
     const list = state.squads[pl.focus].soldiers.map((id) => state.soldiers[id]).filter((e) => isActive(e) && visible(state, e, opts));
     if (!list.length) continue;
     const c = centroid(list);
-    const p = toScreen(cam, c.x, c.y - lift);
+    const p = toScreen(cam, c.x, LY(c.x, c.y) - lift);
     const r = 20 + 3 * Math.sin(opts.now * 5);
     g.strokeStyle = 'rgba(255,74,50,0.95)';
     g.lineWidth = 2.5;
@@ -97,7 +104,7 @@ function drawMarks(g, state, cam, opts) {
   g.lineWidth = 2;
   for (const s of state.soldiers) {
     if (!isActive(s) || !(s.markUntil > state.tick) || !visible(state, s, opts)) continue;
-    const p = toScreen(cam, s.x, s.y - lift);
+    const p = toScreen(cam, s.x, LY(s.x, s.y) - lift);
     const r = 5;
     g.beginPath();
     g.moveTo(p.x - r, p.y - r + 3); g.lineTo(p.x - r, p.y - r); g.lineTo(p.x - r + 3, p.y - r);
@@ -149,7 +156,8 @@ function drawWire(g, r, state, cam) {
 }
 
 function drawSitesWorld(g, state, now, px, fxs) {
-  for (const s of state.sites) {
+  for (const s0 of state.sites) {
+    const s = lifted(s0);
     const col = ownerColour(s.owner);
     g.fillStyle = col;
     g.globalAlpha = s.kind === 'objective' ? 0.1 : 0.08;
@@ -174,7 +182,7 @@ function drawSitesWorld(g, state, now, px, fxs) {
     g.globalAlpha = 1;
   }
   for (const ring of fxs.rings) {
-    const s = state.sites.find((x) => x.id === ring.site);
+    const s = lifted(state.sites.find((x) => x.id === ring.site));
     const k = (now - ring.t0) / ring.life;
     g.strokeStyle = ownerColour(ring.side);
     g.globalAlpha = 1 - k;
@@ -187,7 +195,8 @@ function drawSitesWorld(g, state, now, px, fxs) {
 }
 
 function drawTanks(g, state, now) {
-  for (const t of state.tanks) {
+  for (const t0 of state.tanks) {
+    const t = lifted(t0);
     if (t.exploded) {
       g.fillStyle = '#1a1612';
       g.beginPath();
@@ -240,17 +249,23 @@ function drawGrid(g, state, cam, opts, px) {
   const t = state.cfg.ui.tile;
   const x0 = Math.floor(cam.x / t) * t, y0 = Math.floor(cam.y / t) * t;
   const x1 = cam.x + cam.vw / cam.z, y1 = cam.y + cam.vh / cam.z;
+  // Each tile sits at the height of its middle (so tiles on a hill rise with it).
+  const ty = (x, y) => LY(x + t / 2, y + t / 2) - t / 2;
   g.strokeStyle = 'rgba(240,236,220,0.13)';
   g.lineWidth = px;
   g.beginPath();
-  for (let x = x0; x <= x1; x += t) { g.moveTo(x, Math.max(0, y0)); g.lineTo(x, Math.min(state.map.height, y1)); }
-  for (let y = y0; y <= y1; y += t) { g.moveTo(Math.max(0, x0), y); g.lineTo(Math.min(state.map.width, x1), y); }
+  if (opts.tilt) {
+    for (let x = Math.max(0, x0); x < Math.min(state.map.width, x1); x += t) for (let y = Math.max(0, y0); y < Math.min(state.map.height, y1 + 2 * t); y += t) g.rect(x, ty(x, y), t, t);
+  } else {
+    for (let x = x0; x <= x1; x += t) { g.moveTo(x, Math.max(0, y0)); g.lineTo(x, Math.min(state.map.height, y1)); }
+    for (let y = y0; y <= y1; y += t) { g.moveTo(Math.max(0, x0), y); g.lineTo(Math.min(state.map.width, x1), y); }
+  }
   g.stroke();
   // Cover preview: each tile is tinted by the best cover a squad could find
   // in it (green good, amber some), so you can see where to send them.
   const cov = state.cfg.cover;
   for (let x = Math.max(0, x0); x < Math.min(state.map.width, x1); x += t) {
-    for (let y = Math.max(0, y0); y < Math.min(state.map.height, y1); y += t) {
+    for (let y = Math.max(0, y0); y < Math.min(state.map.height, y1 + 2 * t); y += t) {
       let best = 0, high = false;
       for (const fx of [0.2, 0.5, 0.8]) for (const fy of [0.2, 0.5, 0.8]) {
         const name = coverName(state, x + t * fx, y + t * fy);
@@ -260,14 +275,14 @@ function drawGrid(g, state, cam, opts, px) {
       const level = best >= 0.5 ? 2 : best >= 0.3 || high ? 1 : 0;
       if (!level) continue;
       g.fillStyle = level === 2 ? 'rgba(120,230,120,0.16)' : 'rgba(240,200,80,0.12)';
-      g.fillRect(x + px, y + px, t - 2 * px, t - 2 * px);
+      g.fillRect(x + px, ty(x, y) + px, t - 2 * px, t - 2 * px);
     }
   }
   const pl = opts.selected !== null && opts.selected !== undefined ? state.platoons[opts.selected] : null;
   if (!pl) return;
   const sq = opts.scope !== null && opts.scope !== undefined ? state.squads[opts.scope] : null;
   if (sq && sq.order && sq.order.type === 'move') {
-    const cx = Math.floor(sq.order.x / t) * t, cy = Math.floor(sq.order.y / t) * t;
+    const cx = Math.floor(sq.order.x / t) * t, cy = ty(Math.floor(sq.order.x / t) * t, Math.floor(sq.order.y / t) * t);
     g.fillStyle = 'rgba(170,255,170,0.14)';
     g.fillRect(cx, cy, t, t);
     g.strokeStyle = 'rgba(170,255,170,0.65)';
@@ -279,11 +294,12 @@ function drawGrid(g, state, cam, opts, px) {
   // The platoon's tile and the ones above and below (one per squad).
   const cx = Math.floor(pl.order.x / t) * t, cy = Math.floor(pl.order.y / t) * t;
   for (const k of [-1, 0, 1]) {
+    const yy = ty(cx, cy + k * t);
     g.fillStyle = 'rgba(170,255,170,0.14)';
-    g.fillRect(cx, cy + k * t, t, t);
+    g.fillRect(cx, yy, t, t);
     g.strokeStyle = 'rgba(170,255,170,0.65)';
     g.lineWidth = 1.5 * px;
-    g.strokeRect(cx + px, cy + k * t + px, t - 2 * px, t - 2 * px);
+    g.strokeRect(cx + px, yy + px, t - 2 * px, t - 2 * px);
   }
 }
 
@@ -297,12 +313,12 @@ function drawOrderLine(g, state, opts, px) {
     g.lineWidth = (faint ? 1.5 : 2) * px;
     g.setLineDash([10 * px, 8 * px]);
     g.beginPath();
-    g.moveTo(from.x, from.y);
-    g.lineTo(o.x, o.y);
+    g.moveTo(from.x, LY(from.x, from.y));
+    g.lineTo(o.x, LY(o.x, o.y));
     g.stroke();
     g.setLineDash([]);
     g.beginPath();
-    g.arc(o.x, o.y, 6 * px, 0, Math.PI * 2);
+    g.arc(o.x, LY(o.x, o.y), 6 * px, 0, Math.PI * 2);
     g.stroke();
   };
   // The platoon's shared goal from the squads still following it, then a
@@ -342,6 +358,7 @@ function drawVehicle(g, r, state, v, ps, opts) {
   else if (ticks >= 0 && ticks < 5) frame = 'fire';
   else if (v.moved > 0) frame = 'move' + (1 + (Math.floor(r.vdist[v.id] / 4) % 4));
   const fx = v.facing === 1 ? TANK_FOOT[0] : TANK_W - TANK_FOOT[0];
+  v = lifted(v);
   const x0 = v.x - fx * ps, y0 = v.y - TANK_FOOT[1] * ps;
   g.fillStyle = 'rgba(15,12,8,0.35)';
   g.beginPath();
@@ -424,14 +441,15 @@ function drawSoldiers(g, r, state, opts, px) {
     const size = SPRITE_SIZE * spriteScale(px);
     for (const { s, sq, frame, dir } of list) {
       g.globalAlpha = sq.mode === 'rout' ? 0.6 : 1;
+      const sy = LY(s.x, s.y);
       if (sel === sq.platoon) {
         g.strokeStyle = 'rgba(255,240,170,0.9)';
         g.lineWidth = 1.6 * px;
         g.beginPath();
-        g.arc(s.x, s.y, size * 0.42, 0, Math.PI * 2);
+        g.arc(s.x, sy, size * 0.42, 0, Math.PI * 2);
         g.stroke();
       }
-      g.drawImage(getSprite(s.side, s.role, frame, dir), s.x - size / 2, s.y - size / 2, size, size);
+      g.drawImage(getSprite(s.side, s.role, frame, dir), s.x - size / 2, sy - size / 2, size, size);
     }
     g.globalAlpha = 1;
     for (const v of state.vehicles || []) if (vehicleSeen(state, v, opts)) drawVehicle(g, r, state, v, spriteScalePixel(px), opts);
@@ -445,16 +463,17 @@ function drawSoldiers(g, r, state, opts, px) {
   list.sort((a, b) => a.s.y - b.s.y || a.s.id - b.s.id);
   const tanks = (state.vehicles || []).filter((v) => vehicleSeen(state, v, opts)).sort((a, b) => a.y - b.y);
   for (const { s, sq } of list) {
+    const sy = LY(s.x, s.y);
     g.fillStyle = 'rgba(15,12,8,0.35)';
     g.beginPath();
-    g.ellipse(s.x, s.y + 0.5 * ps, 6 * ps * foot, 2.6 * ps * foot, 0, 0, Math.PI * 2);
+    g.ellipse(s.x, sy + 0.5 * ps, 6 * ps * foot, 2.6 * ps * foot, 0, 0, Math.PI * 2);
     g.fill();
     if (sel === sq.platoon) {
       const dim = opts.scope !== null && opts.scope !== undefined && opts.scope !== sq.id;
       g.strokeStyle = dim ? 'rgba(255,240,170,0.3)' : 'rgba(255,240,170,0.9)';
       g.lineWidth = (dim ? 1 : 1.6) * px;
       g.beginPath();
-      g.ellipse(s.x, s.y + 0.5 * ps, 8 * ps * foot, 3.6 * ps * foot, 0, 0, Math.PI * 2);
+      g.ellipse(s.x, sy + 0.5 * ps, 8 * ps * foot, 3.6 * ps * foot, 0, 0, Math.PI * 2);
       g.stroke();
     }
   }
@@ -462,6 +481,7 @@ function drawSoldiers(g, r, state, opts, px) {
   for (const { s, sq, frame, dir, ang } of list) {
     while (ti < tanks.length && tanks[ti].y <= s.y) drawVehicle(g, r, state, tanks[ti++], pixel ? ps : ps * 1.4, opts);
     g.globalAlpha = sq.mode === 'rout' ? 0.6 : 1;
+    const sy = LY(s.x, s.y);
     if (pixel) {
       // Jetpack troopers in the air are drawn above their shadow; infiltrators
       // still hidden from the enemy are drawn faded on their own side.
@@ -469,19 +489,19 @@ function drawSoldiers(g, r, state, opts, px) {
       const role = state.cfg.roles[s.role];
       const hidden = role.hidden && (sq.vanishUntil > state.tick || state.tick - s.lastShotTick > role.revealSec * state.cfg.tickRate);
       if (hidden) g.globalAlpha = 0.5;
-      drawTrooper(g, s.side, frame, ang, s.x, s.y - lift, ps, s.role);
+      drawTrooper(g, s.side, frame, ang, s.x, sy - lift, ps, s.role);
       if (hidden) g.globalAlpha = 1;
       // Hit flash: draw the soldier again, added on top, for a split second.
       if (opts.now - (opts.fxs.lastHit.get(s.id) ?? -9) < 0.1) {
         g.globalCompositeOperation = 'lighter';
         g.globalAlpha = 0.7;
-        drawTrooper(g, s.side, frame, ang, s.x, s.y - lift, ps, s.role);
+        drawTrooper(g, s.side, frame, ang, s.x, sy - lift, ps, s.role);
         g.globalCompositeOperation = 'source-over';
         g.globalAlpha = 1;
       }
       continue;
     }
-    g.drawImage(getSprite25(s.side, s.role, frame, dir), s.x - ANCHOR_X * ps, s.y - ANCHOR_Y * ps, W25 * ps, H25 * ps);
+    g.drawImage(getSprite25(s.side, s.role, frame, dir), s.x - ANCHOR_X * ps, sy - ANCHOR_Y * ps, W25 * ps, H25 * ps);
   }
   g.globalAlpha = 1;
   while (ti < tanks.length) drawVehicle(g, r, state, tanks[ti++], pixel ? ps : ps * 1.4, opts);
@@ -509,7 +529,8 @@ function drawBodies(g, r, state, fxs, now, px, view) {
 
 function drawStrikes(g, state, now, px) {
   const a = state.cfg.artillery;
-  for (const st of state.strikes) {
+  for (const st0 of state.strikes) {
+    const st = lifted(st0);
     const incoming = state.tick < st.start;
     const pulse = 0.5 + 0.5 * Math.sin(now * 12);
     g.strokeStyle = `rgba(255,60,40,${incoming ? 0.5 + 0.5 * pulse : 0.35})`;
@@ -527,8 +548,8 @@ function drawStrikes(g, state, now, px) {
 }
 
 function drawMarker(g, opts, now, px) {
-  const m = opts.marker;
-  if (!m) return;
+  if (!opts.marker) return;
+  const m = lifted(opts.marker);
   const k = (now - m.t0) / 0.7;
   if (k > 1) return;
   g.strokeStyle = m.colour;
@@ -543,7 +564,7 @@ function drawMarker(g, opts, now, px) {
 // Little drawn icons for the capturable features and objective letters.
 function drawSiteIcons(g, state, cam) {
   for (const s of state.sites) {
-    const p = toScreen(cam, s.x, s.y);
+    const p = toScreen(cam, s.x, LY(s.x, s.y));
     if (p.x < -40 || p.y < -40 || p.x > cam.vw + 40 || p.y > cam.vh + 40) continue;
     const col = ownerColour(s.owner);
     g.save();
@@ -597,7 +618,7 @@ function drawBadges(g, state, cam, opts) {
     for (const id of pl.squads) for (const s of members(state, state.squads[id])) if (visible(state, s, opts)) list.push(s);
     if (!list.length) continue;
     const c = centroid(list);
-    const p = toScreen(cam, c.x, c.y - 40);
+    const p = toScreen(cam, c.x, LY(c.x, c.y) - 40);
     const col = sideColours(pl.side);
     const isSel = opts.selected === pl.id;
     const w = 20, h = 16;
@@ -639,7 +660,7 @@ function drawSquadLabels(g, state, cam, opts) {
       const list = members(state, sq).filter((s) => visible(state, s, opts));
       if (!list.length) continue;
       const c = centroid(list);
-      const p = toScreen(cam, c.x, c.y + 18);
+      const p = toScreen(cam, c.x, LY(c.x, c.y) + 18);
       const text = `${state.cfg.roles[sq.role].label}: ${sq.status}`;
       const w = g.measureText(text).width + 10;
       g.fillStyle = sq.pinned ? 'rgba(120,20,15,0.85)' : 'rgba(15,14,12,0.75)';
