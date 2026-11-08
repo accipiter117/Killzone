@@ -2,14 +2,26 @@
 
 import { next } from './rng.js';
 import { T } from './map.js';
-import { terrainAt } from './map.js';
+import { terrainAt, heightAt, cellIndex } from './map.js';
 import { coverAt, isActive, dist, feed, sideName } from './util.js';
 import { explodeTank } from './features.js';
 
-// Does any smoke cloud block the line between two points?
+// Is the line between two points blocked by smoke, or by raised ground
+// higher than both ends (you cannot see through a hill)?
 export function losClear(state, x1, y1, x2, y2) {
   for (const sm of state.smokes) {
     if (segHitsCircle(x1, y1, x2, y2, sm.x, sm.y, sm.r)) return false;
+  }
+  const map = state.map;
+  if (map.hasHeight) {
+    const top = Math.max(heightAt(map, x1, y1), heightAt(map, x2, y2));
+    if (top < 2) {
+      const d = Math.hypot(x2 - x1, y2 - y1), steps = Math.floor(d / 20);
+      for (let k = 1; k < steps; k++) {
+        const i = cellIndex(map, x1 + ((x2 - x1) * k) / steps, y1 + ((y2 - y1) * k) / steps);
+        if (i >= 0 && map.elev[i] > top) return false;
+      }
+    }
   }
   return true;
 }
@@ -24,13 +36,16 @@ function segHitsCircle(x1, y1, x2, y2, cx, cy, r) {
 
 const inBuilding = (state, s) => terrainAt(state.map, s.x, s.y) === T.building;
 
+// High ground adds range and sight; so does a ruined building.
+const lift = (state, s) => 1 + state.cfg.height.rangePerLevel * heightAt(state.map, s.x, s.y);
+
 export function weaponRange(state, s) {
-  const r = state.cfg.roles[s.role].range;
+  const r = state.cfg.roles[s.role].range * lift(state, s);
   return inBuilding(state, s) ? r * state.cfg.cover.building.rangeMult : r;
 }
 
 function sightOf(state, s) {
-  const r = state.cfg.roles[s.role].sight;
+  const r = state.cfg.roles[s.role].sight * lift(state, s);
   return inBuilding(state, s) ? r * state.cfg.cover.building.rangeMult : r;
 }
 
@@ -68,12 +83,17 @@ function pickTarget(state, s) {
   return best;
 }
 
-export function hitChance(state, accuracy, d, range, target, shooterPinned) {
+export function hitChance(state, accuracy, d, range, target, shooterPinned, shooter = null) {
   const c = state.cfg.combat;
   const cover = coverAt(state, target.x, target.y);
   let p = accuracy * (1 - c.rangeFalloff * Math.min(1, d / range));
   p *= 1 - cover.hit;
   if (shooterPinned) p *= c.pinnedAccuracy;
+  if (shooter) {
+    // Firing down from higher ground is easier; firing up at it is harder.
+    const diff = heightAt(state.map, shooter.x, shooter.y) - heightAt(state.map, target.x, target.y);
+    p *= Math.max(0.4, 1 + state.cfg.height.hitPerLevel * diff);
+  }
   return p;
 }
 
@@ -108,7 +128,7 @@ export function updateFiring(state, dt) {
 // One shot from a soldier or an MG nest at a target soldier.
 export function fireShot(state, from, t, w, range, shooterPinned, source) {
   const d = dist(from, t);
-  const p = hitChance(state, w.accuracy, d, range, t, shooterPinned);
+  const p = hitChance(state, w.accuracy, d, range, t, shooterPinned, from);
   const hit = next(state) < p;
   let ix = t.x, iy = t.y;
   if (hit) {

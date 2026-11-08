@@ -27,7 +27,19 @@ export const CONFIG = {
     objectiveRadius: 90,
     featureRadius: 45,
     ruinsPerObjective: [3, 5],
+    hills: {
+      centre: [150, 125], // the raised ground round B (radii, mirrored so the hill is wider)
+      centreOffset: 60,
+      top: [58, 52], // the second tier right on B
+      ridges: [1, 2], // extra ridges per half of the map
+      ridgeSize: [90, 150],
+      rampRadius: 30,
+    },
   },
+
+  // High ground: range, sight and accuracy per level above the target, and
+  // how much slower climbing a ramp is.
+  height: { rangePerLevel: 0.15, hitPerLevel: 0.15, rampSpeed: 0.7 },
 
   deploy: { x: 190, spreadY: [0.22, 0.5, 0.78] },
 

@@ -17,6 +17,9 @@ export function generateMap(seedInt, cfg) {
     width: W, height: H, cell, cols, rows,
     grid: new Array(cols * rows).fill(T.open),
     wire: new Array(cols * rows).fill(0),
+    elev: new Array(cols * rows).fill(0), // 0 low ground, 1 and 2 raised ground
+    ramp: new Array(cols * rows).fill(0), // 1 where you can walk between heights
+    hills: [], // plateau outlines for drawing
     trenches: [], wires: [], buildings: [], craters: [], sites: [], tanks: [],
   };
   const mir = (p) => ({ x: W - p.x, y: H - p.y });
@@ -104,7 +107,104 @@ export function generateMap(seedInt, cfg) {
       if (map.grid[i] !== T.trench) map.wire[i] = 1;
     });
   }
+  addHighGround(map, g, cfg, [A, B]);
   return map;
+}
+
+// ---- High ground --------------------------------------------------------
+// Raised plateaus with cliff edges you cannot climb, reached only by ramps.
+// They make chokepoints and give the side holding them range and accuracy.
+// Built on the left half and mirrored, like everything else.
+
+export const heightAt = (map, x, y) => { const i = cellIndex(map, x, y); return i < 0 ? 0 : map.elev[i]; };
+export const rampAt = (map, x, y) => { const i = cellIndex(map, x, y); return i < 0 ? 0 : map.ramp[i]; };
+
+// Can a soldier step from fine cell a to fine cell b?
+export const canStep = (map, a, b) => a < 0 || b < 0 || map.elev[a] === map.elev[b] || map.ramp[a] === 1 || map.ramp[b] === 1;
+
+function addHighGround(map, g, cfg, [A, B]) {
+  const hc = cfg.map.hills;
+  const W = map.width, H = map.height;
+  const n = map.elev.length;
+  const raise = (blobs, level) => {
+    for (const b of blobs) {
+      forCells(map, b.x - b.rx, b.y - b.ry, b.x + b.rx, b.y + b.ry, (i, x, y) => {
+        if (x >= W / 2) return; // left half only; mirrored below
+        if (((x - b.x) / b.rx) ** 2 + ((y - b.y) / b.ry) ** 2 <= 1) map.elev[i] = Math.max(map.elev[i], level);
+      });
+    }
+  };
+  // Ramps: a patch where the cliff edge becomes a slope, found by walking out
+  // from the middle of a plateau until the ground drops.
+  const ramps = [];
+  const rampFrom = (cx, cy, ang, level) => {
+    for (let d = 0; d < 400; d += 5) {
+      const x = cx + Math.cos(ang) * d, y = cy + Math.sin(ang) * d;
+      if (x < 0 || y < 0 || x >= W || y >= H) return;
+      if (heightAt(map, x, y) < level) { ramps.push({ x, y, r: hc.rampRadius }); return; }
+    }
+  };
+  // The hill at B: two tiers, ramps on the near side and both flanks.
+  const bx = B.x - hc.centreOffset;
+  raise([{ x: bx, y: B.y, rx: hc.centre[0], ry: hc.centre[1] }], 1);
+  raise([{ x: B.x - 20, y: B.y, rx: hc.top[0], ry: hc.top[1] }], 2);
+  for (const ang of [Math.PI, Math.PI * 0.62, -Math.PI * 0.62]) rampFrom(bx, B.y, ang, 1);
+  rampFrom(B.x - 20, B.y, Math.PI, 2);
+  // Ridges out in no man's land, kept away from the B hill and the trenches.
+  const count = int(g, hc.ridges[0], hc.ridges[1]);
+  for (let k = 0; k < count; k++) {
+    let x = 0, y = 0;
+    for (let tries = 0; tries < 20; tries++) {
+      x = range(g, 680, 1180); y = range(g, 110, H - 110);
+      if (Math.hypot(x - B.x, y - B.y) > 380 && Math.hypot(x - A.x, y - A.y) > 140) break;
+    }
+    const rx = range(g, hc.ridgeSize[0], hc.ridgeSize[1]), ry = range(g, hc.ridgeSize[0] * 0.6, hc.ridgeSize[1] * 0.8);
+    const blobs = [{ x, y, rx, ry }, { x: x + range(g, -60, 60), y: y + range(g, -50, 50), rx: rx * 0.7, ry: ry * 0.8 }];
+    raise(blobs, 1);
+    rampFrom(x, y, Math.PI + range(g, -0.4, 0.4), 1); // towards home
+    rampFrom(x, y, range(g, -0.5, 0.5), 1); // towards the enemy
+    rampFrom(x, y, y < H / 2 ? Math.PI / 2 : -Math.PI / 2, 1); // towards the middle
+  }
+  for (const r of ramps) {
+    forCells(map, r.x - r.r, r.y - r.r, r.x + r.r, r.y + r.r, (i, x, y) => {
+      if (x < W / 2 && (x - r.x) ** 2 + (y - r.y) ** 2 <= r.r * r.r) map.ramp[i] = 1;
+    });
+  }
+  // Mirror the left half onto the right (turned 180 degrees).
+  for (let i = 0; i < n; i++) {
+    const x = (i % map.cols) * map.cell + map.cell / 2;
+    if (x >= W / 2) continue;
+    map.elev[n - 1 - i] = map.elev[i];
+    map.ramp[n - 1 - i] = map.ramp[i];
+  }
+  // Trenches, wire and the deployment ground stay on the flat.
+  for (let i = 0; i < n; i++) if (map.grid[i] === T.trench || map.wire[i] > 0) { map.elev[i] = 0; map.ramp[i] = 0; }
+  if (!connected(map)) {
+    // Never trap an objective: if anything is unreachable, flatten it all.
+    map.elev.fill(0);
+    map.ramp.fill(0);
+  }
+  map.hasHeight = map.elev.some((h) => h > 0);
+}
+
+// Can every site and the far deployment be reached from the ISA deployment?
+function connected(map) {
+  const n = map.elev.length, seen = new Uint8Array(n);
+  const start = cellIndex(map, 190, map.height / 2);
+  const q = [start];
+  seen[start] = 1;
+  while (q.length) {
+    const i = q.pop();
+    const x = i % map.cols, y = (i / map.cols) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= map.cols || ny >= map.rows) continue;
+      const j = ny * map.cols + nx;
+      if (!seen[j] && canStep(map, i, j)) { seen[j] = 1; q.push(j); }
+    }
+  }
+  const targets = [...map.sites.map((s) => [s.x, s.y]), [map.width - 190, map.height / 2]];
+  return targets.every(([x, y]) => seen[cellIndex(map, x, y)]);
 }
 
 function site(id, kind, p, r) {

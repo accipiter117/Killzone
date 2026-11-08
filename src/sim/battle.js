@@ -35,6 +35,7 @@ export function createBattle(seed, options = {}) {
     result: null,
   };
   const W = map.width, H = map.height;
+  const jitter = {};
   for (const side of [0, 1]) {
     cfg.platoons.forEach((roles, pi) => {
       const pl = {
@@ -48,17 +49,21 @@ export function createBattle(seed, options = {}) {
           id: state.squads.length, platoon: pl.id, side, role, soldiers: [],
           supp: 0, pinned: false, lastHitTick: -9999, lastFiredTick: -9999, tally: {},
           mode: 'idle', status: 'Awaiting orders', bound: null, pauseUntil: 0, holdSpot: null, flankDone: false, waitSince: -1, cx: 0, cy: 0,
-          bestD: Infinity, bestTick: 0, pushUntil: 0,
+          bestD: Infinity, bestTick: 0, pushUntil: 0, path: null, pathTo: null, pathTick: 0,
         };
         state.squads.push(sq);
         pl.squads.push(sq.id);
         for (let n = 0; n < cfg.soldiersPerSquad; n++) {
           // ISA lays out its deployment; the Helghast copy is turned 180 degrees.
-          let x = cfg.deploy.x + range(state, -25, 25) - (n % 2) * 14;
+          // Random spacing is drawn once and shared, so the two sides start
+          // as exact mirror images.
+          const key = `${pi}.${k}.${n}`;
+          if (side === 0) jitter[key] = [range(state, -25, 25), range(state, 0, 1)];
+          let x = cfg.deploy.x + jitter[key][0] - (n % 2) * 14;
           let y = baseY + (k - 1) * 62 + (n - 2) * 11;
           if (side === 1) { x = W - x; y = H - y; }
           const hp = cfg.roles[role].hp;
-          const s = { id: state.soldiers.length, squad: sq.id, side, role, x, y, tx: x, ty: y, hp, maxHp: hp, alive: true, fled: false, cd: range(state, 0, 1), target: -1, retarget: 0 };
+          const s = { id: state.soldiers.length, squad: sq.id, side, role, x, y, tx: x, ty: y, hp, maxHp: hp, alive: true, fled: false, cd: jitter[key][1], target: -1, retarget: 0 };
           state.soldiers.push(s);
           sq.soldiers.push(s.id);
         }

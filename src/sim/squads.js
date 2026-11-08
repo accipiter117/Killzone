@@ -1,7 +1,8 @@
 // Squad behaviour. The player orders platoons; each squad works out how to
 // carry the order out according to its role and the platoon's stance.
 
-import { findCover, wireAt, forCells } from './map.js';
+import { findCover, wireAt, forCells, cellIndex, canStep, rampAt } from './map.js';
+import { nextStep, straightClear, findPath } from './path.js';
 import {
   members, centroid, clamp, dist, sideDir, edgeX, siteLabel, nearObjective, isActive, coverName,
 } from './util.js';
@@ -21,6 +22,7 @@ export function resetPlans(state, pl) {
     sq.bestD = Infinity;
     sq.bestTick = state.tick;
     sq.pushUntil = 0;
+    sq.path = null;
   }
 }
 
@@ -68,6 +70,19 @@ function formUp(state, sq, list, dest, snapCover) {
       const cv = findCover(state.map, x, y, 22, (cx, cy) => -Math.hypot(cx - x, cy - y));
       if (cv) { x = cv.x; y = cv.y; }
     }
+    // On broken ground a soldier's own spot can be across a cliff from
+    // them: then they follow the squad's point, or find their own way.
+    if (state.map.hasHeight && !straightClear(state.map, s, { x, y }, true)) {
+      if (straightClear(state.map, s, dest, true)) { x = dest.x; y = dest.y; }
+      else {
+        const p = findPath(state.map, s, dest, { maxNodes: 3000, mirror: s.side === 1 });
+        let pt = p && p[0] ? p[Math.min(p.length - 1, 6)] : dest;
+        for (let k = Math.min(p ? p.length - 1 : 0, 30); k > 0; k--) {
+          if (straightClear(state.map, s, p[k], true)) { pt = p[k]; break; }
+        }
+        x = pt.x; y = pt.y;
+      }
+    }
     s.tx = x; s.ty = y;
   }
 }
@@ -82,21 +97,6 @@ export function wireOnLine(state, a, b, maxD = 260) {
   for (let t = 0; t <= d; t += 8) {
     const x = a.x + ux * t, y = a.y + uy * t;
     if (wireAt(state.map, x, y) > 0) return { x, y };
-  }
-  return null;
-}
-
-// Nearest passable point in a wire belt (a natural gap or one an engineer
-// has cut) close to where the squad would hit the wire.
-function findGap(state, w, maxDy = 200) {
-  for (let dy = 0; dy <= maxDy; dy += 10) {
-    for (const sgn of dy === 0 ? [1] : [1, -1]) {
-      const y = w.y + dy * sgn;
-      if (y < 10 || y > state.map.height - 10) continue;
-      let clear = true;
-      for (let dx = -24; dx <= 24 && clear; dx += 8) if (wireAt(state.map, w.x + dx, y) > 0) clear = false;
-      if (clear) return { x: w.x, y };
-    }
   }
   return null;
 }
@@ -134,7 +134,7 @@ export function thinkSquad(state, sq) {
   if (pl.broken) {
     sq.mode = 'rout';
     sq.status = 'Routing';
-    formUp(state, sq, list, { x: edgeX(state, sq.side), y: c.y }, false);
+    formUp(state, sq, list, nextStep(state, sq, c, { x: sq.side === 0 ? 1 : state.map.width - 1, y: c.y }), false);
     return;
   }
   const order = pl.order;
@@ -183,7 +183,7 @@ export function thinkSquad(state, sq) {
     const there = dist(c, dest) < 60;
     sq.mode = 'fallback';
     sq.status = there ? 'Regrouping' : 'Falling back';
-    formUp(state, sq, list, dest, there);
+    formUp(state, sq, list, there ? dest : nextStep(state, sq, c, dest), there);
     return;
   }
   advance(state, sq, pl, list, c, firing);
@@ -242,7 +242,10 @@ function advance(state, sq, pl, list, c, firing) {
   let flanking = false;
   if (sq.role === 'assault' && !sq.flankDone && d > 260) {
     const k = pl.squads.indexOf(sq.id) - 1;
-    const sign = k !== 0 ? Math.sign(k) * dir : goal.y < state.map.height / 2 ? 1 : -1;
+    // Dead centre (objective B) breaks the tie by side, so both armies swing
+    // round mirror image flanks.
+    const midY = state.map.height / 2;
+    const sign = k !== 0 ? Math.sign(k) * dir : goal.y < midY ? 1 : goal.y > midY ? -1 : dir;
     const wp = { x: goal.x - dir * 120, y: clamp(goal.y + sign * sc.flankOffset, 30, state.map.height - 30) };
     if (dist(c, wp) < 45) sq.flankDone = true;
     else { target = wp; flanking = true; }
@@ -250,7 +253,7 @@ function advance(state, sq, pl, list, c, firing) {
 
   // Engineers deal with wire on their way; they do not detour round it.
   if (sq.role === 'engineer' && !pushing) {
-    const w = wireOnLine(state, c, target);
+    const w = wireOnLine(state, c, nextStep(state, sq, c, target));
     if (w) {
       if (dist(c, w) > 34) {
         sq.mode = 'move';
@@ -268,29 +271,22 @@ function advance(state, sq, pl, list, c, firing) {
     }
   }
 
-  // Wire in the way: go to the nearest gap and then through it, or wait for
-  // the engineers. (Aiming only at the near side of a gap used to leave
-  // squads standing at the wire for good.)
-  let next = target;
+  // Route round cliffs (up and down ramps only) and through gaps in the
+  // wire where there is one nearby. If the route still crosses wire, wait a
+  // little for the platoon's engineers unless the stance is aggressive.
+  const next = nextStep(state, sq, c, target);
   let crossing = false;
-  const w = sq.role !== 'engineer' && !pushing ? wireOnLine(state, c, target, 160) : null;
+  const w = sq.role !== 'engineer' && !pushing ? wireOnLine(state, c, next, 80) : null;
   if (w) {
-    const gap = findGap(state, w);
-    if (gap) {
-      const before = dir * (gap.x - c.x);
-      next = before > 25 ? { x: gap.x - dir * 20, y: gap.y } : { x: gap.x + dir * 45, y: gap.y };
-      crossing = true;
-    } else {
-      const hasEngineers = pl.squads.some((id) => state.squads[id].role === 'engineer' && members(state, state.squads[id]).length);
-      if (sq.waitSince < 0) sq.waitSince = tick;
-      const waited = (tick - sq.waitSince) / cfg.tickRate;
-      if (hasEngineers && pl.stance !== 'aggressive' && waited < 12 && dist(c, w) < 60) {
-        sq.mode = 'wait';
-        sq.status = 'Waiting for wire to be cut';
-        stopAll(list);
-        return;
-      }
-      crossing = dist(c, w) < 40;
+    crossing = dist(c, w) < 40;
+    const hasEngineers = pl.squads.some((id) => state.squads[id].role === 'engineer' && members(state, state.squads[id]).length);
+    if (sq.waitSince < 0) sq.waitSince = tick;
+    const waited = (tick - sq.waitSince) / cfg.tickRate;
+    if (hasEngineers && pl.stance !== 'aggressive' && waited < 12 && dist(c, w) < 60) {
+      sq.mode = 'wait';
+      sq.status = 'Waiting for wire to be cut';
+      stopAll(list);
+      return;
     }
   } else sq.waitSince = -1;
 
@@ -342,7 +338,7 @@ function advance(state, sq, pl, list, c, firing) {
 
   if (flanking) {
     sq.mode = 'move';
-    sq.status = crossing ? 'Heading for a gap in the wire' : label ? `Flanking toward ${label}` : 'Flanking';
+    sq.status = crossing ? 'Crossing wire' : label ? `Flanking toward ${label}` : 'Flanking';
     formUp(state, sq, list, next, false);
     return;
   }
@@ -381,7 +377,7 @@ function advance(state, sq, pl, list, c, firing) {
   }
 
   sq.mode = 'move';
-  if (crossing) sq.status = 'Heading for a gap in the wire';
+  if (crossing) sq.status = 'Crossing wire';
   else if (sq.role === 'recon') sq.status = 'Moving to overwatch';
   else sq.status = sq.role === 'assault' && sq.flankDone && label ? `Assaulting ${label}` : `Advancing ${towards}`;
   formUp(state, sq, list, next, false);
@@ -411,9 +407,14 @@ export function moveSoldiers(state, dt) {
     if (wireAt(state.map, s.x, s.y) > 0) speed *= cfg.wire.speedMult;
     if (sq.mode === 'rout') speed *= cfg.squad.routSpeedMult;
     if (sq.mode === 'crawl') speed *= 0.5;
+    if (rampAt(state.map, s.x, s.y)) speed *= cfg.height.rampSpeed;
     const step = Math.min(d, speed * dt);
-    s.x += (dx / d) * step;
-    s.y += (dy / d) * step;
+    // Cliffs: only ramps lead up or down. Slide along the edge if blocked.
+    const from = cellIndex(state.map, s.x, s.y);
+    const nx = s.x + (dx / d) * step, ny = s.y + (dy / d) * step;
+    if (canStep(state.map, from, cellIndex(state.map, nx, ny))) { s.x = nx; s.y = ny; }
+    else if (canStep(state.map, from, cellIndex(state.map, nx, s.y))) s.x = nx;
+    else if (canStep(state.map, from, cellIndex(state.map, s.x, ny))) s.y = ny;
     if (sq.mode === 'rout' && (s.x < 35 || s.x > W - 35)) {
       s.fled = true;
       state.sides[s.side].fled++;
