@@ -2,7 +2,7 @@
 // {tick, side, type, params} passed to applyCommand. The player's taps and the
 // AI's decisions both arrive here, so they follow exactly the same rules.
 
-import { clamp } from './util.js';
+import { clamp, isActive } from './util.js';
 import { T, cellIndex } from './map.js';
 import { resetPlans, thinkSquad } from './squads.js';
 import { callArtillery, dropSmoke } from './features.js';
@@ -53,7 +53,7 @@ function reinforce(state, pl) {
   return { ok: true };
 }
 
-export const COMMAND_TYPES = ['move', 'take', 'hold', 'fallback', 'stance', 'artillery', 'smoke', 'ability', 'reinforce', 'vmove', 'vability'];
+export const COMMAND_TYPES = ['move', 'take', 'hold', 'fallback', 'stance', 'artillery', 'smoke', 'ability', 'reinforce', 'vmove', 'vability', 'focus'];
 
 const fail = (reason) => ({ ok: false, reason });
 
@@ -81,7 +81,7 @@ function applyInner(state, cmd) {
   if (!sd) return fail('Unknown side');
 
   let pl = null;
-  if (['move', 'take', 'hold', 'fallback', 'stance', 'ability', 'reinforce'].includes(type)) {
+  if (['move', 'take', 'hold', 'fallback', 'stance', 'ability', 'reinforce', 'focus'].includes(type)) {
     pl = state.platoons[p.platoon];
     if (!pl || pl.side !== side) return fail('Not your platoon');
     // A platoon regrouping after breaking can still be reinforced.
@@ -151,6 +151,17 @@ function applyInner(state, cmd) {
       if (!sq) return fail('No such squad in that platoon');
       const res = useAbility(state, sq);
       if (!res.ok) return res;
+      break;
+    }
+    case 'focus': {
+      // Focus fire on one enemy squad this side can see.
+      const t = state.squads[p.target];
+      if (!t || t.side === side) return fail('Pick an enemy squad');
+      const seen = state.sides[side].spotted;
+      if (!t.soldiers.some((id) => isActive(state.soldiers[id]) && seen[id])) return fail('Your troops cannot see that squad');
+      pl.focus = t.id;
+      pl.focusUntil = state.tick + Math.round(cfg.focus.durationSec * cfg.tickRate);
+      for (const id of pl.squads) for (const sid of state.squads[id].soldiers) state.soldiers[sid].retarget = 0;
       break;
     }
     case 'vmove': {

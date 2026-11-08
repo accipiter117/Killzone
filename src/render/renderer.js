@@ -1,7 +1,8 @@
 // Draws one frame of the battle: terrain, wire, sites, soldiers, effects and
 // the labels that explain what is going on. Reads the sim state, never writes it.
 
-import { isActive, members, centroid } from '../sim/util.js';
+import { isActive, members, centroid, coverName } from '../sim/util.js';
+import { heightAt } from '../sim/map.js';
 import { toScreen } from './camera.js';
 import { sideColours, drawSmoke, drawEffects } from './effects.js';
 import { getSprite, dirIndex, SPRITE_SIZE } from './sprites.js';
@@ -60,9 +61,35 @@ export function drawFrame(g, r, state, cam, opts) {
   r.badges = drawBadges(g, state, cam, opts);
   drawSquadLabels(g, state, cam, opts);
   drawMarks(g, state, cam, opts);
+  drawFocus(g, state, cam, opts);
 }
 
 // Red brackets over enemies marked by recon.
+// A red target over each enemy squad one of your platoons is focusing on.
+function drawFocus(g, state, cam, opts) {
+  const px = 1 / cam.z;
+  const lift = opts.view === 'pixel' ? 40 * spriteScalePixel(px) : 12;
+  for (const pl of state.platoons) {
+    if (pl.side !== opts.playerSide || pl.focus < 0 || pl.broken || state.tick >= pl.focusUntil) continue;
+    const list = state.squads[pl.focus].soldiers.map((id) => state.soldiers[id]).filter((e) => isActive(e) && visible(state, e, opts));
+    if (!list.length) continue;
+    const c = centroid(list);
+    const p = toScreen(cam, c.x, c.y - lift);
+    const r = 20 + 3 * Math.sin(opts.now * 5);
+    g.strokeStyle = 'rgba(255,74,50,0.95)';
+    g.lineWidth = 2.5;
+    g.beginPath();
+    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      g.moveTo(p.x + sx * r, p.y + sy * (r - 7)); g.lineTo(p.x + sx * r, p.y + sy * r); g.lineTo(p.x + sx * (r - 7), p.y + sy * r);
+    }
+    g.stroke();
+    g.fillStyle = 'rgba(255,74,50,0.95)';
+    g.font = '700 10px system-ui, sans-serif';
+    g.textAlign = 'center';
+    g.fillText(pl.index + 1, p.x, p.y - r - 4);
+  }
+}
+
 function drawMarks(g, state, cam, opts) {
   const px = 1 / cam.z;
   const lift = opts.view === 'pixel' ? 74 * spriteScalePixel(px) : opts.view === 'top' ? 10 : 26 * Math.max(1, 0.7 * px);
@@ -219,6 +246,23 @@ function drawGrid(g, state, cam, opts, px) {
   for (let x = x0; x <= x1; x += t) { g.moveTo(x, Math.max(0, y0)); g.lineTo(x, Math.min(state.map.height, y1)); }
   for (let y = y0; y <= y1; y += t) { g.moveTo(Math.max(0, x0), y); g.lineTo(Math.min(state.map.width, x1), y); }
   g.stroke();
+  // Cover preview: each tile is tinted by the best cover a squad could find
+  // in it (green good, amber some), so you can see where to send them.
+  const cov = state.cfg.cover;
+  for (let x = Math.max(0, x0); x < Math.min(state.map.width, x1); x += t) {
+    for (let y = Math.max(0, y0); y < Math.min(state.map.height, y1); y += t) {
+      let best = 0, high = false;
+      for (const fx of [0.2, 0.5, 0.8]) for (const fy of [0.2, 0.5, 0.8]) {
+        const name = coverName(state, x + t * fx, y + t * fy);
+        best = Math.max(best, cov[name].hit);
+        if (heightAt(state.map, x + t * fx, y + t * fy) > 0) high = true;
+      }
+      const level = best >= 0.5 ? 2 : best >= 0.3 || high ? 1 : 0;
+      if (!level) continue;
+      g.fillStyle = level === 2 ? 'rgba(120,230,120,0.16)' : 'rgba(240,200,80,0.12)';
+      g.fillRect(x + px, y + px, t - 2 * px, t - 2 * px);
+    }
+  }
   const pl = opts.selected !== null && opts.selected !== undefined ? state.platoons[opts.selected] : null;
   if (!pl || pl.order.type !== 'move') return;
   // The platoon's tile and the ones above and below (one per squad).

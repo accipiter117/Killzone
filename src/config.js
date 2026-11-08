@@ -55,7 +55,7 @@ export const CONFIG = {
     regenSec: 6, // seconds per order point
     amendSec: 5, // a movement order can be changed free for this long after giving it
     commsRegenMult: 1.75, // owning the comms post speeds refill by this much
-    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0 },
+    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0, focus: 1 },
   },
 
   // Squad roles. range/sight in world units, fireInterval in seconds,
@@ -174,6 +174,8 @@ export const CONFIG = {
     crushRadius: 36, // wire this close under the tank is flattened (a lane a squad can walk through)
     wreckRadius: 26, // the burnt-out wreck becomes cover
   },
+  // Focus fire: a platoon's squads shoot one chosen enemy squad first.
+  focus: { durationSec: 40 },
   // Engineers' ability becomes a breaching charge when an enemy tank is close.
   breach: { label: 'Breach', range: 220, plantDist: 40, fuseSec: 2.5, damage: 380, cooldownSec: 25, runSec: 14, speedMult: 1.3 },
 
@@ -203,7 +205,7 @@ export const CONFIG = {
     siteValue: { objective: 10, comms: 4, mg: 3, arc: 3 },
     threatRadius: 320, // enemies seen this close to a site count as massing on it
     threatValue: 0.6, // extra value per enemy soldier massing on a site
-    reinforceBelow: 0.65, tankRetreatHp: 0.35, tankRetreatX: 200, tankBehind: 90, tankReorderDist: 120, // the AI reinforces a platoon below this strength
+    reinforceBelow: 0.65, tankRetreatHp: 0.35, tankRetreatX: 200, tankBehind: 90, tankReorderDist: 120, focusRange: 380, focusEverySec: 30, // the AI reinforces a platoon below this strength
     highGroundValue: 0.35, // extra value per level of high ground a site sits on
     garrison: 10, // soldiers an objective needs before the AI sends others elsewhere...
     garrisonPerLevel: 11, // ...plus this many per level of high ground it sits on
@@ -227,6 +229,7 @@ export const RULES = {
   arc: ['Arc tower', 'Capture it and it zaps nearby enemies every few seconds.'],
   comms: ['Comms post', 'Capture it and your order points refill faster.'],
   sandbag: ['Sandbags', 'Cover built by engineers: as good as a trench.'],
+  focus: ['Focus fire', 'With a platoon selected, tap an enemy squad: all three of its squads shoot that squad first while they can see it (1 point, 40 seconds).'],
   armour: ['Tank', 'Heavily armoured: rifles barely scratch it. Heavies, grenades, artillery, arc towers, dives, engineer charges and the other tank hurt it. Infantry close behind it are covered.'],
   wreck: ['Tank wreck', 'A burnt-out tank: cover for infantry.'],
   tank: ['Petrusite tank', 'Explodes when hit by stray fire or shells, hurting everyone nearby.'],

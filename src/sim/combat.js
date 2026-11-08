@@ -84,10 +84,30 @@ export function updateVision(state) {
   }
 }
 
+// The squad this soldier's platoon has been told to focus on, if any.
+export function focusSquad(state, pl) {
+  if (pl.focus < 0) return null;
+  const sq = state.squads[pl.focus];
+  if (state.tick >= pl.focusUntil || !sq.soldiers.some((id) => isActive(state.soldiers[id]))) { pl.focus = -1; return null; }
+  return sq;
+}
+
 function pickTarget(state, s) {
   const range = weaponRange(state, s);
   const seen = state.sides[s.side].spotted;
   let best = -1, bd = range * range;
+  // Focus fire: the nearest seen member of the focused squad, if one is in
+  // range and in sight; otherwise the usual nearest enemy.
+  const fq = focusSquad(state, state.platoons[state.squads[s.squad].platoon]);
+  if (fq) {
+    for (const id of fq.soldiers) {
+      const e = state.soldiers[id];
+      if (!isActive(e) || !seen[e.id]) continue;
+      const d2 = (e.x - s.x) ** 2 + (e.y - s.y) ** 2;
+      if (d2 < bd && losClear(state, s.x, s.y, e.x, e.y)) { bd = d2; best = e.id; }
+    }
+    if (best >= 0) return best;
+  }
   for (const e of state.soldiers) {
     if (e.side === s.side || !isActive(e) || !seen[e.id]) continue;
     const d2 = (e.x - s.x) ** 2 + (e.y - s.y) ** 2;
@@ -134,7 +154,7 @@ export function updateFiring(state, dt) {
     s.retarget -= dt;
     let t = s.target >= 0 ? state.soldiers[s.target] : null;
     const range = weaponRange(state, s);
-    if (!t || !isActive(t) || s.retarget <= 0 || dist(s, t) > range || !state.sides[s.side].spotted[t.id]) {
+    if (!t || !isActive(t) || s.retarget <= 0 || dist(s, t) > range || !state.sides[s.side].spotted[t.id] || (state.platoons[sq.platoon].focus >= 0 && t.squad !== state.platoons[sq.platoon].focus)) {
       s.target = pickTarget(state, s);
       s.retarget = cfg.combat.retargetSec;
       t = s.target >= 0 ? state.soldiers[s.target] : null;

@@ -15,7 +15,7 @@ const PROFILES = {
 };
 
 export function createAI(side, profile = 'standard') {
-  const memory = { smokeTick: {}, fallbackTick: {} };
+  const memory = { smokeTick: {}, fallbackTick: {}, focusTick: {} };
   return {
     side,
     profile,
@@ -145,6 +145,24 @@ function decide(state, side, prof, memory) {
       continue;
     }
     if (can(cost.take)) spend({ type: 'take', params: { platoon: pl.id, site: best.id } }, cost.take);
+  }
+
+  // Focus fire on an enemy heavy squad close to a platoon: heavies pin
+  // everyone, so they are the squads most worth silencing first.
+  for (const pl of mine) {
+    if (pl.focus >= 0 || state.tick - (memory.focusTick[pl.id] ?? -1e9) < ai.focusEverySec * cfg.tickRate) continue;
+    if (!can(cost.focus) || op < cost.focus + prof.reserve) continue;
+    const c = centres.get(pl.id);
+    if (!c) continue;
+    let best = null, bd = ai.focusRange;
+    for (const e of seenFoes) {
+      if (e.role !== 'heavy') continue;
+      const d = dist(e, c);
+      if (d < bd || (d === bd && best && e.squad < best.squad)) { bd = d; best = e; }
+    }
+    if (!best) continue;
+    spend({ type: 'focus', params: { platoon: pl.id, target: best.squad } }, cost.focus);
+    memory.focusTick[pl.id] = state.tick;
   }
 
   // Abilities are free, so use any that has something to do, as a sharp
