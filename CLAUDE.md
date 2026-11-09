@@ -20,7 +20,8 @@ index.html, style.css     page and UI styling (colour tokens for light and dark)
 src/config.js             every tuning number and the player-facing rule texts
 src/sim/                  pure simulation (no DOM, no Math.random)
   rng.js                  mulberry32 on state.rng
-  map.js                  procedural front line map (point symmetric so both sides get the same ground)
+  map.js                  map generation entry (trenches map) and ground helpers; point symmetric so both sides get the same ground
+  maps.js                 the industrial site and ruined city maps (built on the ISA half and mirrored); walls (T.wall)
   battle.js               createBattle, step (one tick), scoring, end of battle
   squads.js               squad behaviour by role, stances, platoon orders
   combat.js               vision, targeting, shooting, suppression, damage
@@ -30,7 +31,7 @@ src/sim/                  pure simulation (no DOM, no Math.random)
   ai.js                   the AI commander (same commands as the player)
   path.js                 route finding round cliffs and through wire gaps
   abilities.js            squad abilities (grenade, barrage, charge, sandbags, mark)
-src/render/               canvas drawing, camera, cosmetic effects, terrain painters (terrain.js flat, terrain-tilt.js tilted three quarter view with liftAt), audio.js (synthesised sound),
+src/render/               canvas drawing, camera (pan, zoom, free rotation), cosmetic effects, terrain painters (terrain.js top-down, works at any rotation; terrain-tilt.js tilted three quarter view with liftAt, north up only), audio.js (synthesised sound),
                           puppet.js + pixel-troopers.js (the detailed soldier sprites)
 src/ui/                   DOM panels, input, overlays
 src/main.js               wires it together and owns the game loop

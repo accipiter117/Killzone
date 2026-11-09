@@ -21,7 +21,7 @@ export function attachMapInput(el, cam, { onTap, onLongPress }) {
   const cancelLong = () => { clearTimeout(longTimer); longTimer = 0; };
 
   el.addEventListener('pointerdown', (e) => {
-    el.setPointerCapture(e.pointerId);
+    try { el.setPointerCapture(e.pointerId); } catch { /* not every pointer can be captured */ }
     pts.set(e.pointerId, local(e));
     if (pts.size === 1) {
       mode = 'pending';
