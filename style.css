@@ -238,3 +238,72 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 @media (max-width: 375px) {
   #actions button { font-size: 11px; letter-spacing: -0.01em; }
 }
+
+/* ---- The war map (campaign) ---------------------------------------------- */
+#campaign { position: fixed; inset: 0; z-index: 8; background: #16140f; color: #ece6d6; overflow: hidden;
+  --hud-l: max(10px, var(--safe-l)); --hud-r: max(10px, var(--safe-r)); --hud-t: max(8px, var(--safe-t)); --hud-b: max(10px, var(--safe-b)); }
+#campaign[hidden] { display: none; }
+#campaign button { color: #ece6d6; }
+#warmap { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#cp-top { position: absolute; left: var(--hud-l); top: var(--hud-t); right: calc(var(--hud-r) + 248px); min-height: 44px; display: flex; align-items: center; gap: 10px; padding-right: 10px; z-index: 3; overflow-x: auto; scrollbar-width: none; }
+#cp-top::-webkit-scrollbar { display: none; }
+#cp-when { display: flex; flex-direction: column; line-height: 1.1; white-space: nowrap; }
+#cp-when b { font-size: 15px; }
+#cp-when small, .res small { font-size: 10px; color: #a39b88; white-space: nowrap; }
+#cp-res { display: flex; gap: 12px; }
+.res { display: flex; flex-direction: column; line-height: 1.1; }
+.res b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.res-manpower b { color: #9fd38a; }
+.res-materiel b { color: #e0c27a; }
+.res-power b { color: #8fd0ff; }
+.res-val b.isa { color: #7fb6ff; }
+.res-val b.hgh { color: #ff8a52; }
+#cp-actions { position: absolute; right: var(--hud-r); top: var(--hud-t); display: flex; gap: 6px; z-index: 3; }
+.hud-btn.wide { width: auto; padding: 0 14px; font-size: 13px; }
+.hud-btn.go { background: #2f6db5; border-color: #6aa8ff; }
+.hud-btn.wide:disabled { opacity: 0.4; }
+#cp-hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: var(--hud-b); max-width: calc(100% - 24px); text-align: center; pointer-events: none; z-index: 2; }
+#cp-hint span { display: inline-block; background: rgba(15, 14, 12, 0.72); color: #f2ede0; padding: 6px 12px; border-radius: 14px; font-size: 12px; }
+#cp-tray { position: absolute; left: var(--hud-l); bottom: var(--hud-b); width: min(420px, calc(100% - var(--hud-l) - var(--hud-r))); max-height: 60%; overflow-y: auto; padding: 8px 10px 10px; z-index: 4; animation: tray-in 0.14s ease-out; touch-action: pan-y; }
+#cp-tray[hidden] { display: none; }
+#cp-tray-head { display: flex; align-items: center; gap: 8px; }
+#cp-tray-title { font-size: 14px; }
+#cp-tray-close { width: 34px; height: 34px; min-width: 34px; min-height: 34px; margin-left: auto; color: #c9c2b2; }
+#cp-tray-body { font-size: 12px; color: #d8d2c0; margin: 4px 0 8px; }
+#cp-tray-body .sqs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+#cp-tray-body .sq { background: rgba(236, 230, 214, 0.08); border-radius: 8px; padding: 3px 7px; }
+#cp-tray-body .sq.gone { opacity: 0.4; text-decoration: line-through; }
+#cp-tray-body .meta { color: #b8b09c; }
+#cp-tray-body .site { margin-top: 6px; }
+#cp-tray-body .site small { color: #a39b88; }
+#cp-tray-body .bad, .cb-row .bad { color: #ff8a80; }
+#cp-tray-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+#cp-tray-btns button { height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(236, 230, 214, 0.18); background: rgba(236, 230, 214, 0.06); font-size: 12px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+#cp-tray-btns button small { font-size: 10px; font-weight: 500; color: #a39b88; }
+#cp-tray-btns button.on { border-color: #e8c04a; background: rgba(232, 192, 74, 0.18); }
+#cp-toast { position: absolute; left: 50%; top: calc(var(--hud-t) + 56px); transform: translateX(-50%); width: min(92%, 380px); background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 13px; z-index: 5; pointer-events: none; }
+#cp-toast[hidden] { display: none; }
+#cp-toast b { display: block; margin-bottom: 2px; }
+#cp-toast.bad { border-color: var(--danger); }
+@media (orientation: portrait) {
+  #cp-top { right: var(--hud-r); }
+  #cp-actions { top: calc(var(--hud-t) + 52px); }
+  #cp-hint { bottom: auto; top: calc(var(--hud-t) + 104px); }
+}
+
+/* Battle lists, results and dispatches. */
+.sheet.wide { width: min(100%, 560px); }
+#cb-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.cb-row { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: var(--panel-2); }
+.cb-row.key { border-color: #c9a227; box-shadow: inset 3px 0 0 #e8c04a; }
+.cb-row.won { box-shadow: inset 3px 0 0 var(--good); }
+.cb-row.lost { box-shadow: inset 3px 0 0 var(--danger); }
+.cb-head { display: flex; justify-content: space-between; gap: 8px; }
+.cb-head span { font-size: 12px; color: var(--muted); }
+.cb-what, .cb-status { font-size: 12px; }
+.cb-status { font-weight: 600; margin-top: 2px; }
+.cb-changes { margin: 4px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
+.cb-replay { margin-top: 6px; min-height: 36px; font-size: 12px; }
+.dispatch { padding-left: 18px; }
+.dispatch li { margin-bottom: 5px; }
+#code-box { width: 100%; max-width: 100%; font: 12px/1.3 ui-monospace, monospace; border-radius: 8px; border: 1px solid var(--line); background: var(--btn); color: var(--text); padding: 8px; user-select: text; -webkit-user-select: text; }

@@ -2,9 +2,42 @@
 
 A fan-made, non-commercial battle prototype set in the Killzone universe: the ISA against the Helghast. Not affiliated with Guerrilla Games or Sony. All art is drawn in code.
 
-This is the **battle layer only**: one real-time fight on a trench front line, played solo against an AI. The war map, front line movement, economy and multiplayer come later, and the battle is built so they can slot in (every battle can be replayed exactly from its seed and command log).
+Two layers, played solo against an AI: real-time **battles**, and a **campaign** on a war map above them where the battles decide where the front line runs. Multiplayer comes later; both layers are built so it can slot in (every battle and every campaign order is a command that can be replayed exactly).
 
-Play it: **https://accipiter117.github.io/Killzone/** (once GitHub Pages is switched on, see below). Add `?seed=anything` to the address to fight on a particular map.
+Play it: **https://accipiter117.github.io/Killzone/**. The start menu offers a campaign (new, continue or load from a code) or a quick battle. Add `?seed=anything` to the address to jump straight into a quick battle on a particular map.
+
+## The campaign (war map)
+
+- **The map:** an invented stretch of front, 24 sectors in named regions (ISA west, Helghast east, the east half the west half turned round, so both sides start equal). Blue ground is ISA, orange Helghast; the dark trench is the front line. Each sector has a terrain kit (trenches, industrial site or ruined city) that picks the battle map fought there.
+- **Sites** give one bonus each while held and connected to your capital through your own ground: city (manpower), factory (materiel), tank works (your tank joins battles), power plant (power, and artillery in battle), comms hub (+1 starting order point), airfield (jetpack squads; without it they fight as riflemen). Holding every site in a region pays a bonus. A red dashed ring means a site is cut off and gives nothing.
+- **Defences:** cities, factories and capitals have 1 to 3 defences (gold pips). Each battle lost there knocks one off; the site can only be taken at zero.
+- **Platoons:** each side starts with two army groups of three platoons (numbered chips with a strength bar). They keep their squads, casualties and a named sergeant from battle to battle.
+- **A round** (three per night): you plan, then the battles are fought, then the front moves.
+  - Tap a platoon: pale sectors are where it can move (two sectors through your own ground), red ones where it can attack. A platoon moves or attacks, not both.
+  - **Refill** a weakened platoon (manpower, only while in supply), **dig in** on a sector of yours (materiel: its defenders get extra trenches), **recruit** a new platoon at your capital (manpower, materiel and power).
+  - **Key battle** (gold star): the one battle you fight yourself on the battle screen; your first attack each round is marked key, and you can move the star (or mark a sector of yours to fight there if attacked). Every other battle is fought by the AI for both sides in the background (a Web Worker), with your platoons, survivors, tank, artillery and order points carried in.
+  - **Results:** each battle with what changed and a Replay button. The bigger the margin, the further the front moves: narrow nudges it, clear pushes it, crushing breaks through into the sectors behind. Broken platoons fall back a sector; platoons cut off from supply lose soldiers every round.
+  - After the third round, the night's **dispatches** sum up what happened.
+- **Victory:** take the enemy capital, or hold the most site value when the final night ends (4 nights for a short war, 8 for a full one).
+- **Saving:** the campaign saves itself in the browser after every order. Menu, "Save as a code" gives a text code to copy to another device; "Load a campaign from a code" carries on from it.
+
+### Campaign numbers worth trying first
+
+All in `CAMPAIGN` in [`src/config.js`](src/config.js).
+
+| What | Where | Try | Effect on play |
+| --- | --- | --- | --- |
+| How far the front moves | `push` (narrow 22, clear 55 cells; breakthrough 45 more) | narrow 12, clear 40 | Smaller numbers make a slower, grinding war where defences matter more. |
+| Site defences | `sites[].defence` (capital 3, cities and factories 1 to 2) | +1 each | Higher makes capitals much harder to rush; wars go to the final night more often. |
+| Battle length | `battle.durationSec` (360) | 300 or 480 | Shorter battles are quicker to play and decide fewer cells per fight. |
+| Income | `income`, `regionBonus`, `start` | | How quickly losses can be refilled; low income makes every soldier count. |
+| Costs | `costs.refillPerSoldier`, `costs.fortify`, `costs.recruit` | | How often digging in and recruiting are worth it. |
+| Supply attrition | `attrition` (1 soldier a round) | 2 | How dangerous it is to be cut off. |
+| War length | `nights` (8), `roundsPerNight` (3) | | Also picked on the start menu (4 or 8 nights). |
+| Platoon limit | `maxPlatoons` (8), `maxPerSide` (3 per battle) | | How big the armies and battles get. |
+| Movement | `moveRange` (2 sectors) | 1 or 3 | How fast reserves can reach a breach. |
+
+`node tools/campaign-balance.mjs 6 4 90` plays six AI against AI campaigns (4 nights, 90 second battles) and reports win rates, how wars end and how many battles are fought. Last run: 50/50, a third won by taking the capital.
 
 ## Switching on GitHub Pages (from a phone)
 
@@ -136,7 +169,8 @@ Every number is in [`src/config.js`](src/config.js). Change one, push, reload on
 
 - Vanilla JavaScript modules, no build step, no dependencies. Open `index.html` through any static server (for example `python3 -m http.server`).
 - `src/sim/` is the whole battle with no DOM: fixed 30 ticks per second, one seeded RNG, and every order is a command object passed through `applyCommand`. The AI issues the same commands with the same order point rules.
-- `npm test` runs the Node test suite (determinism and replays, AI vs AI battles finishing on time, capture and flipping, pinned squads not advancing, wire slowing until cut, petrusite tanks exploding once, order points, tanks (driving, armour, breaching, Overwatch, wrecks, rolling cover), routing, map symmetry, cliffs, ramps and high ground, every ability).
+- `src/campaign/` is the war map with no DOM: `applyCampaignCommand` is the only way to change a campaign (the player and the campaign AI alike), and seed plus command log rebuilds a campaign exactly. `src/render/warmap.js` draws it and `src/ui/campaign.js` runs its screens.
+- `npm test` runs the Node test suite (campaign determinism, supply, defences, front movement by margin, AI campaigns reaching a winner, save and code round trips, determinism and replays, AI vs AI battles finishing on time, capture and flipping, pinned squads not advancing, wire slowing until cut, petrusite tanks exploding once, order points, tanks (driving, armour, breaching, Overwatch, wrecks, rolling cover), routing, map symmetry, cliffs, ramps and high ground, every ability).
 - `node tools/balance.mjs 10 standard aggressive` plays 10 seeds twice with the AI profiles swapped between sides and reports win rates by side and profile, average battle length and margins. 
 - `tools/balance.mjs` with the same profile on both sides plays every game on its own map. With both AIs on the standard profile, 200 battles on fresh maps came out 47/53 (within chance); battles average about six and a half minutes and roughly 40 percent go to time.
 - The AI has been checked against scripted player strategies (all-in rush on B, spreading out, with and without abilities): it wins most of them, and `test/ai.test.js` guards against the all-in rush becoming a sure win again.
