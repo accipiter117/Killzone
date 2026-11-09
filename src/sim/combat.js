@@ -14,6 +14,15 @@ export function losClear(state, x1, y1, x2, y2) {
     if (segHitsCircle(x1, y1, x2, y2, sm.x, sm.y, sm.r)) return false;
   }
   const map = state.map;
+  // Walls block sight (the cells at either end do not count, so a soldier
+  // at a window or a doorway can still see out).
+  if (map.hasWalls) {
+    const d = Math.hypot(x2 - x1, y2 - y1), steps = Math.floor(d / 8);
+    for (let k = 2; k < steps - 1; k++) {
+      const i = cellIndex(map, x1 + ((x2 - x1) * k) / steps, y1 + ((y2 - y1) * k) / steps);
+      if (i >= 0 && map.grid[i] === T.wall) return false;
+    }
+  }
   if (map.hasHeight) {
     const top = Math.max(heightAt(map, x1, y1), heightAt(map, x2, y2));
     if (top < 2) {

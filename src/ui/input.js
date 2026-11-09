@@ -1,8 +1,8 @@
 // Touch and mouse on the battlefield: one finger drags to pan, two fingers
-// pinch to zoom, a short touch is a tap (allowing ~12px of finger drift), and
+// pinch to zoom and twist to turn the view, a short touch is a tap (allowing ~12px of finger drift), and
 // a long press inspects whatever is under the finger.
 
-import { zoomAt, clampCamera, centreOn } from '../render/camera.js';
+import { zoomAt, panBy, rotateAt, centreOn } from '../render/camera.js';
 
 const TAP_SLOP = 12;
 const LONG_PRESS_MS = 550;
@@ -34,7 +34,7 @@ export function attachMapInput(el, cam, { onTap, onLongPress }) {
     } else if (pts.size === 2) {
       cancelLong();
       const [a, b] = [...pts.values()];
-      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: cam.z, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: cam.z, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, ang: Math.atan2(b.y - a.y, b.x - a.x), rot: cam.rot };
       mode = 'pinch';
     }
   });
@@ -48,19 +48,23 @@ export function attachMapInput(el, cam, { onTap, onLongPress }) {
       cancelLong();
     }
     if (mode === 'pan') {
-      cam.x -= (p.x - last.x) / cam.z;
-      cam.y -= (p.y - last.y) / cam.z;
-      clampCamera(cam);
+      panBy(cam, p.x - last.x, p.y - last.y);
       last = p;
     } else if (mode === 'pinch' && pts.size >= 2) {
       const [a, b] = [...pts.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      // Pan with the midpoint, then zoom about it.
-      cam.x -= (mid.x - pinch.mid.x) / cam.z;
-      cam.y -= (mid.y - pinch.mid.y) / cam.z;
+      // Pan with the midpoint, then zoom and turn about it.
+      panBy(cam, mid.x - pinch.mid.x, mid.y - pinch.mid.y);
       pinch.mid = mid;
       zoomAt(cam, mid.x, mid.y, pinch.z * (d / pinch.d));
+      if (cam.canRotate) {
+        let turn = Math.atan2(b.y - a.y, b.x - a.x) - pinch.ang;
+        if (turn > Math.PI) turn -= Math.PI * 2;
+        if (turn < -Math.PI) turn += Math.PI * 2;
+        // A small dead zone so a plain pinch does not wobble the view.
+        if (Math.abs(turn) > 0.08 || pinch.turning) { pinch.turning = true; rotateAt(cam, mid.x, mid.y, pinch.rot + turn); }
+      }
     }
   });
 

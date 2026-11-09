@@ -10,7 +10,7 @@ import { fingerprint } from './sim/battle.js';
 import { seedFrom } from './sim/rng.js';
 import { wireAt, heightAt } from './sim/map.js';
 import { isActive, coverName, dist } from './sim/util.js';
-import { createCamera, setViewport, toWorld, centreOn, clampCamera } from './render/camera.js';
+import { createCamera, setViewport, toWorld, toScreen, centreOn, clampCamera, rotateAt } from './render/camera.js';
 import { buildTerrain } from './render/terrain.js';
 import { buildTiltTerrain, liftAt, LIFT } from './render/terrain-tilt.js';
 import { createRenderer, drawFrame, drawMinimap } from './render/renderer.js';
@@ -129,6 +129,7 @@ function startBattle(seed, { replayLog = null } = {}) {
   paintTerrain();
   game.fxs.reduced = reduceMotion.matches;
   game.cam = createCamera(st.map.width, st.map.height);
+  applyRotationRule();
   game.selected = null;
   game.vehicle = false;
   game.armed = null;
@@ -152,6 +153,13 @@ function startBattle(seed, { replayLog = null } = {}) {
   centreOn(game.cam, 260, st.map.height / 2);
   keepAwake(true);
   try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}`); } catch { /* file:// */ }
+}
+
+// The tilted look only works with north up, so it locks turning.
+function applyRotationRule() {
+  if (!game.cam) return;
+  game.cam.canRotate = !game.tilt;
+  if (game.tilt && game.cam.rot) rotateAt(game.cam, game.cam.vw / 2, game.cam.vh / 2, 0);
 }
 
 // The battlefield picture: tilted three quarter view (default) or flat.
@@ -264,7 +272,7 @@ function focusPlatoon(pl) {
 
 function focusPoint(x, y) {
   const cam = game.cam;
-  const sx = (x - cam.x) * cam.z, sy = (y - cam.y) * cam.z;
+  const { x: sx, y: sy } = toScreen(cam, x, y);
   // Only move the view if the unit is off screen or would sit under the
   // order tray (which pops up along the bottom); then put it a little above
   // the middle.
@@ -424,6 +432,7 @@ function inspect(sx, sy) {
   toast(ui, ...RULES[coverName(st, w.x, w.y)]);
 }
 
+document.getElementById('btn-compass').addEventListener('click', () => rotateAt(game.cam, game.cam.vw / 2, game.cam.vh / 2, 0));
 attachMapInput(mapCanvas, new Proxy({}, { get: (_, k) => game.cam[k], set: (_, k, v) => { game.cam[k] = v; return true; } }), {
   onTap,
   onLongPress: inspect,
@@ -482,6 +491,7 @@ document.getElementById('tilt-toggle').addEventListener('change', (e) => {
   game.tilt = e.target.checked;
   store.set('tilt', game.tilt);
   paintTerrain();
+  applyRotationRule();
 });
 document.getElementById('view-select').addEventListener('change', (e) => {
   game.view = e.target.value;
@@ -560,6 +570,10 @@ function frame(t) {
     }
     if (n === 16) game.acc = 0; // slow device: drop time rather than spiral
   }
+  // The compass: shows where north is when the map is turned; tap to reset.
+  const compass = document.getElementById('btn-compass');
+  compass.hidden = !game.cam.canRotate || !game.cam.rot;
+  if (!compass.hidden) document.getElementById('compass-needle').style.transform = `rotate(${game.cam.rot}rad)`;
   if (st.result && !game.endShown) {
     game.endShown = true;
     keepAwake(false);

@@ -1,7 +1,7 @@
 // Objectives and capturable features, petrusite tanks, artillery and smoke.
 
 import { next } from './rng.js';
-import { T, terrainAt, paintCircle } from './map.js';
+import { T, terrainAt, paintCircle, forCells } from './map.js';
 import { isActive, dist, feed, sideName, siteLabel, nearObjective, coverAt } from './util.js';
 import { fireShot, damageSoldier, suppress, losClear } from './combat.js';
 import { blastVehicles, damageVehicle } from './vehicles.js';
@@ -93,6 +93,7 @@ function nearestEnemies(state, p, side, range, n) {
 // Damage everyone in a radius (friend and foe), with falloff from the centre.
 export function blast(state, x, y, radius, damage, suppRadius, suppAmount, source, buildingMult = 1, cause = source) {
   blastVehicles(state, x, y, radius, damage);
+  breakWalls(state, x, y, radius * state.cfg.walls.breakShare);
   const hitSquads = new Set();
   for (const s of state.soldiers) {
     if (!isActive(s)) continue;
@@ -107,6 +108,23 @@ export function blast(state, x, y, radius, damage, suppRadius, suppAmount, sourc
     const lead = state.soldiers[sq.soldiers[0]];
     suppress(state, sq, suppAmount * coverAt(state, lead.x, lead.y).supp, source, { x, y });
   }
+}
+
+// Explosions knock walls down to rubble, opening new routes and sight lines.
+export function breakWalls(state, x, y, r) {
+  const map = state.map;
+  if (!map.hasWalls || r <= 0) return;
+  const cells = [];
+  forCells(map, x - r, y - r, x + r, y + r, (i, cx, cy) => {
+    if (map.grid[i] === T.wall && (cx - x) ** 2 + (cy - y) ** 2 <= r * r) { map.grid[i] = T.rubble; cells.push(i); }
+  });
+  if (!cells.length) return;
+  if (!map.broken) map.broken = new Uint8Array(map.grid.length);
+  for (const i of cells) map.broken[i] = 1;
+  state.events.push({ type: 'wallBroken', cells, x, y });
+  // Routes planned round the old wall may now go straight through.
+  for (const sq of state.squads) sq.path = null;
+  for (const v of state.vehicles) v.path = null;
 }
 
 export function addCrater(state, x, y, r) {

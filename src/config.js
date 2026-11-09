@@ -110,6 +110,7 @@ export const CONFIG = {
     crater: { hit: 0.35, supp: 0.6, speed: 0.85 },
     building: { hit: 0.5, supp: 0.5, speed: 0.8, rangeMult: 1.2, artilleryMult: 2 },
     sandbag: { hit: 0.55, supp: 0.45, speed: 0.85 },
+    wall: { hit: 0.6, supp: 0.4, speed: 1 }, // never stood in; listed so every ground type has an entry
   },
   wire: { speedMult: 0.22 },
 
@@ -181,6 +182,9 @@ export const CONFIG = {
     artillery: 'artillery', grenade: 'grenades', petrusite: 'a petrusite explosion', arc: 'the arc tower', dive: 'jetpack landings', charge: 'a breaching charge',
   },
   historyEverySec: 5,
+  // Walls (industrial and city maps): how much of a blast's radius knocks
+  // them down, and how wide a hole a tank shell makes.
+  walls: { breakShare: 0.55, tankShell: 22 },
   // Focus fire: a platoon's squads shoot one chosen enemy squad first.
   focus: { durationSec: 40 },
   // Engineers' ability becomes a breaching charge when an enemy tank is close.
