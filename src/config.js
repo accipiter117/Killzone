@@ -263,5 +263,58 @@ export const ABILITY_HELP = {
   vanish: 'Infiltrators go fully hidden for eight seconds, even up close: slip away or set up the next ambush.',
 };
 
+// The war map campaign (src/campaign). Every strategic number lives here.
+export const CAMPAIGN = {
+  version: 1, // save format; bump and add an upgrade step when the save shape changes
+  grid: { cols: 80, rows: 40, sectorCols: 4, sectorRows: 3 }, // per side: 4 columns of 3 sectors
+  // Region per sector column (ISA half, west to east); the Helghast half
+  // mirrors the shapes with its own names.
+  regions: { isa: ['ISA capital district', 'Landing beaches', 'Mountain line', 'Mountain line'], hgh: ['Helghast capital district', 'Industrial belt', 'Petrusite basin', 'Petrusite basin'] },
+  // Sites per side: kind, sector (column, row on that side's half), defence.
+  sites: [
+    { kind: 'capital', at: [0, 1], defence: 3 },
+    { kind: 'city', at: [1, 0], defence: 2 },
+    { kind: 'factory', at: [1, 2], defence: 2 },
+    { kind: 'tankworks', at: [0, 2], defence: 0 },
+    { kind: 'power', at: [0, 0], defence: 0 },
+    { kind: 'comms', at: [2, 1], defence: 0 },
+    { kind: 'airfield', at: [1, 1], defence: 0 },
+    { kind: 'factory', at: [2, 2], defence: 1 },
+    { kind: 'city', at: [3, 0], defence: 1 },
+  ],
+  siteValue: { capital: 6, city: 3, factory: 3, tankworks: 2, power: 2, comms: 2, airfield: 2 },
+  // Income per round from each connected site.
+  income: { capital: { manpower: 6, materiel: 2, power: 2 }, city: { manpower: 4 }, factory: { materiel: 4 }, power: { power: 4 } },
+  regionBonus: { manpower: 2, materiel: 2, power: 2 }, // holding every site in a region
+  start: { manpower: 10, materiel: 10, power: 4 },
+  costs: { refillPerSoldier: { manpower: 1 }, fortify: { materiel: 4 }, recruit: { manpower: 12, materiel: 8, power: 2 }, artilleryPerBattle: { power: 1 } },
+  maxPlatoons: 8, // per side
+  moveRange: 2, // sectors a platoon can move in one round, through its own ground
+  // Front movement (cells flipped) by margin of victory; crushing takes the
+  // whole sector and breaks through into the next.
+  push: { narrow: 22, clear: 55, crushing: 999, breakthrough: 45, defenderNarrow: 10, walkover: 999 }, // walkover: nobody defending, the whole sector falls
+  attrition: 1, // soldiers a cut-off platoon loses per round
+  minStrength: 0.25, // a platoon this weak cannot attack
+  battle: { durationSec: 360 }, // every campaign battle, played or auto-resolved
+  maxPerSide: 3, // platoons per side in one battle
+  roundsPerNight: 3,
+  nights: 8, // the default final night
+  templates: [['rifle', 'heavy', 'engineer'], ['jump', 'assault', 'engineer'], ['infiltrator', 'heavy', 'recon']],
+  sergeants: {
+    isa: ['Sgt Hale', 'Sgt Okafor', 'Sgt Brandt', 'Sgt Reyes', 'Sgt Lindqvist', 'Sgt Moreau', 'Sgt Adeyemi', 'Sgt Kowal', 'Sgt Tanaka', 'Sgt Byrne'],
+    hgh: ['Sgt Vrell', 'Sgt Draxx', 'Sgt Korrin', 'Sgt Malvek', 'Sgt Tesh', 'Sgt Grozan', 'Sgt Ulvar', 'Sgt Pyke', 'Sgt Stahl', 'Sgt Varno'],
+  },
+};
+
+export const SITE_RULES = {
+  capital: ['Capital', 'Pays manpower, materiel and power. Lose it and the war is lost.'],
+  city: ['City', 'Pays manpower (refills squads) while held and connected to your capital.'],
+  factory: ['Factory', 'Pays materiel (trenches, recruiting) while held and connected to your capital.'],
+  tankworks: ['Tank works', 'Your tank joins battles while this is held and connected to your capital.'],
+  power: ['Power plant', 'Pays power; artillery is available in battle while this is held and connected.'],
+  comms: ['Comms hub', '+1 starting order point in every battle while held and connected.'],
+  airfield: ['Airfield', 'Jetpack squads fight in your platoons while held and connected (otherwise they fight as riflemen).'],
+};
+
 export const SIDE_NAMES = ['ISA', 'Helghast'];
 export const PLATOON_NAMES = ['1st Platoon', '2nd Platoon', '3rd Platoon'];
