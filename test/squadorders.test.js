@@ -24,7 +24,7 @@ test('a squad can be sent on its own while the platoon keeps its shared goal', (
   const op = s.sides[0].op;
   const to = { x: Math.round(start.x + 60), y: Math.round(start.y - 160) };
   assert.ok(cmd(s, 'squad', { platoon: pl.id, role: b.role, what: 'move', ...to }).ok);
-  assert.equal(s.sides[0].op, op - s.cfg.orders.cost.squad, 'a squad order costs a point');
+  assert.equal(s.sides[0].op, op, 'placing a squad straight after its platoon order is free');
   assert.equal(b.order.type, 'move');
   assert.equal(a.order, null, 'the others still follow the platoon');
   run(s, 30 * 12);
@@ -59,4 +59,18 @@ test('a squad order can be changed free for a few seconds', () => {
   const op = s.sides[0].op;
   assert.ok(cmd(s, 'squad', { platoon: pl.id, role: sqs[2].role, what: 'move', x: Math.round(c.x + 100), y: Math.round(c.y) }).ok);
   assert.equal(s.sides[0].op, op);
+});
+
+test('squads placed within 10 seconds of their platoon order are free; later ones cost a point', () => {
+  const { s, pl, sqs } = setup();
+  const c = centre(s, sqs[0]);
+  assert.ok(cmd(s, 'move', { platoon: pl.id, x: c.x + 200, y: c.y }).ok);
+  run(s, 30 * 8);
+  let op = s.sides[0].op;
+  assert.ok(cmd(s, 'squad', { platoon: pl.id, role: sqs[1].role, what: 'move', x: Math.round(c.x + 150), y: Math.round(c.y - 120) }).ok);
+  assert.equal(s.sides[0].op, op, 'free at 8 seconds');
+  run(s, 30 * 3);
+  op = s.sides[0].op;
+  assert.ok(cmd(s, 'squad', { platoon: pl.id, role: sqs[2].role, what: 'hold' }).ok);
+  assert.equal(s.sides[0].op, op - s.cfg.orders.cost.squad, 'a point at 11 seconds');
 });

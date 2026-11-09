@@ -106,7 +106,7 @@ function applyInner(state, cmd) {
     if (p.what === 'rejoin') cost = 0;
   }
   const amending = (MOVES.includes(type) && amendWindow(state, pl) > 0) || (type === 'vmove' && amendWindow(state, v) > 0)
-    || (type === 'squad' && p.what !== 'rejoin' && amendWindow(state, sq) > 0);
+    || (type === 'squad' && p.what !== 'rejoin' && squadFreeWindow(state, sq) > 0);
   if (amending) cost = 0;
   if (sd.op + 1e-9 < cost) return fail('Not enough order points');
   const W = state.map.width, H = state.map.height;
@@ -241,6 +241,19 @@ function tankSpot(state, pt, side) {
 export function amendWindow(state, pl) {
   if (!pl || pl.paidTick === undefined || pl.paidTick < 0) return 0;
   return Math.max(0, pl.paidTick + Math.round(state.cfg.orders.amendSec * state.cfg.tickRate) - state.tick);
+}
+
+// Ticks left in which a platoon's squads can be given their own places free,
+// as the finishing touches to the platoon's last paid order.
+export function followUpWindow(state, pl) {
+  if (!pl || pl.paidTick === undefined || pl.paidTick < 0) return 0;
+  return Math.max(0, pl.paidTick + Math.round(state.cfg.orders.squadFollowUpSec * state.cfg.tickRate) - state.tick);
+}
+
+// A squad order is free while the squad's own last order can be changed, or
+// while its platoon's order is fresh.
+export function squadFreeWindow(state, sq) {
+  return Math.max(amendWindow(state, sq), followUpWindow(state, state.platoons[sq.platoon]));
 }
 
 function setOrder(state, pl, order) {
