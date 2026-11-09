@@ -68,6 +68,111 @@
     </main>
   </div>
 
+
+  <!-- The war map: the campaign above the battles. -->
+  <section id="campaign" hidden>
+    <canvas id="warmap" aria-label="War map"></canvas>
+    <div id="cp-top" class="glass">
+      <button id="cp-menu" class="hud-btn bare" aria-label="Campaign menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <div id="cp-when"></div>
+      <div id="cp-res"></div>
+    </div>
+    <div id="cp-actions">
+      <button id="cp-recruit" class="hud-btn wide">Recruit</button>
+      <button id="cp-end" class="hud-btn wide go">End planning</button>
+    </div>
+    <div id="cp-hint"></div>
+    <section id="cp-tray" class="glass" hidden>
+      <div id="cp-tray-head"><b id="cp-tray-title"></b><button id="cp-tray-close" class="hud-btn bare" aria-label="Close">&#10005;</button></div>
+      <div id="cp-tray-body"></div>
+      <div id="cp-tray-btns"></div>
+    </section>
+    <div id="cp-toast" hidden></div>
+  </section>
+
+  <div id="overlay-start" class="overlay" hidden>
+    <div class="sheet">
+      <h2>Front Line</h2>
+      <p class="small">ISA against Helghast. Fight a single battle, or command a whole war on the war map.</p>
+      <div class="buttons">
+        <button class="primary" id="st-continue" hidden>Continue campaign</button>
+        <button id="st-new-short">New campaign (short: 4 nights)</button>
+        <button id="st-new">New campaign (full: 8 nights)</button>
+        <button id="st-quick">Quick battle</button>
+        <button id="st-import">Load a campaign from a code</button>
+        <button id="st-help">How the campaign works</button>
+      </div>
+      <p class="small">Fan-made, non-commercial prototype. Not affiliated with Guerrilla Games or Sony.</p>
+    </div>
+  </div>
+
+  <div id="overlay-cmenu" class="overlay" hidden>
+    <div class="sheet">
+      <h2>Campaign</h2>
+      <p id="cm-info" class="small"></p>
+      <div class="buttons">
+        <button class="primary" data-close>Back to the war map</button>
+        <button id="cm-export">Save as a code (to copy to another device)</button>
+        <button id="cm-import">Load a campaign from a code</button>
+        <button id="cm-help">How the campaign works</button>
+        <button id="cm-sound">Sound: on</button>
+        <button id="cm-main">Main menu</button>
+      </div>
+      <p class="small">The campaign saves itself in this browser after every order.</p>
+    </div>
+  </div>
+
+  <div id="overlay-code" class="overlay" hidden>
+    <div class="sheet">
+      <h2 id="code-title">Campaign code</h2>
+      <p id="code-text" class="small"></p>
+      <textarea id="code-box" rows="6" spellcheck="false" aria-label="Campaign code"></textarea>
+      <p id="code-msg" class="small"></p>
+      <div class="buttons">
+        <button class="primary" id="code-go">Copy</button>
+        <button data-close>Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay-recruit" class="overlay" hidden>
+    <div class="sheet">
+      <h2>Raise a platoon</h2>
+      <p id="rc-cost" class="small"></p>
+      <div id="rc-list" class="buttons"></div>
+      <div class="buttons"><button data-close>Cancel</button></div>
+    </div>
+  </div>
+
+  <div id="overlay-cbattles" class="overlay" hidden>
+    <div class="sheet wide">
+      <h2 id="cb-title">Battles</h2>
+      <p id="cb-sub" class="small"></p>
+      <div id="cb-list"></div>
+      <div id="cb-btns" class="buttons"></div>
+    </div>
+  </div>
+
+  <div id="overlay-chelp" class="overlay" hidden>
+    <div class="sheet">
+      <h2>How the campaign works</h2>
+      <ul>
+        <li>The war map is split into <b>sectors</b>. Blue ground is <b class="isa-text">ISA</b>, orange is <b class="hgh-text">Helghast</b>; the dark trench is the front line.</li>
+        <li>Each <b>night</b> has three <b>rounds</b>. A round: you plan, then the battles are fought, then the front moves.</li>
+        <li><b>Planning:</b> tap one of your platoons (the numbered chips). Pale sectors are where it can <b>move</b> (up to two sectors through your own ground). Red sectors are where it can <b>attack</b>. A platoon either moves or attacks each round.</li>
+        <li><b>Key battle</b> (gold star): the one battle you fight yourself on the battle screen. Your first attack each round is marked key; change it in the platoon panel. Every other battle is fought by the AI for both sides.</li>
+        <li>Tap a sector of yours to <b>dig in</b> (materiel): its defenders fight from extra trenches. <b>Refill</b> a weakened platoon with manpower (only while it is in supply).</li>
+        <li><b>Sites</b> give one bonus each while you hold them <i>and</i> they connect to your capital through your own ground: cities pay manpower, factories materiel, the power plant power and artillery, the tank works your tank, the comms hub an extra order point, the airfield jetpacks.</li>
+        <li>Cities, factories and capitals have <b>defences</b> (gold pips). Each battle lost there knocks one off; only at zero can the site be taken.</li>
+        <li>The bigger the win, the further the front moves: narrow nudges it, clear pushes it, crushing breaks through into the sectors behind.</li>
+        <li>Platoons cut off from supply (a red dashed outline) cannot be refilled and lose soldiers every round.</li>
+        <li><b>Victory:</b> take the enemy capital, or hold the most valuable sites when the last night ends.</li>
+        <li>Drag to pan, pinch to zoom. Every battle can be replayed from the results.</li>
+      </ul>
+      <button class="primary" data-close>Got it</button>
+    </div>
+  </div>
+
   <div id="overlay-help" class="overlay" hidden>
     <div class="sheet">
       <h2>How to play</h2>
@@ -136,6 +241,8 @@
         <button id="btn-new">New battle (new map)</button>
         <button id="btn-restart">Restart this map</button>
         <button id="btn-help">How to play</button>
+        <button id="btn-leave" hidden>Leave this battle (the AI fights it out)</button>
+        <button id="btn-main">Main menu</button>
         <a class="button" href="sprites.html">Sprite sheet</a>
       </div>
       <p class="small">Fan-made, non-commercial prototype. Not affiliated with Guerrilla Games or Sony.</p>
@@ -157,6 +264,7 @@
         <button class="primary" id="btn-replay">Watch replay</button>
         <button id="btn-end-restart">Fight this map again</button>
         <button id="btn-end-new">New battle</button>
+        <button class="primary" id="btn-end-campaign" hidden>Back to the war map</button>
       </div>
     </div>
   </div>

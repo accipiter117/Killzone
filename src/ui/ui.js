@@ -126,7 +126,7 @@ export function updateUI(ui, state, view) {
   const pauseHtml = view.paused ? '&#9654;' : '&#10074;&#10074;';
   if (e.pause.dataset.p !== pauseHtml) { e.pause.innerHTML = pauseHtml; e.pause.dataset.p = pauseHtml; }
   e.speed.textContent = `${view.speed}x`;
-  const art = state.tick < me.artReadyTick ? `${Math.ceil((me.artReadyTick - state.tick) / state.cfg.tickRate)}s` : `${state.cfg.orders.cost.artillery} pts`;
+  const art = me.noArtillery ? 'none' : state.tick < me.artReadyTick ? `${Math.ceil((me.artReadyTick - state.tick) / state.cfg.tickRate)}s` : `${state.cfg.orders.cost.artillery} pts`;
   e.actions.artillery.querySelector('small').textContent = art;
   e.actions.reinforce.querySelector('small').textContent = state.tick < me.reinforceReadyTick ? `${Math.ceil((me.reinforceReadyTick - state.tick) / state.cfg.tickRate)}s` : `${state.cfg.orders.cost.reinforce} pts`;
 
@@ -135,6 +135,8 @@ export function updateUI(ui, state, view) {
   // still be changed for free.
   const live = !(view.replay || view.watch);
   const mine = state.platoons.filter((p) => p.side === view.playerSide);
+  // Campaign battles can bring fewer than three platoons (or no tank).
+  for (let i = 0; i < 3; i++) ui.cards[i].hidden = i >= mine.length;
   mine.forEach((pl, i) => {
     const card = ui.cards[i];
     const str = platoonStrength(state, pl);
@@ -153,6 +155,7 @@ export function updateUI(ui, state, view) {
   if (tank) {
     const card = ui.cards[3];
     card.classList.toggle('sel', !!view.vehicle);
+    card.hidden = !!tank.absent;
     card.classList.toggle('broken', !tank.alive);
     const bar = card.querySelector('.bar i');
     bar.style.width = `${Math.round((100 * tank.hp) / tank.maxHp)}%`;

@@ -94,7 +94,8 @@ function applyInner(state, cmd) {
   let v = null;
   if (type === 'vmove' || type === 'vability') {
     v = state.vehicles.find((o) => o.side === side);
-    if (!v || !v.alive) return fail('Your tank has been destroyed');
+    if (!v || v.absent) return fail('No tank in this battle (it needs a tank works on the war map)');
+    if (!v.alive) return fail('Your tank has been destroyed');
   }
   // Squad orders: params.role picks the squad, params.what is move, take,
   // hold or rejoin (back to the platoon's goal, free).
@@ -138,6 +139,7 @@ function applyInner(state, cmd) {
     case 'artillery': {
       const pt = point();
       if (!pt) return fail('Bad position');
+      if (sd.noArtillery) return fail('No artillery in this battle (it needs a power plant on the war map)');
       if (state.tick < sd.artReadyTick) return fail('Artillery is reloading');
       callArtillery(state, side, pt.x, pt.y);
       sd.artReadyTick = state.tick + Math.round(cfg.artillery.cooldownSec * cfg.tickRate);

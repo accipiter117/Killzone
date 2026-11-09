@@ -19,6 +19,9 @@ import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
 import { createAudio, unlockAudio, newFrame, playEvents, uiClick } from './render/audio.js';
 import { attachMapInput, attachMinimapInput } from './ui/input.js';
 import { createUI, updateUI, toast, flashOrderPoints, openOverlay, closeOverlay, showEnd, resetFeed } from './ui/ui.js';
+import { createCampaignUI } from './ui/campaign.js';
+import { battleOptions } from './campaign/battles.js';
+import { loadCampaign, hasSave } from './campaign/save.js';
 
 const PLAYER = 0;
 const STANCES = ['cautious', 'balanced', 'aggressive'];
@@ -120,16 +123,25 @@ function controllersFor(watch) {
 }
 
 const MAP_KINDS = ['trenches', 'industrial', 'city'];
-function startBattle(seed, { replayLog = null, mapType = null } = {}) {
+// campaign: { rec, onEnd } for a war map battle (rec is its battle record).
+function startBattle(seed, { replayLog = null, mapType = null, campaign = null } = {}) {
   game.seed = seed;
-  if (!replayLog) {
+  game.campaign = campaign;
+  // Campaign battles are always yours to command (watch mode stays a
+  // quick battle setting).
+  game.watch = campaign ? false : store.get('watch', false);
+  if (campaign) {
+    game.mapType = campaign.rec.mapType;
+  } else if (!replayLog) {
     const choice = mapType || game.mapChoice;
     game.mapType = choice === 'random' ? MAP_KINDS[Math.floor(Math.random() * MAP_KINDS.length)] : MAP_KINDS.includes(choice) ? choice : 'trenches';
   }
   const size = CONFIG.mapSizes[game.mapType];
-  game.options = replayLog ? replayLog.options : { config: { battle: { durationSec: game.lengthSec }, map: { type: game.mapType }, world: { width: size.width, height: size.height } } };
+  game.options = replayLog ? replayLog.options : campaign ? battleOptions(campaign.rec) : { config: { battle: { durationSec: game.lengthSec }, map: { type: game.mapType }, world: { width: size.width, height: size.height } } };
   game.replay = !!replayLog;
   game.match = createMatch({ seed, options: game.options, controllers: replayLog ? [] : controllersFor(game.watch), replayLog });
+  closeOverlay('overlay-start');
+  document.getElementById('stage').hidden = false;
   const st = game.match.state;
   game.renderer = createRenderer(st.map);
   game.fxs = createEffects();
@@ -160,6 +172,12 @@ function startBattle(seed, { replayLog = null, mapType = null } = {}) {
   clampCamera(game.cam);
   centreOn(game.cam, 260, st.map.height / 2);
   keepAwake(true);
+  if (!store.get('seenHelp', false) && !replayLog) {
+    pausedBeforeMenu = game.paused; // stay in planning after the help closes
+    game.paused = true;
+    openOverlay('overlay-help');
+  }
+  if (campaign) return;
   try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}&map=${game.mapType}`); } catch { /* file:// */ }
 }
 
@@ -454,6 +472,11 @@ let pausedBeforeMenu = false;
 function openMenu() {
   pausedBeforeMenu = game.paused;
   game.paused = true;
+  // In a war map battle the menu offers a way back instead of new battles.
+  const inCampaign = !!game.campaign;
+  document.getElementById('btn-leave').hidden = !inCampaign;
+  document.getElementById('btn-leave').textContent = game.campaign && game.campaign.replay ? 'Back to the war map' : 'Leave this battle (the AI fights it out)';
+  for (const id of ['btn-new', 'btn-restart', 'btn-main']) document.getElementById(id).hidden = inCampaign;
   document.getElementById('seed-input').value = game.seed;
   document.getElementById('length-select').value = String(game.lengthSec);
   document.getElementById('watch-toggle').checked = game.watch;
@@ -528,6 +551,83 @@ document.getElementById('btn-replay').addEventListener('click', () => {
 document.getElementById('btn-end-restart').addEventListener('click', () => startBattle(game.replay ? game.original.log.seed : game.seed, { mapType: game.replay ? game.original.log.options.config.map?.type : game.mapType }));
 document.getElementById('btn-end-new').addEventListener('click', () => startBattle(newSeed()));
 
+// ---- Campaign and the start menu ------------------------------------------------
+
+const campaignUI = createCampaignUI({
+  fightBattle(rec, { onEnd }) {
+    startBattle(rec.seed, { campaign: { rec, onEnd } });
+  },
+  watchReplay(rec, { onEnd }) {
+    game.original = null;
+    startBattle(rec.seed, { replayLog: { seed: rec.seed, options: battleOptions(rec), commands: JSON.parse(JSON.stringify(rec.log)) }, campaign: { rec, onEnd, replay: true } });
+    game.speed = 2;
+  },
+  toMenu: showStart,
+  soundOn: () => audio.enabled,
+  toggleSound() {
+    audio.enabled = !audio.enabled;
+    store.set('sound', audio.enabled);
+    return audio.enabled;
+  },
+});
+window.__kzCampaign = campaignUI; // for browser tests
+
+// On a campaign battle's end screen, the only way on is back to the war map.
+function endButtons() {
+  const c = !!game.campaign;
+  for (const id of ['btn-replay', 'btn-end-restart', 'btn-end-new']) document.getElementById(id).hidden = c;
+  document.getElementById('btn-end-campaign').hidden = !c;
+}
+
+// Leave a campaign battle: result null means the AI should fight it out.
+function backToCampaign(result) {
+  const c = game.campaign;
+  if (!c) return;
+  const log = game.match.log.commands;
+  game.campaign = null;
+  game.match = null;
+  game.watch = store.get('watch', false);
+  keepAwake(false);
+  closeOverlay('overlay-end');
+  closeOverlay('overlay-menu');
+  closeOverlay('overlay-help');
+  c.onEnd(c.replay ? null : result, log);
+}
+document.getElementById('btn-end-campaign').addEventListener('click', () => backToCampaign(game.match.state.result));
+document.getElementById('btn-leave').addEventListener('click', () => backToCampaign(null));
+document.getElementById('btn-main').addEventListener('click', () => {
+  closeOverlay('overlay-menu');
+  game.match = null;
+  keepAwake(false);
+  showStart();
+});
+
+function showStart() {
+  game.match = null;
+  document.getElementById('stage').hidden = true;
+  document.getElementById('st-continue').hidden = !hasSave();
+  openOverlay('overlay-start');
+}
+document.getElementById('st-continue').addEventListener('click', () => {
+  const cm = loadCampaign();
+  if (!cm) { document.getElementById('st-continue').hidden = true; return; }
+  closeOverlay('overlay-start');
+  campaignUI.open(cm);
+});
+function startCampaign(nights) {
+  if (hasSave()) {
+    const old = loadCampaign();
+    if (old && old.state.phase !== 'over' && !window.confirm('Start a new campaign? The one saved in this browser will be replaced.')) return;
+  }
+  closeOverlay('overlay-start');
+  campaignUI.newCampaign(newSeed(), nights);
+}
+document.getElementById('st-new').addEventListener('click', () => startCampaign(8));
+document.getElementById('st-new-short').addEventListener('click', () => startCampaign(4));
+document.getElementById('st-quick').addEventListener('click', () => { closeOverlay('overlay-start'); startBattle(newSeed()); });
+document.getElementById('st-import').addEventListener('click', () => campaignUI.openImport());
+document.getElementById('st-help').addEventListener('click', () => openOverlay('overlay-chelp'));
+
 // ---- Screen wake lock -------------------------------------------------------
 
 let wakeLock = null;
@@ -565,6 +665,8 @@ function frame(t) {
   const now = t / 1000;
   const dt = Math.min(0.25, now - game.last / 1000);
   game.last = t;
+  // The war map (or the start menu) is up: no battle to run or draw.
+  if (campaignUI.draw(now) || !game.match) { requestAnimationFrame(frame); return; }
   const m = game.match;
   const st = m.state;
   const tickDt = 1 / st.cfg.tickRate;
@@ -595,7 +697,7 @@ function frame(t) {
     if (game.replay && game.original) {
       check = fingerprint(st) === game.original.print ? 'Replay check: identical to the original battle.' : 'Replay check: the replay drifted from the original.';
     }
-    setTimeout(() => showEnd(ui, st, game.watch || game.replay ? null : PLAYER, check), 900);
+    setTimeout(() => { showEnd(ui, st, game.watch || game.replay ? null : PLAYER, check); endButtons(); }, 900);
   }
   if (game.selected !== null && st.platoons[game.selected].broken) game.selected = null;
   if (game.vehicle && !st.vehicles.some((v) => v.side === PLAYER && v.alive)) game.vehicle = false;
@@ -634,10 +736,8 @@ showRotateHint();
 loadUnitSprites();
 const params = new URLSearchParams(location.search);
 const urlSeed = params.get('seed');
-startBattle(urlSeed || newSeed(), { mapType: params.get('map') });
-if (!store.get('seenHelp', false)) {
-  pausedBeforeMenu = game.paused; // stay in planning after the help closes
-  game.paused = true;
-  openOverlay('overlay-help');
-}
+// A link with a seed opens that battle straight away; otherwise the start
+// menu (campaign or quick battle).
+if (urlSeed) startBattle(urlSeed, { mapType: params.get('map') });
+else showStart();
 requestAnimationFrame((t) => { game.last = t; requestAnimationFrame(frame); });

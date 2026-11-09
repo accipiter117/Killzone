@@ -2,7 +2,7 @@
 
 import { CONFIG, SIDE_NAMES, PLATOON_NAMES } from '../config.js';
 import { seedFrom, range } from './rng.js';
-import { generateMap } from './map.js';
+import { generateMap, forCells, T } from './map.js';
 import { updateVision, updateFiring, updateSuppression } from './combat.js';
 import { updateSites, updateEmplacements, updateStrikes, updateSmokes } from './features.js';
 import { thinkSquad, moveSoldiers, resetPlans } from './squads.js';
@@ -38,14 +38,22 @@ export function createBattle(seed, options = {}) {
   };
   const W = map.width, H = map.height;
   const jitter = {};
+  // Forces: the standard three platoons a side, or (from the campaign) each
+  // side's own platoons with their own squads and survivors, and extras
+  // won by holding sites: the tank, artillery, extra order points, and
+  // trenches dug in for the defender.
+  const forces = options.forces || null;
   for (const side of [0, 1]) {
-    cfg.platoons.forEach((roles, pi) => {
+    const f = forces && forces[side];
+    const list = f ? f.platoons : cfg.platoons.map((roles, pi) => ({ roles, name: PLATOON_NAMES[pi] }));
+    const spread = list.length === 3 ? cfg.deploy.spreadY : list.map((_, i) => (i + 1) / (list.length + 1));
+    list.forEach(({ roles, name, alive, ref }, pi) => {
       const pl = {
-        id: state.platoons.length, side, index: pi, name: PLATOON_NAMES[pi],
+        id: state.platoons.length, side, index: pi, name: name || PLATOON_NAMES[pi] || `Platoon ${pi + 1}`, ref: ref ?? null,
         squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, breakBase: 0, paidTick: -1, brokeTick: 0, focus: -1, focusUntil: 0, size: roles.length * cfg.soldiersPerSquad,
       };
       state.platoons.push(pl);
-      const baseY = H * cfg.deploy.spreadY[pi];
+      const baseY = H * spread[pi];
       roles.forEach((role, k) => {
         const sq = {
           id: state.squads.length, platoon: pl.id, side, role, soldiers: [],
@@ -61,12 +69,15 @@ export function createBattle(seed, options = {}) {
           // Random spacing is drawn once and shared, so the two sides start
           // as exact mirror images.
           const key = `${pi}.${k}.${n}`;
-          if (side === 0) jitter[key] = [range(state, -25, 25), range(state, 0, 1)];
+          if (!jitter[key]) jitter[key] = [range(state, -25, 25), range(state, 0, 1)];
           let x = cfg.deploy.x + jitter[key][0] - (n % 2) * 14;
           let y = baseY + (k - 1) * 62 + (n - 2) * 11;
           if (side === 1) { x = W - x; y = H - y; }
           const hp = cfg.roles[role].hp;
-          const s = { id: state.soldiers.length, squad: sq.id, side, role, x, y, tx: x, ty: y, hp, maxHp: hp, alive: true, fled: false, cd: jitter[key][1], target: -1, retarget: 0, markUntil: 0, lastShotTick: -9999 };
+          // A campaign platoon short of men: the empty places are filled as
+          // absent (off the field) so reinforcements can still fill them.
+          const here = !alive || n < alive[k];
+          const s = { id: state.soldiers.length, squad: sq.id, side, role, x, y, tx: x, ty: y, hp: here ? hp : 0, maxHp: hp, alive: here, fled: !here, cd: jitter[key][1], target: -1, retarget: 0, markUntil: 0, lastShotTick: -9999 };
           state.soldiers.push(s);
           sq.soldiers.push(s.id);
         }
@@ -81,10 +92,41 @@ export function createBattle(seed, options = {}) {
     sq.cy = ms.reduce((a, m) => a + m.y, 0) / ms.length;
   }
   createVehicles(state);
+  if (forces) {
+    for (const side of [0, 1]) {
+      const f = forces[side];
+      const sd = state.sides[side];
+      if (!f.tank) { const v = state.vehicles[side]; v.alive = false; v.absent = true; v.hp = 0; }
+      if (!f.artillery) { sd.noArtillery = true; sd.artReadyTick = 1e12; }
+      sd.op = Math.min(cfg.orders.cap, cfg.orders.start + (f.opBonus || 0));
+      if (f.fortified) fortify(state, side);
+    }
+  }
+  // Squads that start with nobody (a campaign platoon that lost a squad).
+  for (const sq of state.squads) if (!sq.soldiers.some((id) => state.soldiers[id].alive)) sq.mode = 'dead';
   state.durationTicks = Math.round(cfg.battle.durationSec * cfg.tickRate);
   updateVision(state);
   updateVehicleVision(state);
   return state;
+}
+
+// Extra trenches dug by the defender (bought on the war map): sandbag walls
+// in front of their lines and round the objective on their half.
+function fortify(state, side) {
+  const map = state.map, W = map.width, H = map.height;
+  const ring = (cx, cy, r, th, facing) => {
+    forCells(map, cx - r, cy - r, cx + r, cy + r, (i, x, y) => {
+      const d = Math.hypot(x - cx, y - cy);
+      if (d > r || d < r - th) return;
+      if (facing && (x - cx) * facing < r * 0.2) return;
+      if (map.grid[i] === T.open || map.grid[i] === T.rubble || map.grid[i] === T.crater) map.grid[i] = T.sandbag;
+    });
+  };
+  const dir = side === 0 ? 1 : -1;
+  const lineX = side === 0 ? state.cfg.deploy.x + 120 : W - state.cfg.deploy.x - 120;
+  for (const f of [0.2, 0.4, 0.6, 0.8]) ring(lineX, H * f, 34, 9, dir);
+  const own = state.sites.filter((s) => s.kind === 'objective' && (side === 0 ? s.x < W / 2 : s.x > W / 2));
+  for (const s of own) ring(s.x, s.y, s.r * 0.75, 9, 0);
 }
 
 // Advance the battle by exactly one tick. Commands for this tick must already
@@ -228,6 +270,8 @@ function finish(state, winner, reason) {
     reinforcements: state.sides.map((s) => s.reinforcements),
     tanksLost: state.sides.map((s) => (s.tankLost ? 1 : 0)),
     lossBy: state.sides.map((s) => ({ ...s.lossBy })),
+    // Per platoon: survivors in each squad (for the war map), and whether it broke.
+    platoons: state.platoons.map((pl) => ({ side: pl.side, index: pl.index, ref: pl.ref, broken: pl.broken, survivors: pl.squads.map((id) => state.squads[id].soldiers.filter((sid) => state.soldiers[sid].alive).length) })),
     history: state.history.slice(),
     held: [0, 1].map((side) => state.sites.filter((s) => s.kind === 'objective' && s.owner === side).map((s) => s.id)),
   };
