@@ -109,7 +109,11 @@ export function blast(state, x, y, radius, damage, suppRadius, suppAmount, sourc
   breakWalls(state, x, y, radius * state.cfg.walls.breakShare);
   const hitSquads = new Set();
   for (const s of state.soldiers) {
-    if (!isActive(s)) continue;
+    if (!isActive(s)) {
+      // A blast finishes off the downed.
+      if (s.downed && !s.fled && Math.hypot(s.x - x, s.y - y) <= radius) { s.downed = false; state.events.push({ type: 'bledOut', id: s.id, side: s.side }); }
+      continue;
+    }
     const d = Math.hypot(s.x - x, s.y - y);
     if (d <= suppRadius) hitSquads.add(s.squad);
     if (d > radius) continue;

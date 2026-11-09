@@ -40,6 +40,7 @@ function reinforce(state, pl) {
     s.x = s.tx = Math.max(10, Math.min(W - 10, at.x + (k % 2) * 12 - 6));
     s.y = s.ty = Math.max(10, Math.min(H - 10, at.y + (k - 2) * 10));
     s.joining = true;
+    s.downed = false;
     s.hp = s.maxHp;
     s.alive = true;
     s.fled = false;

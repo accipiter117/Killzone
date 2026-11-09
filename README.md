@@ -57,7 +57,19 @@ All in `CAMPAIGN` in [`src/config.js`](src/config.js).
   - tap an objective (A, B, C) or a capturable post (MG nest, arc tower, comms post) to **take** it;
   - tap open ground to **move** there.
 - **Hold** digs the platoon in at the nearest cover. **Fall back** pulls it back towards your edge (even pinned squads crawl back).
-- **Stance** (per platoon) trades speed for casualties: Cautious squads pause longer in cover and drop down early under fire; Aggressive ones push through fire and wade straight through wire.
+- **Stance** (per platoon) trades speed for casualties, and decides what happens when things go wrong:
+
+  | | Cautious | Balanced | Aggressive |
+  | --- | --- | --- | --- |
+  | Speed | 90% | 100% | 110% |
+  | Pinned | sooner | normal | much harder to pin, and gets up sooner |
+  | Under fire | drops into cover early, long pauses between dashes | some cover, short pauses | no stopping for cover |
+  | Wire | waits for engineers | waits for engineers | wades straight through |
+  | Pinned next to its post | crawls in only from close by | crawls in | crawls in from twice as far out |
+  | Pinned in the open | crawls back to cover | crawls to the nearest cover | crawls forward to cover |
+  | Helping a pinned platoon mate | fires from full range | closes to 85% of range | closes right in (60%) |
+
+- **Medics and the downed:** one soldier in every squad is a medic (a small cross over them). A soldier dropped by bullets goes down for 25 seconds rather than dying: your downed show a red cross with a ring that runs down. A medic from the same platoon within reach runs (or crawls, if pinned) to them and after 3 seconds gets them back up on about a third of their health. Medics only go out while their own squad is not under heavy fire. Shells, grenades, artillery and other blasts kill outright and finish off the downed. Numbers in `medic` in `src/config.js`.
 - Every order costs an **order point** (top right). They refill over time, faster if you hold the comms post. Stance changes are free.
 - **Artillery** (3 points, 25 second reload): tap the button, then the target. After a 3 second warning, shells land in a circle and hit **everyone**, your troops included. The craters they leave become cover. Squads that can still move will try to scramble out of the warning circle.
 - **Smoke** (2 points): blocks sight through an area for about 20 seconds. Good for crossing open ground.
