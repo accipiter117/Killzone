@@ -96,6 +96,7 @@ export function drawFrame(g, r, state, cam, opts) {
   r.badges = drawBadges(g, state, cam, opts);
   drawSquadLabels(g, state, cam, opts);
   drawMarks(g, state, cam, opts);
+  drawMedical(g, state, cam, opts);
   drawFocus(g, state, cam, opts);
   drawIncoming(g, state, cam, opts);
   r.edges = drawEdgeAlerts(g, state, cam, opts);
@@ -224,6 +225,35 @@ function drawMarks(g, state, cam, opts) {
     g.moveTo(p.x + r - 3, p.y - r); g.lineTo(p.x + r, p.y - r); g.lineTo(p.x + r, p.y - r + 3);
     g.moveTo(p.x, p.y + 1); g.lineTo(p.x - 3, p.y - 2); g.moveTo(p.x, p.y + 1); g.lineTo(p.x + 3, p.y - 2);
     g.stroke();
+  }
+}
+
+// Medics wear a small cross; your downed soldiers show a red cross with a
+// ring that runs down as they bleed out (the medic has until it empties).
+function drawMedical(g, state, cam, opts) {
+  const px = 1 / cam.z;
+  const lift = opts.view === 'pixel' ? 74 * spriteScalePixel(px) : opts.view === 'top' ? 10 : 26 * Math.max(1, 0.7 * px);
+  const cross = (x, y, r, fill) => {
+    g.fillStyle = fill;
+    g.fillRect(x - r, y - r / 3, r * 2, (r * 2) / 3);
+    g.fillRect(x - r / 3, y - r, (r * 2) / 3, r * 2);
+  };
+  const bleed = state.cfg.medic.bleedSec * state.cfg.tickRate;
+  for (const s of state.soldiers) {
+    if (s.downed && !s.fled && (s.side === opts.playerSide || opts.reveal)) {
+      const p = toScreen(cam, s.x, LY(s.x, s.y));
+      const left = Math.max(0, (s.bleedUntil - state.tick) / bleed);
+      g.fillStyle = 'rgba(15,14,12,0.7)';
+      g.beginPath(); g.arc(p.x, p.y - 12, 8, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#ff5a4a'; g.lineWidth = 2;
+      g.beginPath(); g.arc(p.x, p.y - 12, 8, -Math.PI / 2, -Math.PI / 2 + left * Math.PI * 2); g.stroke();
+      cross(p.x, p.y - 12, 4, '#ff5a4a');
+    } else if (s.medic && isActive(s) && cam.z >= 0.7 && visible(state, s, opts)) {
+      const p = toScreen(cam, s.x, LY(s.x, s.y) - lift);
+      g.fillStyle = 'rgba(255,255,255,0.9)';
+      g.beginPath(); g.arc(p.x, p.y - 4, 4.5, 0, Math.PI * 2); g.fill();
+      cross(p.x, p.y - 4, 3, '#d8382a');
+    }
   }
 }
 
@@ -814,10 +844,12 @@ function drawBodies(g, r, state, fxs, now, px, view) {
     }
     const t = now - b.t0;
     const frame = t < 0.12 ? 'fall1' : t < 0.26 ? 'fall2' : 'dead';
-    const role = state.soldiers[b.id].role;
+    const sol = state.soldiers[b.id];
+    const role = sol.role;
     const age = now - b.t0;
-    g.globalAlpha = age < 0.3 ? 1 : Math.max(0.3, 0.62 - age / 90);
-    if (canFilter && age >= 0.3) g.filter = 'grayscale(0.75) brightness(0.7)';
+    // The downed (still savable) are not greyed: they are still in it.
+    g.globalAlpha = sol.downed || age < 0.3 ? 1 : Math.max(0.3, 0.62 - age / 90);
+    if (canFilter && age >= 0.3 && !sol.downed) g.filter = 'grayscale(0.75) brightness(0.7)';
     if (top) g.drawImage(getSprite(b.side, role, frame, b.dir), b.x - size / 2, b.y - size / 2, size, size);
     else if (view === 'pixel') drawTrooper(g, b.side, frame, b.ang, b.x, b.y, spriteScalePixel(px), role);
     else g.drawImage(getSprite25(b.side, role, frame, b.dir), b.x - ANCHOR_X * ps, b.y - ANCHOR_Y * ps, W25 * ps, H25 * ps);

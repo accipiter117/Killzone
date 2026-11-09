@@ -51,7 +51,12 @@ export function ingest(fxs, events, now) {
         if (e.id !== undefined) fxs.lastHit.set(e.id, now);
         if (fxs.puffs.length < MAX) fxs.puffs.push({ x: e.x + fx.range(-3, 3), y: e.y + fx.range(-3, 3), t0: now, life: 0.35, r: 4, colour: '120,30,20' });
         break;
+      case 'revived':
+        fxs.bodies = fxs.bodies.filter((b) => b.id !== e.id);
+        break;
+      case 'downed':
       case 'death':
+        fxs.bodies = fxs.bodies.filter((b) => b.id !== e.id);
         fxs.bodies.push({ id: e.id, x: e.x, y: e.y, side: e.side, t0: now, dir: null });
         if (fxs.bodies.length > 400) fxs.bodies.shift();
         break;

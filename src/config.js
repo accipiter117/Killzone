@@ -119,9 +119,14 @@ export const CONFIG = {
   wire: { speedMult: 0.22 },
 
   stances: {
-    cautious: { label: 'Cautious', pause: 4, speedMult: 0.9, pinMult: 0.85, coverAt: 12 },
-    balanced: { label: 'Balanced', pause: 2, speedMult: 1, pinMult: 1, coverAt: 30 },
-    aggressive: { label: 'Aggressive', pause: 0.5, speedMult: 1.1, pinMult: 1.3, coverAt: 999 },
+    // Pinned behaviour by stance: crawlOn scales how far out a pinned squad
+    // crawls onto its post; crawlBack > 0 prefers cover behind, < 0 cover
+    // ahead; support is the share of range platoon mates close to when
+    // helping a pinned squad; unpinShare is how far suppression must fall
+    // before a pinned squad gets up (higher = up sooner).
+    cautious: { label: 'Cautious', pause: 4, speedMult: 0.9, pinMult: 0.85, coverAt: 12, crawlOn: 0.6, crawlBack: 0.9, support: 1, unpinShare: 0.45 },
+    balanced: { label: 'Balanced', pause: 2, speedMult: 1, pinMult: 1, coverAt: 30, crawlOn: 1, crawlBack: 0.3, support: 0.85, unpinShare: 0.55 },
+    aggressive: { label: 'Aggressive', pause: 0.5, speedMult: 1.1, pinMult: 1.3, coverAt: 999, crawlOn: 2, crawlBack: -0.5, support: 0.6, unpinShare: 0.7 },
   },
 
   squad: {
@@ -132,7 +137,6 @@ export const CONFIG = {
     reconBackoff: 210,
     crawlOnReach: 110, // a pinned squad this close to the edge of the post it is taking crawls in
     crawlCoverReach: 90, // a squad pinned in the open crawls to cover this close
-    supportShare: 0.85, // squads helping a pinned platoon mate move to this share of their range from the shooter
     slotSpacing: 60, // squads of a platoon on a move order stand one tile apart
     arriveDist: 28,
     routSpeedMult: 1.25,
@@ -200,6 +204,12 @@ export const CONFIG = {
   // Focus fire: a platoon's squads shoot one chosen enemy squad first.
   focus: { durationSec: 40 },
   // Engineers' ability becomes a breaching charge when an enemy tank is close.
+  // Downed and medics. A soldier dropped by bullets goes down for bleedSec
+  // instead of dying; one soldier in every squad is a medic who can get
+  // a downed platoon mate within reach back up on part of their health.
+  // Blasts and shells kill outright (and finish off the downed).
+  medic: { bleedSec: 25, reviveSec: 3, reach: 220, reviveHp: 0.35, maxSupp: 40, killOutright: ['artillery', 'grenade', 'petrusite', 'tankgun', 'dive', 'charge'] },
+
   // Engineers' ability becomes a field repair when their own tank is damaged
   // (and no enemy tank is close enough to breach).
   repair: { label: 'Repair', range: 260, reach: 40, workSec: 4, heal: 0.35, needBelow: 0.85, cooldownSec: 35, runSec: 14 },

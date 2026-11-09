@@ -171,10 +171,13 @@ export function thinkSquad(state, sq) {
   // The squad's position. Usually the middle of its soldiers, but if it has
   // been split (say round a hill) the middle can be somewhere nobody is
   // standing, so then use the soldier nearest the middle instead.
-  let c = centroid(list);
-  if (!list.some((s) => dist(s, c) < 45)) {
-    let best = list[0];
-    for (const s of list) if (dist(s, c) < dist(best, c)) best = s;
+  // A medic off treating someone does not drag the squad's position with
+  // them (that would pull the whole squad towards the enemy's fire).
+  const core = list.some((s) => !s.healing) ? list.filter((s) => !s.healing) : list;
+  let c = centroid(core);
+  if (!core.some((s) => dist(s, c) < 45)) {
+    let best = core[0];
+    for (const s of core) if (dist(s, c) < dist(best, c)) best = s;
     c = { x: best.x, y: best.y };
   }
   // Stalled and pushing on: lead from the soldier furthest along, so a
@@ -344,11 +347,12 @@ export function thinkSquad(state, sq) {
 // open crawls to the nearest cover (a little back rather than forward).
 function pinnedCrawl(state, sq, c, order) {
   const sc = state.cfg.squad;
+  const st = state.cfg.stances[state.platoons[sq.platoon].stance];
   if (order.type === 'take') {
     const site = goalOf(state, order);
     if (site && site.owner !== sq.side) {
       const d = dist(c, site);
-      if (d > site.r * 0.6 && d < site.r + sc.crawlOnReach) {
+      if (d > site.r * 0.6 && d < site.r + sc.crawlOnReach * st.crawlOn) {
         const k = (site.r * 0.45) / d;
         return { to: { x: site.x + (c.x - site.x) * k, y: site.y + (c.y - site.y) * k }, status: `Pinned, crawling onto ${siteLabel(site)}` };
       }
@@ -356,7 +360,8 @@ function pinnedCrawl(state, sq, c, order) {
   }
   if (coverAt(state, c.x, c.y).hit > 0) return null;
   const dir = sideDir(sq.side);
-  const cv = findCover(state.map, c.x, c.y, sc.crawlCoverReach, (x, y) => -Math.hypot(x - c.x, y - c.y) - Math.max(0, dir * (x - c.x)) * 0.6, sq.side === 1);
+  // Cautious squads prefer cover behind them, aggressive ones cover ahead.
+  const cv = findCover(state.map, c.x, c.y, sc.crawlCoverReach, (x, y) => -Math.hypot(x - c.x, y - c.y) - dir * (x - c.x) * st.crawlBack, sq.side === 1);
   if (!cv || dist(cv, c) < 14) return null;
   return { to: cv, status: 'Pinned, crawling to cover' };
 }
@@ -373,7 +378,7 @@ function supportSpot(state, sq, pl, c, list) {
   }
   if (!mate || !mate.hitFrom || state.tick - mate.hitFrom.tick > 3 * cfg.tickRate) return null;
   const threat = mate.hitFrom;
-  const range = weaponRange(state, list[0]) * cfg.squad.supportShare;
+  const range = weaponRange(state, list[0]) * cfg.stances[pl.stance].support;
   const d = dist(c, threat);
   if (d <= range) return { mate, to: c, inRange: true };
   const spot = { x: threat.x + ((c.x - threat.x) / d) * range, y: threat.y + ((c.y - threat.y) / d) * range };
@@ -599,6 +604,76 @@ function advance(state, sq, pl, list, c, firing, order) {
   formUp(state, sq, list, next, false);
 }
 
+// Medics and the downed, every tick (after the squads have set everyone's
+// spot, before anyone moves). The downed bleed out after medic.bleedSec.
+// Each squad's medic goes to the nearest downed soldier of its platoon in
+// reach (one medic per casualty), works on them for reviveSec, and gets
+// them back up on part of their health; they then run to rejoin.
+export function updateMedics(state) {
+  const m = state.cfg.medic;
+  const rate = state.cfg.tickRate;
+  for (const s of state.soldiers) {
+    if (s.downed && state.tick >= s.bleedUntil) {
+      s.downed = false;
+      state.events.push({ type: 'bledOut', id: s.id, side: s.side });
+    }
+  }
+  for (const s of state.soldiers) {
+    if (!s.medic) continue;
+    s.healing = false;
+    if (!isActive(s)) { s.healTarget = -1; continue; }
+    const sq = state.squads[s.squad];
+    if (sq.mode === 'rout') { s.healTarget = -1; continue; }
+    let t = s.healTarget >= 0 ? state.soldiers[s.healTarget] : null;
+    if (t && (!t.downed || t.fled)) { t = null; s.healTarget = -1; }
+    // Medics go out only while their own squad is not under heavy fire.
+    if (!t && (state.tick + s.id) % 10 === 0 && sq.supp < m.maxSupp) {
+      const pl = state.platoons[sq.platoon];
+      let bd = m.reach;
+      for (const id of pl.squads) {
+        for (const oid of state.squads[id].soldiers) {
+          const o = state.soldiers[oid];
+          if (!o.downed || o.fled) continue;
+          const other = o.medicBy >= 0 && o.medicBy !== s.id ? state.soldiers[o.medicBy] : null;
+          if (other && isActive(other) && other.healTarget === o.id) continue; // someone is on it
+          const d = dist(s, o);
+          if (d < bd || (d === bd && t && o.id < t.id)) { bd = d; t = o; }
+        }
+      }
+      if (t) { s.healTarget = t.id; t.medicBy = s.id; s.healDone = 0; }
+    }
+    if (!t) continue;
+    s.healing = true;
+    if (dist(s, t) > 9) {
+      s.tx = t.x; s.ty = t.y;
+      s.healDone = 0;
+      continue;
+    }
+    s.tx = s.x; s.ty = s.y;
+    s.cd = Math.max(s.cd, 0.2); // hands full: not shooting
+    if (!s.healDone) s.healDone = state.tick + Math.round(m.reviveSec * rate);
+    if (state.tick < s.healDone) continue;
+    // Back on their feet.
+    t.downed = false;
+    t.alive = true;
+    t.hp = t.maxHp * m.reviveHp;
+    t.joining = true;
+    t.medicBy = -1;
+    t.target = -1;
+    s.healTarget = -1;
+    s.healDone = 0;
+    const sd = state.sides[t.side];
+    sd.casualties--;
+    sd.revived = (sd.revived || 0) + 1;
+    const cause = t.lastCause;
+    if (sd.lossBy[cause]) sd.lossBy[cause]--;
+    const tsq = state.squads[t.squad];
+    if (tsq.lossBy[cause]) tsq.lossBy[cause]--;
+    if (tsq.mode === 'dead') tsq.mode = 'move';
+    state.events.push({ type: 'revived', id: t.id, x: t.x, y: t.y, side: t.side });
+  }
+}
+
 // Every tick: walk soldiers toward their spot. Pinned squads stay put
 // (except when ordered back, when they crawl), wire slows everyone.
 export function moveSoldiers(state, dt) {
@@ -608,7 +683,7 @@ export function moveSoldiers(state, dt) {
     if (!isActive(s)) continue;
     const sq = state.squads[s.squad];
     const pl = state.platoons[sq.platoon];
-    if (sq.pinned && sq.mode !== 'rout' && sq.mode !== 'crawl' && sq.mode !== 'charge' && sq.mode !== 'dive' && sq.mode !== 'breach') continue;
+    if (sq.pinned && !s.healing && sq.mode !== 'rout' && sq.mode !== 'crawl' && sq.mode !== 'charge' && sq.mode !== 'dive' && sq.mode !== 'breach') continue;
     const dx = s.tx - s.x, dy = s.ty - s.y;
     const d = Math.hypot(dx, dy);
     if (d < 0.5) continue;
@@ -625,7 +700,7 @@ export function moveSoldiers(state, dt) {
       if (wireAt(state.map, s.x, s.y) > 0) speed *= cfg.wire.speedMult;
     }
     if (sq.mode === 'rout') speed *= cfg.squad.routSpeedMult;
-    if (sq.mode === 'crawl') speed *= 0.5;
+    if (sq.mode === 'crawl' || (s.healing && sq.pinned)) speed *= 0.5; // pinned medics crawl too
     if (sq.mode === 'charge') speed *= cfg.abilities.charge.speedMult;
     if (sq.mode === 'dive') speed *= 3;
     if (sq.mode === 'breach') speed *= cfg.breach.speedMult;

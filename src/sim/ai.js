@@ -56,16 +56,23 @@ function decide(state, side, prof, memory) {
   const seenFoes = state.soldiers.filter((e) => e.side === foe && isActive(e) && sd.spotted[e.id]);
   const centres = new Map(mine.map((pl) => [pl.id, platoonCentre(state, pl)]));
 
+  // How fit a platoon really is: its soldiers' health, not just their
+  // number (soldiers a medic has got back up are on part of their health).
+  const fitness = (pl) => {
+    let hp = 0;
+    for (const id of pl.squads) for (const m of members(state, state.squads[id])) hp += m.hp / m.maxHp;
+    return hp / pl.size;
+  };
   // Stance: push while strong, ease off once a platoon has been bloodied.
   for (const pl of mine) {
-    const want = platoonStrength(state, pl) > 0.6 ? prof.stanceStrong : prof.stanceWeak;
+    const want = fitness(pl) > 0.6 ? prof.stanceStrong : prof.stanceWeak;
     if (pl.stance !== want) spend({ type: 'stance', params: { platoon: pl.id, stance: want } }, cost.stance);
   }
 
   // Pull back platoons that are both weak and taking a beating.
   for (const pl of mine) {
     if (pl.order.type === 'fallback') continue;
-    if (platoonStrength(state, pl) < ai.fallbackStrength && avgSupp(state, pl) > ai.fallbackSupp && can(cost.fallback)) {
+    if (fitness(pl) < ai.fallbackStrength && avgSupp(state, pl) > ai.fallbackSupp && can(cost.fallback)) {
       spend({ type: 'fallback', params: { platoon: pl.id } }, cost.fallback);
       memory.fallbackTick[pl.id] = state.tick;
     }

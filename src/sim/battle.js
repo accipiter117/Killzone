@@ -5,7 +5,7 @@ import { seedFrom, range } from './rng.js';
 import { generateMap, forCells, T } from './map.js';
 import { updateVision, updateFiring, updateSuppression } from './combat.js';
 import { updateSites, updateEmplacements, updateStrikes, updateSmokes } from './features.js';
-import { thinkSquad, moveSoldiers, resetPlans } from './squads.js';
+import { thinkSquad, moveSoldiers, resetPlans, updateMedics } from './squads.js';
 import { updateThrows, updateDives } from './abilities.js';
 import { platoonAlive, feed, sideName } from './util.js';
 import { createVehicles, updateVehicles, updateCharges, updateVehicleVision } from './vehicles.js';
@@ -30,7 +30,7 @@ export function createBattle(seed, options = {}) {
     map,
     sites: map.sites,
     tanks: map.tanks,
-    sides: SIDE_NAMES.map((name, id) => ({ id, name, op: cfg.orders.start, score: 0, casualties: 0, fled: 0, artReadyTick: 0, spotted: null, captures: 0, abilities: 0, rallies: 0, reinforceReadyTick: 0, reinforcements: 0, lossBy: {} })),
+    sides: SIDE_NAMES.map((name, id) => ({ id, name, op: cfg.orders.start, score: 0, casualties: 0, fled: 0, artReadyTick: 0, spotted: null, captures: 0, abilities: 0, rallies: 0, reinforceReadyTick: 0, reinforcements: 0, revived: 0, lossBy: {} })),
     platoons: [], squads: [], soldiers: [],
     strikes: [], smokes: [], throws: [], charges: [], vehicles: [],
     events: [], feed: [], history: [],
@@ -77,7 +77,10 @@ export function createBattle(seed, options = {}) {
           // A campaign platoon short of men: the empty places are filled as
           // absent (off the field) so reinforcements can still fill them.
           const here = !alive || n < alive[k];
-          const s = { id: state.soldiers.length, squad: sq.id, side, role, x, y, tx: x, ty: y, hp: here ? hp : 0, maxHp: hp, alive: here, fled: !here, cd: jitter[key][1], target: -1, retarget: 0, markUntil: 0, lastShotTick: -9999 };
+          const s = { id: state.soldiers.length, squad: sq.id, side, role, x, y, tx: x, ty: y, hp: here ? hp : 0, maxHp: hp, alive: here, fled: !here, cd: jitter[key][1], target: -1, retarget: 0, markUntil: 0, lastShotTick: -9999,
+            // The first soldier of every squad is its medic (the first place
+            // is never empty, even in a short-handed campaign squad).
+            medic: n === 0, downed: false, bleedUntil: 0, medicBy: -1, healTarget: -1, healDone: 0, healing: false };
           state.soldiers.push(s);
           sq.soldiers.push(s.id);
         }
@@ -148,6 +151,7 @@ export function step(state) {
   // Mirrored squads on both sides think on the same tick.
   for (const sq of state.squads) if ((state.tick + (sq.id % perSide)) % thinkEvery === 0) thinkSquad(state, sq);
 
+  updateMedics(state);
   moveSoldiers(state, dt);
   updateVehicles(state, dt);
   updateFiring(state, dt);
@@ -268,6 +272,7 @@ function finish(state, winner, reason) {
     abilities: state.sides.map((s) => s.abilities),
     rallies: state.sides.map((s) => s.rallies),
     reinforcements: state.sides.map((s) => s.reinforcements),
+    revived: state.sides.map((s) => s.revived || 0),
     tanksLost: state.sides.map((s) => (s.tankLost ? 1 : 0)),
     lossBy: state.sides.map((s) => ({ ...s.lossBy })),
     // Per platoon: survivors in each squad (for the war map), and whether it broke.

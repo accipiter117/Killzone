@@ -260,12 +260,17 @@ export function damageSoldier(state, s, dmg, cause = 'rifle') {
   if (s.hp > 0) return;
   s.alive = false;
   s.hp = 0;
+  // Bullets leave a soldier down (a medic can still get them up); blasts
+  // and shells kill outright.
+  const med = state.cfg.medic;
+  s.downed = !med.killOutright.includes(cause);
+  if (s.downed) { s.bleedUntil = state.tick + Math.round(med.bleedSec * state.cfg.tickRate); s.medicBy = -1; }
   state.sides[s.side].casualties++;
   const lb = state.sides[s.side].lossBy;
   lb[cause] = (lb[cause] || 0) + 1;
   const owner = state.squads[s.squad];
   owner.lossBy[cause] = (owner.lossBy[cause] || 0) + 1;
-  state.events.push({ type: 'death', id: s.id, x: s.x, y: s.y, side: s.side });
+  state.events.push({ type: s.downed ? 'downed' : 'death', id: s.id, x: s.x, y: s.y, side: s.side });
   const sq = state.squads[s.squad];
   if (sq.soldiers.every((id) => !state.soldiers[id].alive)) {
     const pl = state.platoons[sq.platoon];
@@ -286,9 +291,10 @@ export function updateSuppression(state, dt) {
     const quiet = state.tick - sq.lastHitTick > quietTicks;
     sq.supp = Math.max(0, sq.supp - (quiet ? c.quietDecay : c.decay) * dt);
     const pl = state.platoons[sq.platoon];
-    const pinAt = c.pinAt * state.cfg.stances[pl.stance].pinMult;
+    const stance = state.cfg.stances[pl.stance];
+    const pinAt = c.pinAt * stance.pinMult;
     if (!sq.pinned && sq.supp >= pinAt) sq.pinned = true;
-    else if (sq.pinned && sq.supp < pinAt * c.unpinShare) sq.pinned = false;
+    else if (sq.pinned && sq.supp < pinAt * (stance.unpinShare ?? c.unpinShare)) sq.pinned = false;
     for (const k in sq.tally) sq.tally[k] *= 0.995;
   }
 }

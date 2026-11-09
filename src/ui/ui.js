@@ -326,6 +326,7 @@ export function showEnd(ui, state, playerSide, replayCheck) {
     ['Tanks lost', r.tanksLost?.[0] ?? 0, r.tanksLost?.[1] ?? 0],
     ['Platoons rallied', r.rallies[0], r.rallies[1]],
     ['Reinforcements called', r.reinforcements[0], r.reinforcements[1]],
+    ['Revived by medics', r.revived?.[0] ?? 0, r.revived?.[1] ?? 0],
     ['Battle length', fmtTime(r.durationSec), ''],
   ];
   const table = $('#end-table');
