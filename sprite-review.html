@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Helghast Sprite Review</title>
+  <title>Infantry Sprite Review</title>
   <style>
     /* Field manual plate, as the tank and tilt checks: parchment page, stencilled labels. */
     :root {
-      --page: #ece6d6; --ink: #221e17; --muted: #6d6656; --line: #cfc6b2; --accent: #d9531c; --chip: #f6f1e4;
+      --page: #ece6d6; --ink: #221e17; --muted: #6d6656; --line: #cfc6b2; --accent: #d9531c; --isa: #3f7fd0; --chip: #f6f1e4;
       --display: "Black Ops One", "Impact", "Arial Narrow", sans-serif;
       --body: "IBM Plex Sans", system-ui, sans-serif;
       --mono: "IBM Plex Mono", ui-monospace, monospace;
     }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #15130f; --ink: #ece6d6; --muted: #a39b88; --line: #3a352c; --accent: #ff7a3a; --chip: #221f19; color-scheme: dark; } }
-    :root[data-theme="dark"] { --page: #15130f; --ink: #ece6d6; --muted: #a39b88; --line: #3a352c; --accent: #ff7a3a; --chip: #221f19; color-scheme: dark; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #15130f; --ink: #ece6d6; --muted: #a39b88; --line: #3a352c; --accent: #ff7a3a; --isa: #7fb6ff; --chip: #221f19; color-scheme: dark; } }
+    :root[data-theme="dark"] { --page: #15130f; --ink: #ece6d6; --muted: #a39b88; --line: #3a352c; --accent: #ff7a3a; --isa: #7fb6ff; --chip: #221f19; color-scheme: dark; }
     body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.5 var(--body); padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
     main { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
     h1 { font: 400 30px/1.1 var(--display); letter-spacing: 0.04em; margin: 0; text-wrap: balance; }
@@ -22,6 +22,7 @@
     .controls { display: flex; flex-wrap: wrap; gap: 6px; }
     .controls button { font: 600 13px var(--body); min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--chip); color: var(--ink); cursor: pointer; }
     .controls button.on { border-color: var(--accent); background: var(--accent); color: #fff; }
+    #sides button.on.isa { border-color: var(--isa); background: var(--isa); }
     .label { font: 12px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 10px 0 4px; }
     .stage { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; align-items: start; }
     canvas { display: block; image-rendering: pixelated; border-radius: 8px; max-width: 100%; }
@@ -31,6 +32,7 @@
     .dirs figcaption { font: 11px var(--mono); color: var(--muted); }
     .dirs canvas { width: 100%; height: auto; }
     .field canvas { width: 100%; height: auto; }
+    #missing { color: var(--accent); font-weight: 600; min-height: 1.5em; margin: 6px 0 0; }
     ul { color: var(--muted); margin: 6px 0 0; padding-left: 20px; max-width: 70ch; }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -39,15 +41,18 @@
 <body>
   <main>
     <header>
-      <h1>Helghast sprite review</h1>
-      <p class="lede">Your six ChatGPT sheets, cut out, scaled to match and pinned to the ground, playing as the game would play them. Pick an action and a direction; the battlefield below shows them at the real in-battle size beside the current code-drawn troopers.</p>
+      <h1>Infantry sprite review</h1>
+      <p class="lede">The ChatGPT sheets for both sides, cut out, scaled to match and pinned to the ground, playing as the game would play them. Pick a side, an action and a direction; the battlefield below puts an ISA squad against a Helghast squad at real battle size.</p>
     </header>
 
     <section>
+      <div class="label">Side</div>
+      <div class="controls" id="sides"></div>
       <div class="label">Action</div>
       <div class="controls" id="acts"></div>
       <div class="label">Facing</div>
       <div class="controls" id="dirsel"></div>
+      <p id="missing"></p>
     </section>
 
     <section class="stage">
@@ -62,28 +67,31 @@
     </section>
 
     <section class="field">
-      <h2>At battle size</h2>
-      <p class="note">Left: a squad with the new sprites running a loop (each soldier faces the way he moves), stopping to fire, throwing a grenade, going to ground and dying. Right: the same squad with today's code-drawn troopers, which can only face left or right.</p>
+      <h2>In battle</h2>
+      <p class="note">ISA (left) and Helghast (right) at real battle size: squads advance and fall back, stop to fire, throw grenades, go to ground under fire and take casualties, and two soldiers are locked in a grapple in the middle. Each soldier faces the way he moves or fires.</p>
       <canvas id="field" class="mud"></canvas>
     </section>
 
     <ul>
-      <li>Shown at the size a soldier is in battle with the camera at its normal zoom.</li>
-      <li>The muzzle flash comes from your firing sheet; the game's tracers would be added on top.</li>
+      <li>"ISA (blue)" is the ISA sheets with the grey armour tinted towards the ISA's blue so the sides read apart at a glance; "ISA (as drawn)" is ChatGPT's original colours.</li>
+      <li>The grapple pair is one sprite: the direction is the way the ISA soldier faces.</li>
+      <li>The ISA prone sheet has not come in yet; until it does, the ISA "Pinned / crawl" view says so and pinned ISA troopers in the battle kneel in place.</li>
     </ul>
   </main>
 
   <script type="module">
-    import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './src/render/pixel-troopers.js';
-
-    const meta = await (await fetch('assets/sprites/hgh-rifle.json')).json();
-    const img = new Image();
-    img.src = 'assets/sprites/' + meta.image;
-    await img.decode();
+    const loadUnit = async (name) => {
+      const meta = await (await fetch(`assets/sprites/${name}.json`)).json();
+      const img = new Image();
+      img.src = 'assets/sprites/' + meta.image;
+      await img.decode();
+      return { meta, img };
+    };
+    const [HGH, ISA, ISA_BLUE, GRAPPLE] = await Promise.all(['hgh-rifle', 'isa-rifle', 'isa-rifle-blue', 'grapple'].map(loadUnit));
+    const SIDES = { Helghast: HGH, 'ISA (blue)': ISA_BLUE, 'ISA (as drawn)': ISA };
 
     const DIRS = ['Facing you', 'Front right', 'Right', 'Back right', 'Away', 'Back left', 'Left', 'Front left'];
-    const SHORT = ['S', 'SE', 'E', 'NE', 'N', 'NW', 'W', 'SW'];
-    // Each action: a list of [frame, seconds]; hold: the last frame stays.
+    // Each action: a list of [frame, seconds]; the grapple uses its own sheet.
     const ACTS = {
       Stand: [['stand', 1]],
       Run: [['run1', 0.11], ['run2', 0.11], ['run3', 0.11], ['run4', 0.11]],
@@ -91,8 +99,9 @@
       'Pinned / crawl': [['prone1', 0.45], ['prone2', 0.45]],
       'Hit and die': [['stand', 0.6], ['hit', 0.14], ['fall', 0.18], ['dead', 1.6]],
       Grenade: [['throw1', 0.3], ['throw2', 0.28], ['throw3', 0.35], ['stand', 0.7]],
+      Grapple: [['grapple1', 0.3], ['grapple2', 0.35], ['grapple3', 0.3], ['grapple4', 0.35]],
     };
-    let act = 'Run', dir = 2, spin = false;
+    let side = 'ISA (blue)', act = 'Run', dir = 2, spin = false;
 
     const frameAt = (name, t) => {
       const seq = ACTS[name], total = seq.reduce((a, [, s]) => a + s, 0);
@@ -100,24 +109,31 @@
       for (const [f, s] of seq) { if (u < s) return f; u -= s; }
       return seq[seq.length - 1][0];
     };
-    // Draw one frame with its feet at (x, y), scale s.
-    function sprite(g, f, d, x, y, s) {
-      const r = meta.frames[`${f}:${d}`];
-      if (!r) return;
+    // Draw one frame of a unit with its feet at (x, y), scale s. Returns false if missing.
+    function sprite(g, unit, f, d, x, y, s) {
+      const r = unit.meta.frames[`${f}:${d}`];
+      if (!r) return false;
       const [sx, sy, w, h, fx, fy] = r;
-      g.drawImage(img, sx, sy, w, h, Math.round(x - fx * s), Math.round(y - fy * s), Math.round(w * s), Math.round(h * s));
+      g.drawImage(unit.img, sx, sy, w, h, Math.round(x - fx * s), Math.round(y - fy * s), Math.round(w * s), Math.round(h * s));
+      return true;
     }
     const shadow = (g, x, y, rx) => { g.fillStyle = 'rgba(15,12,8,0.35)'; g.beginPath(); g.ellipse(x, y, rx, rx * 0.35, 0, 0, 7); g.fill(); };
 
     // Controls.
-    const mk = (host, label, on, click) => { const b = document.createElement('button'); b.textContent = label; b.onclick = click; host.append(b); return b; };
-    const actBtns = Object.keys(ACTS).map((k) => mk(document.getElementById('acts'), k, k === act, () => { act = k; refresh(); }));
-    const dirBtns = DIRS.map((label, d) => mk(document.getElementById('dirsel'), label, d === dir, () => { dir = d; spin = false; refresh(); }));
-    const spinBtn = mk(document.getElementById('dirsel'), 'Spin', false, () => { spin = !spin; refresh(); });
+    const mk = (host, label, click, cls) => { const b = document.createElement('button'); b.textContent = label; b.onclick = click; if (cls) b.classList.add(cls); host.append(b); return b; };
+    const sideBtns = Object.keys(SIDES).map((k) => mk(document.getElementById('sides'), k, () => { side = k; refresh(); }, k.startsWith('ISA') ? 'isa' : null));
+    const actBtns = Object.keys(ACTS).map((k) => mk(document.getElementById('acts'), k, () => { act = k; refresh(); }));
+    const dirBtns = DIRS.map((label, d) => mk(document.getElementById('dirsel'), label, () => { dir = d; spin = false; refresh(); }));
+    const spinBtn = mk(document.getElementById('dirsel'), 'Spin', () => { spin = !spin; refresh(); });
+    const unitNow = () => (act === 'Grapple' ? GRAPPLE : SIDES[side]);
     function refresh() {
+      sideBtns.forEach((b) => b.classList.toggle('on', b.textContent === side));
       actBtns.forEach((b) => b.classList.toggle('on', b.textContent === act));
       dirBtns.forEach((b, d) => b.classList.toggle('on', !spin && d === dir));
       spinBtn.classList.toggle('on', spin);
+      const u = unitNow();
+      const miss = act !== 'Grapple' && ACTS[act].some(([f]) => !u.meta.frames[`${f}:0`]);
+      document.getElementById('missing').textContent = miss ? 'This sheet has not come in yet for this side.' : act === 'Grapple' ? 'The grapple is one ISA and one Helghast together; the direction is the way the ISA soldier faces.' : '';
     }
     refresh();
 
@@ -128,76 +144,71 @@
     const BW = 300, BH = 300;
     big.style.width = '100%';
     const bg = setup(big, BW, BH);
-
-    const dirsHost = document.getElementById('dirs');
-    const small = SHORT.map((s, d) => {
+    const small = DIRS.map((label) => {
       const fig = document.createElement('figure');
       const c = document.createElement('canvas'); c.className = 'mud';
-      const cap = document.createElement('figcaption'); cap.textContent = DIRS[d];
-      fig.append(c, cap); dirsHost.append(fig);
+      const cap = document.createElement('figcaption'); cap.textContent = label;
+      fig.append(c, cap); document.getElementById('dirs').append(fig);
       return setup(c, 110, 110);
     });
 
-    // The battlefield: two squads of five on the mud at battle scale.
+    // ---- The battlefield ------------------------------------------------------
     const field = document.getElementById('field');
-    const FW = 640, FH = 260;
+    const FW = 640, FH = 300;
     const fg = setup(field, FW, FH);
     const mud = document.createElement('canvas'); mud.width = FW; mud.height = FH;
     { const m = mud.getContext('2d'); m.fillStyle = '#5a5847'; m.fillRect(0, 0, FW, FH);
-      for (let i = 0; i < 70; i++) { m.globalAlpha = 0.45; m.fillStyle = i % 2 ? '#5f5d4b' : '#555342'; m.beginPath(); m.ellipse((i * 97) % FW, (i * 53) % FH, 26 + (i % 7) * 7, 18 + (i % 5) * 5, 0, 0, 7); m.fill(); }
+      for (let i = 0; i < 80; i++) { m.globalAlpha = 0.45; m.fillStyle = i % 2 ? '#5f5d4b' : '#555342'; m.beginPath(); m.ellipse((i * 97) % FW, (i * 53) % FH, 26 + (i % 7) * 7, 18 + (i % 5) * 5, 0, 0, 7); m.fill(); }
       m.globalAlpha = 1;
-      for (const [x, y, r] of [[120, 70, 14], [480, 200, 18], [300, 130, 10], [560, 60, 12], [60, 210, 11]]) { m.fillStyle = '#7a765f'; m.beginPath(); m.ellipse(x, y, r, r * 0.8, 0, 0, 7); m.fill(); m.fillStyle = '#3a372c'; m.beginPath(); m.ellipse(x, y + 1, r * 0.7, r * 0.5, 0, 0, 7); m.fill(); }
-      m.fillStyle = 'rgba(236,230,214,0.5)'; m.font = '12px system-ui'; m.fillText('NEW SPRITES', 14, 20); m.fillText('CURRENT', FW / 2 + 14, 20);
-      m.fillStyle = 'rgba(236,230,214,0.25)'; m.fillRect(FW / 2, 0, 1, FH); }
+      for (const [x, y, r] of [[150, 80, 14], [470, 230, 18], [320, 70, 10], [560, 100, 12], [80, 240, 11], [250, 250, 13]]) { m.fillStyle = '#7a765f'; m.beginPath(); m.ellipse(x, y, r, r * 0.8, 0, 0, 7); m.fill(); m.fillStyle = '#3a372c'; m.beginPath(); m.ellipse(x, y + 1, r * 0.7, r * 0.5, 0, 0, 7); m.fill(); } }
     // Battle size: a standing soldier is about 34 world units tall, shown at
     // the game's usual zoom (about 1.1 screen pixels per unit).
-    const NEW_S = (34 * 1.1) / meta.height;
-    const OLD_S = 0.42 * 1.1;
+    const S = (34 * 1.1) / HGH.meta.height;
     const dirOf = (dx, dy) => {
-      const a = Math.atan2(dy, dx); // screen angle, y down: E = 0, S = 90 degrees
-      const k = ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8; // 0 E, 1 SE, 2 S, 3 SW, 4 W, 5 NW, 6 N, 7 NE
+      const k = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8; // 0 E, 1 SE, 2 S, 3 SW, 4 W, 5 NW, 6 N, 7 NE
       return [2, 1, 0, 7, 6, 5, 4, 3][k];
     };
-    // Five soldiers on a loop; each runs, now and then stops to fire; one
-    // throws, one drops prone, one dies and gets up again (for the demo).
-    const squad = [0, 1, 2, 3, 4].map((i) => ({ i, ph: i * 1.25 }));
-    function soldierState(s, t) {
-      const cyc = (t + s.ph) % 12;
-      const special = ['run', 'fire', 'throw', 'prone', 'die'][s.i];
-      if (cyc < 7) return { mode: 'run', u: (t + s.ph) * 0.42 - (Math.max(0, cyc - 7)) };
-      return { mode: special === 'run' ? 'fire' : special, at: cyc - 7, u: (t + s.ph - (cyc - 7)) * 0.42 };
+    // Each soldier: a home spot and a little routine on a 10 second loop.
+    const roles = ['fire', 'run', 'throw', 'prone', 'die'];
+    const troops = [];
+    for (const s of [0, 1]) for (let i = 0; i < 5; i++) {
+      const hx = s === 0 ? 110 + (i % 2) * 40 : FW - 110 - (i % 2) * 40;
+      troops.push({ side: s, i, role: roles[i], hx, hy: 50 + i * 50, ph: i * 1.7 + s * 0.9 });
     }
-    function drawSquad(g, ox, t, newStyle) {
-      const items = [];
-      for (const s of squad) {
-        const st = soldierState(s, t);
-        const ang = st.mode === 'run' ? (t + s.ph) * 0.42 : st.u;
-        const cx = ox + FW / 4, cy = FH / 2 + 10;
-        const x = cx + Math.cos(ang + s.i * 1.26) * 95, y = cy + Math.sin(ang + s.i * 1.26) * 70;
-        const vx = -Math.sin(ang + s.i * 1.26) * 95, vy = Math.cos(ang + s.i * 1.26) * 70;
-        items.push({ x, y, vx, vy, st });
+    function trooperAt(tr, t) {
+      const u = (t + tr.ph) % 10, dirX = tr.side === 0 ? 1 : -1, enemyDir = tr.side === 0 ? 2 : 6;
+      // Advance 3s, act 4s, fall back 3s.
+      if (u < 3) return { x: tr.hx + dirX * u * 25, y: tr.hy + Math.sin(u * 1.3 + tr.i) * 6, f: ['run1', 'run2', 'run3', 'run4'][Math.floor(t * 9) % 4], d: dirOf(dirX, Math.cos(u * 1.3 + tr.i) * 0.3) };
+      const fx = tr.hx + dirX * 75, fy = tr.hy + Math.sin(3 * 1.3 + tr.i) * 6;
+      if (u < 7) {
+        const a = u - 3;
+        let f;
+        if (tr.role === 'fire' || tr.role === 'run') f = Math.floor(t * 8) % 3 === 0 ? 'fire' : 'aim';
+        else if (tr.role === 'throw') f = a < 0.3 ? 'throw1' : a < 0.6 ? 'throw2' : a < 1 ? 'throw3' : Math.floor(t * 8) % 3 === 0 ? 'fire' : 'aim';
+        else if (tr.role === 'prone') f = Math.floor(t * 2.2) % 2 ? 'prone1' : 'prone2';
+        else f = a < 0.15 ? 'hit' : a < 0.35 ? 'fall' : 'dead';
+        return { x: fx, y: fy, f, d: enemyDir, fallback: 'aim' };
       }
+      const b = u - 7;
+      return { x: fx - dirX * b * 25, y: fy, f: ['run1', 'run2', 'run3', 'run4'][Math.floor(t * 9) % 4], d: dirOf(-dirX, 0) };
+    }
+    function drawField(t) {
+      fg.setTransform(dpr, 0, 0, dpr, 0, 0);
+      fg.drawImage(mud, 0, 0);
+      const items = troops.map((tr) => ({ tr, ...trooperAt(tr, t) }));
+      // The grapple pair in the middle, slowly turning so every angle shows.
+      items.push({ grapple: true, x: FW / 2, y: FH / 2 + 20, d: Math.floor(t / 2.5) % 8, f: ['grapple1', 'grapple2', 'grapple3', 'grapple4'][Math.floor(t * 3) % 4] });
       items.sort((a, b) => a.y - b.y);
-      for (const { x, y, vx, vy, st } of items) {
-        const d = dirOf(vx, vy);
-        shadow(g, x, y + 1, 9);
-        if (newStyle) {
-          let f;
-          if (st.mode === 'run') f = ['run1', 'run2', 'run3', 'run4'][Math.floor(t * 9) % 4];
-          else if (st.mode === 'fire') f = Math.floor(t * 8) % 3 === 0 ? 'fire' : 'aim';
-          else if (st.mode === 'throw') f = st.at < 0.3 ? 'throw1' : st.at < 0.6 ? 'throw2' : st.at < 1 ? 'throw3' : 'stand';
-          else if (st.mode === 'prone') f = Math.floor(t * 2.2) % 2 ? 'prone1' : 'prone2';
-          else f = st.at < 0.15 ? 'hit' : st.at < 0.35 ? 'fall' : 'dead';
-          sprite(g, f, d, x, y, NEW_S);
-        } else {
-          const facing = vx >= 0 ? 1 : -1;
-          let f = 'stand';
-          if (st.mode === 'run') f = ['walk1', 'walk2', 'walk3', 'walk4'][Math.floor(t * 9) % 4];
-          else if (st.mode === 'fire' || st.mode === 'throw') f = Math.floor(t * 8) % 3 === 0 ? 'fire' : 'stand';
-          else if (st.mode === 'prone') f = Math.floor(t * 2.2) % 2 ? 'prone1' : 'prone2';
-          else f = st.at < 0.15 ? 'fall1' : st.at < 0.35 ? 'fall2' : 'dead';
-          const fx = facing === 1 ? PT_FOOT[0] : PT_W - 1 - PT_FOOT[0];
-          g.drawImage(getPixelTrooper('hgh', f, facing, 'rifle'), Math.round(x - fx * OLD_S), Math.round(y - PT_FOOT[1] * OLD_S), PT_W * OLD_S, PT_H * OLD_S);
+      for (const it of items) {
+        if (it.grapple) { shadow(fg, it.x, it.y + 1, 16); sprite(fg, GRAPPLE, it.f, it.d, it.x, it.y, S); continue; }
+        const unit = it.tr.side === 0 ? ISA_BLUE : HGH;
+        shadow(fg, it.x, it.y + 1, 9);
+        if (!sprite(fg, unit, it.f, it.d, it.x, it.y, S)) sprite(fg, unit, it.fallback || 'stand', it.d, it.x, it.y, S);
+        // A tracer now and then from the firers.
+        if (it.f === 'fire') {
+          fg.strokeStyle = it.tr.side === 0 ? 'rgba(225,240,255,0.9)' : 'rgba(255,110,50,0.9)';
+          fg.lineWidth = 1;
+          fg.beginPath(); fg.moveTo(it.x + (it.tr.side === 0 ? 14 : -14), it.y - 24); fg.lineTo(it.x + (it.tr.side === 0 ? 70 : -70), it.y - 22 + ((t * 37) % 10) - 5); fg.stroke();
         }
       }
     }
@@ -207,21 +218,20 @@
       const t = (performance.now() - t0) / 1000;
       const d = spin ? Math.floor(t / 1.2) % 8 : dir;
       if (spin) dirBtns.forEach((b, k) => b.classList.toggle('on', k === d));
+      const unit = unitNow();
       const f = frameAt(act, t);
+      const grapple = act === 'Grapple';
       bg.setTransform(dpr, 0, 0, dpr, 0, 0);
       bg.clearRect(0, 0, BW, BH);
-      shadow(bg, BW / 2, BH - 40, 46);
-      sprite(bg, f, d, BW / 2, BH - 40, 3);
+      shadow(bg, BW / 2, BH - 40, grapple ? 80 : 46);
+      sprite(bg, unit, f, d, BW / 2, BH - 40, grapple ? 1.7 : 3);
       small.forEach((g, k) => {
         g.setTransform(dpr, 0, 0, dpr, 0, 0);
         g.clearRect(0, 0, 110, 110);
-        shadow(g, 55, 96, 16);
-        sprite(g, f, k, 55, 96, 1.05);
+        shadow(g, 55, 96, grapple ? 26 : 16);
+        sprite(g, unit, f, k, 55, 96, grapple ? 0.62 : 1.05);
       });
-      fg.setTransform(dpr, 0, 0, dpr, 0, 0);
-      fg.drawImage(mud, 0, 0);
-      drawSquad(fg, 0, t, true);
-      drawSquad(fg, FW / 2, t, false);
+      drawField(t);
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
