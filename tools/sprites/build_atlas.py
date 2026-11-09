@@ -32,6 +32,10 @@ RIFLE = [
     ('die', 3, ['hit', 'fall', 'dead'], ('as', 'throw')),
     ('throw', 3, ['throw1', 'throw2', 'throw3'], ('h', 0.95)),
 ]
+TANK = [
+    ('stand', 1, ['idle'], ('w', 2.4)),
+    ('anim', 5, ['move1', 'move2', 'fire', 'damaged', 'wreck'], ('w', 2.4)),
+]
 UNITS = {
     'hgh-rifle': {'sheets': RIFLE},
     # The ISA dying sheet came from its own request, so it is sized by its
@@ -40,6 +44,11 @@ UNITS = {
     # One ISA and one Helghast locked together; 8 directions given as the
     # way the ISA soldier faces; a 4 frame struggling loop.
     'grapple': {'sheets': [('grapple', 4, ['grapple1', 'grapple2', 'grapple3', 'grapple4'], ('h', 0.9))], 'file': 'grapple.png'},
+    # Tanks: a reference sheet (standing still) and an animation sheet
+    # (two driving frames, firing, damaged, wreck), 8 directions each; both
+    # sized so the side view is the same length.
+    'hgh-tank': {'sheets': TANK},
+    'isa-tank': {'sheets': TANK},
 }
 
 
