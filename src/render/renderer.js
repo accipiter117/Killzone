@@ -10,7 +10,7 @@ import { getSprite25, W25, H25, ANCHOR_X, ANCHOR_Y } from './sprites25d.js';
 import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './pixel-troopers.js';
 import { getTank, TANK_W, TANK_H, TANK_FOOT } from './tanks.js';
 import { liftAt } from './terrain-tilt.js';
-import { SPRITES, drawUnit, dirFromAngle } from './unit-sprites.js';
+import { SPRITES, drawUnit, dirFromAngle, tankScale } from './unit-sprites.js';
 import { fx } from './fx-random.js';
 
 // In the tilted view, anything standing on raised ground is drawn higher up
@@ -40,7 +40,7 @@ function drawTrooper(g, side, frame, ang, x, y, ps, role, up = 0) {
     if (rot) { billboard(g, x, y); x = 0; y = 0; }
     const ok = drawUnit(g, side === 0 ? 'isa' : 'hgh', frame, d, x, y - up, ps);
     if (rot) setWorld(g);
-    if (ok) return;
+    if (ok !== false) return;
   }
   if (frame === 'aim') frame = 'stand';
   else if (frame.startsWith('throw')) frame = 'fire';
@@ -529,8 +529,16 @@ const vehicleSeen = (state, v, opts) => v.side === opts.playerSide || opts.revea
 // after a shot, a burnt wreck once destroyed, smoke when badly damaged.
 function drawVehicle(g, r, state, v, ps, opts) {
   const last = r.vlast[v.id];
-  if (last) r.vdist[v.id] += Math.hypot(v.x - last.x, v.y - last.y);
+  r.vhead = r.vhead || [];
+  if (last) {
+    const step = Math.hypot(v.x - last.x, v.y - last.y);
+    r.vdist[v.id] += step;
+    // The tank's heading on the ground, from the way it last drove.
+    if (step > 0.05) r.vhead[v.id] = Math.atan2(v.y - last.y, v.x - last.x);
+  }
+  if (r.vhead[v.id] === undefined) r.vhead[v.id] = v.facing === 1 ? 0 : Math.PI;
   r.vlast[v.id] = { x: v.x, y: v.y };
+  const heading = r.vhead[v.id];
   const ticks = state.tick - v.lastFireTick;
   let frame = 'idle';
   if (!v.alive) frame = 'wreck';
@@ -546,7 +554,18 @@ function drawVehicle(g, r, state, v, ps, opts) {
     v = { ...v, x: 0, y: 0, facing: Math.abs(sxDir) < 0.2 ? v.facing : sxDir > 0 ? 1 : -1 };
   }
   const fx = v.facing === 1 ? TANK_FOOT[0] : TANK_W - TANK_FOOT[0];
-  const x0 = v.x - fx * ps, y0 = v.y - TANK_FOOT[1] * ps;
+  let x0 = v.x - fx * ps, y0 = v.y - TANK_FOOT[1] * ps;
+  // The ChatGPT tank sprites, facing any of 8 ways (the code-drawn tanks
+  // stand in until they load).
+  const key = v.side === 0 ? 'isa-tank' : 'hgh-tank';
+  const k = SPRITES.ready ? tankScale(key, ps) : 0;
+  let sframe = frame;
+  if (k) {
+    if (frame.startsWith('move')) sframe = Math.floor(r.vdist[v.id] / 6) % 2 ? 'move2' : 'move1';
+    if (v.alive && v.hp < v.maxHp * 0.5 && frame !== 'fire') sframe = 'damaged';
+  }
+  const sdir = dirFromAngle(heading + rot);
+  const draw = () => (k ? drawUnit(g, key, sframe, sdir, v.x, v.y, ps, k) : (g.drawImage(getTank(FACTION[v.side], frame, v.facing), x0, y0, TANK_W * ps, TANK_H * ps), y0));
   g.fillStyle = 'rgba(15,12,8,0.35)';
   g.beginPath();
   g.ellipse(v.x, v.y - 2 * ps, 96 * ps, 16 * ps, 0, 0, Math.PI * 2);
@@ -558,11 +577,12 @@ function drawVehicle(g, r, state, v, ps, opts) {
     g.ellipse(v.x, v.y, 110 * ps, 26 * ps, 0, 0, Math.PI * 2);
     g.stroke();
   }
-  g.drawImage(getTank(FACTION[v.side], frame, v.facing), x0, y0, TANK_W * ps, TANK_H * ps);
+  const top = draw();
+  if (k && top !== false) y0 = top - 14 * ps;
   if (opts.now - (opts.fxs.lastVehicleHit?.get(v.id) ?? -9) < 0.1) {
     g.globalCompositeOperation = 'lighter';
     g.globalAlpha = 0.6;
-    g.drawImage(getTank(FACTION[v.side], frame, v.facing), x0, y0, TANK_W * ps, TANK_H * ps);
+    draw();
     g.globalCompositeOperation = 'source-over';
     g.globalAlpha = 1;
   }

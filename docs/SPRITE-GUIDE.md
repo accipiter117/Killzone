@@ -10,7 +10,7 @@ game frames. Agreed with the owner after the Helghast rifleman review
   ordinary infantry squad: rifle, assault, engineer, infiltrator.
 - Specialists get their own sets later, in a separate pass: jetpack
   (flying), heavy weapons, sniper / recon, and any others the owner names.
-- Vehicles stay as they are (drawn in code) unless the owner says otherwise.
+- Tanks have their own sets (see "Tanks" below).
 
 ## The six sheets per unit
 Each sheet is 8 columns (directions) by N rows (frames).
@@ -98,3 +98,23 @@ bottom: [ROWS]. [RULES]"
   pairs per patch of ground (about 170 units square) so a clash stays a
   firefight, each pair starting on a random frame. Picture only: the rules
   carry on as normal underneath.
+
+## Tanks
+Two sheets per tank, 8 directions in the same order, turret and gun always
+pointing the way the hull faces:
+1. Reference (standing still): 1 row. Brief with the owner's design
+   pictures plus a finished tank sheet (or a soldier sheet for the first)
+   as the style reference; ask for true low-resolution pixel art (drawn
+   small, scaled up 4 times with hard pixels, about 16 colours, flat 3 or 4
+   step shading, 1 pixel dark outline, no text or markings). Check the
+   main cannon is there in every view (end on as a round muzzle when facing
+   the viewer).
+2. Animation: 5 rows: driving A, driving B (tracks shifted half a link),
+   firing (flash and recoil), damaged (scorched, still whole, no smoke),
+   wreck (burnt, turret askew, gun drooping, no flames or smoke).
+Helghast: charcoal and gunmetal with rust, orange flash. ISA: sand and
+khaki (the owner's choice), yellow-white flash. Files:
+`tools/sprites/source/<faction>-tank-stand.png` and `-anim.png`; atlases
+`assets/sprites/<faction>-tank`. In the game the tank faces the way it last
+drove; under half health it shows the damaged frame; the game adds its own
+smoke and tracers.

@@ -4,7 +4,7 @@
 // plus the ISA v Helghast grapple. Loaded in the background; until they are
 // ready (or if they fail) the code-drawn troopers are used instead.
 
-const UNITS = { isa: 'isa-rifle-blue', hgh: 'hgh-rifle', grapple: 'grapple' };
+const UNITS = { isa: 'isa-rifle-blue', hgh: 'hgh-rifle', grapple: 'grapple', 'isa-tank': 'isa-tank', 'hgh-tank': 'hgh-tank' };
 export const SPRITES = { ready: false, units: {} };
 
 export function loadUnitSprites(base = 'assets/sprites/') {
@@ -33,15 +33,25 @@ export const sheetFrame = (f) => FRAME[f] || f;
 // troopers are about 80, so the new sprites are scaled to match.
 const SIZE = 80;
 
-// Draw a frame with its feet at (x, y); s is the code-drawn trooper scale.
-// Returns false if the frame is missing.
-export function drawUnit(g, key, frame, dir, x, y, s) {
+// Tanks: the side view is drawn this many code-drawn tank pixels long, so
+// the new tanks come out the size the old ones were.
+const TANK_LEN = 190;
+export const tankScale = (key, ps) => {
+  const u = SPRITES.units[key];
+  const side = u && u.meta.frames['idle:2'];
+  return side ? (ps * TANK_LEN) / side[2] : 0;
+};
+
+// Draw a frame with its feet at (x, y); s is the code-drawn trooper scale
+// (or, with k given, the exact sprite scale). Returns the top of the drawn
+// figure, or false if the frame is missing.
+export function drawUnit(g, key, frame, dir, x, y, s, k = 0) {
   const u = SPRITES.units[key];
   if (!u) return false;
   const r = u.meta.frames[`${sheetFrame(frame)}:${dir}`];
   if (!r) return false;
   const [sx, sy, w, h, fx, fy] = r;
-  const k = (s * SIZE) / u.meta.height;
+  k = k || (s * SIZE) / u.meta.height;
   g.drawImage(u.img, sx, sy, w, h, x - fx * k, y - fy * k, w * k, h * k);
-  return true;
+  return y - fy * k;
 }
