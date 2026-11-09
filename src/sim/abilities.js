@@ -54,7 +54,7 @@ export function useAbility(state, sq) {
       if (!t) return fail('No enemy within throwing range');
       const thrower = list[0];
       state.throws.push({ side: sq.side, x: t.x, y: t.y, at: state.tick + ticks(a.fuseSec) });
-      state.events.push({ type: 'throw', x1: thrower.x, y1: thrower.y, x2: t.x, y2: t.y, sec: a.fuseSec });
+      state.events.push({ type: 'throw', id: thrower.id, x1: thrower.x, y1: thrower.y, x2: t.x, y2: t.y, sec: a.fuseSec });
       break;
     }
     case 'barrage': {

@@ -16,6 +16,7 @@ export function createEffects() {
     lastShot: new Map(), // soldier id -> time of their last shot (for the firing frame)
     throws: [], marks: [],
     lastHit: new Map(), // soldier id -> time they were last hit (for the hit flash)
+    lastThrow: new Map(), // soldier id -> time they threw a grenade (for the throwing frames)
     lastVehicleHit: new Map(),
     shake: 0, reduced: false, terrain: null,
   };
@@ -93,6 +94,7 @@ export function ingest(fxs, events, now) {
         break; // smoke clouds are drawn from the sim's smoke list
       case 'throw':
         fxs.throws.push({ ...e, t0: now, life: e.sec });
+        if (e.id !== undefined) fxs.lastThrow.set(e.id, now);
         break;
       case 'grenadeBlast':
         boom(fxs, e.x, e.y, 34, now, '255,190,110');

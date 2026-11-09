@@ -14,6 +14,7 @@ import { createCamera, setViewport, toWorld, toScreen, centreOn, clampCamera, ro
 import { buildTerrain } from './render/terrain.js';
 import { buildTiltTerrain, liftAt, LIFT } from './render/terrain-tilt.js';
 import { createRenderer, drawFrame, drawMinimap } from './render/renderer.js';
+import { loadUnitSprites } from './render/unit-sprites.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
 import { createAudio, unlockAudio, newFrame, playEvents, uiClick } from './render/audio.js';
 import { attachMapInput, attachMinimapInput } from './ui/input.js';
@@ -628,6 +629,9 @@ document.getElementById('rotate-ok').addEventListener('click', () => { store.set
 portrait.addEventListener('change', showRotateHint);
 showRotateHint();
 
+// The infantry sprite sheets load in the background; the code-drawn
+// troopers stand in until they are ready.
+loadUnitSprites();
 const params = new URLSearchParams(location.search);
 const urlSeed = params.get('seed');
 startBattle(urlSeed || newSeed(), { mapType: params.get('map') });

@@ -12,7 +12,7 @@ Current scope: the real-time battle layer only, solo against an AI. Not yet: war
 - Every player action is a command object `{tick, side, type, params}` passed through one `applyCommand` function (`src/sim/commands.js`). The AI uses exactly the same commands and order point rules as the player. A battle must be fully reproducible from seed + command log (foundation for replays, auto-resolve and multiplayer).
 - Before every commit: run `npm test` (Node only, no browser needed) and keep it passing. Long commit messages explaining what changed and why. Commit and push work in progress on long tasks.
 - All tuning numbers (ranges, speeds, damage, timers, costs) live in `src/config.js`, not scattered through code.
-- Original placeholder art only, drawn in code. No ripped assets, logos or reproductions of characters from the games.
+- Infantry sprites come from sprite sheets the owner generates in ChatGPT, briefed and processed exactly as docs/SPRITE-GUIDE.md says (the official unit sprite guidelines: six sheets, 8 directions, fixed rules for every prompt). One shared infantry set per faction for ordinary squads; specialists (jetpack, heavy weapons, sniper and so on) get their own sets later. Everything else stays original art drawn in code. No ripped assets or logos.
 
 ## Layout
 ```
