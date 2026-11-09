@@ -50,7 +50,7 @@ export function createBattle(seed, options = {}) {
     list.forEach(({ roles, name, alive, ref }, pi) => {
       const pl = {
         id: state.platoons.length, side, index: pi, name: name || PLATOON_NAMES[pi] || `Platoon ${pi + 1}`, ref: ref ?? null,
-        squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, breakBase: 0, paidTick: -1, brokeTick: 0, focus: -1, focusUntil: 0, size: roles.length * cfg.soldiersPerSquad,
+        squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, reinforceReadyTick: 0, breakBase: 0, paidTick: -1, brokeTick: 0, focus: -1, focusUntil: 0, size: roles.length * cfg.soldiersPerSquad,
       };
       state.platoons.push(pl);
       const baseY = H * spread[pi];
@@ -60,7 +60,7 @@ export function createBattle(seed, options = {}) {
           supp: 0, pinned: false, lastHitTick: -9999, lastFiredTick: -9999, tally: {}, lossBy: {}, hitFrom: null,
           mode: 'idle', status: 'Awaiting orders', bound: null, pauseUntil: 0, holdSpot: null, flankDone: false, waitSince: -1, cx: 0, cy: 0,
           bestD: Infinity, bestTick: 0, pushUntil: 0, path: null, pathTo: null, pathTick: 0,
-          order: null, paidTick: -1, abilityReady: 0, barrageUntil: 0, chargeUntil: 0, chargeTarget: -1, diveUntil: 0, diveTarget: null, vanishUntil: 0, breachUntil: 0, breachVehicle: -1,
+          order: null, paidTick: -1, abilityReady: 0, barrageUntil: 0, chargeUntil: 0, chargeTarget: -1, diveUntil: 0, diveTarget: null, vanishUntil: 0, breachUntil: 0, breachVehicle: -1, repairUntil: 0, repairVehicle: -1, repairDoneTick: 0,
         };
         state.squads.push(sq);
         pl.squads.push(sq.id);

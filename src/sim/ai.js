@@ -88,9 +88,9 @@ function decide(state, side, prof, memory) {
 
   // Reinforce the weakest platoon still in the fight when there are points
   // to spare.
-  if (state.tick >= sd.reinforceReadyTick && op >= cost.reinforce + prof.reserve) {
+  if (op >= cost.reinforce + prof.reserve) {
     let weakest = null;
-    for (const pl of mine) if (platoonStrength(state, pl) < ai.reinforceBelow && (!weakest || platoonStrength(state, pl) < platoonStrength(state, weakest))) weakest = pl;
+    for (const pl of mine) if (state.tick >= (pl.reinforceReadyTick || 0) && platoonStrength(state, pl) < ai.reinforceBelow && (!weakest || platoonStrength(state, pl) < platoonStrength(state, weakest))) weakest = pl;
     if (weakest) {
       cmds.push({ side, type: 'reinforce', params: { platoon: weakest.id } });
       op -= cost.reinforce;
@@ -176,7 +176,7 @@ function decide(state, side, prof, memory) {
       if (sq.role === 'assault' && platoonStrength(state, pl) < 0.4) continue;
       // Infiltrators only vanish once they have given themselves away.
       if (sq.role === 'infiltrator' && !list.some((x) => state.tick - x.lastShotTick < cfg.roles.infiltrator.revealSec * cfg.tickRate)) continue;
-      if (sq.role === 'engineer' && abilityKey(state, sq) !== 'breach') {
+      if (sq.role === 'engineer' && abilityKey(state, sq) === 'sandbags') {
         const c = centroid(list);
         if (!seenFoes.some((e) => dist(e, c) < 400)) continue;
       } else if (!abilityHasTarget(state, sq)) continue;

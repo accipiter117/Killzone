@@ -130,6 +130,9 @@ export const CONFIG = {
     boundMax: 170,
     flankOffset: 170,
     reconBackoff: 210,
+    crawlOnReach: 110, // a pinned squad this close to the edge of the post it is taking crawls in
+    crawlCoverReach: 90, // a squad pinned in the open crawls to cover this close
+    supportShare: 0.85, // squads helping a pinned platoon mate move to this share of their range from the shooter
     slotSpacing: 60, // squads of a platoon on a move order stand one tile apart
     arriveDist: 28,
     routSpeedMult: 1.25,
@@ -146,6 +149,9 @@ export const CONFIG = {
 
   features: {
     mg: { range: 330, fireInterval: 0.25, damage: 10, accuracy: 0.3, suppress: 14 },
+    // Fire and blasts at an enemy MG nest pile up on it: it fires slower,
+    // and past silencedAt its crew keep their heads down and stop firing.
+    mgSilence: { perShot: 0.25, blast: 45, decay: 18, fireMult: 2, silencedAt: 70, recoverShare: 0.5 },
     arc: { range: 220, intervalSec: 4, targets: 3, damage: 45, suppress: 30 },
     tank: { radius: 16, blastRadius: 95, damage: 120, suppress: 60 },
   },
@@ -194,6 +200,9 @@ export const CONFIG = {
   // Focus fire: a platoon's squads shoot one chosen enemy squad first.
   focus: { durationSec: 40 },
   // Engineers' ability becomes a breaching charge when an enemy tank is close.
+  // Engineers' ability becomes a field repair when their own tank is damaged
+  // (and no enemy tank is close enough to breach).
+  repair: { label: 'Repair', range: 260, reach: 40, workSec: 4, heal: 0.35, needBelow: 0.85, cooldownSec: 35, runSec: 14 },
   breach: { label: 'Breach', range: 220, plantDist: 40, fuseSec: 2.5, damage: 380, cooldownSec: 25, runSec: 14, speedMult: 1.3 },
 
   // Reinforcements: refill the weakest squad of a platoon with fresh
@@ -242,7 +251,7 @@ export const RULES = {
   building: ['Ruined building', 'Longer range and good cover, but artillery does double damage inside.'],
   wire: ['Barbed wire', 'Slows infantry to a crawl until an engineer squad cuts it or a tank rolls it flat.'],
   objective: ['Objective', 'Score points while you hold it. The bar fills while only your troops are inside and stalls when contested.'],
-  mg: ['MG nest', 'Capture it and it fires on any enemy in range, pinning them down.'],
+  mg: ['MG nest', 'Capture it and it fires on any enemy in range, pinning them down. Heavy fire, grenades and shells on an enemy nest slow it and can silence it for a while.'],
   arc: ['Arc tower', 'Capture it and it zaps nearby enemies every few seconds.'],
   comms: ['Comms post', 'Capture it and your order points refill faster.'],
   sandbag: ['Sandbags', 'Cover built by engineers: as good as a trench.'],
@@ -256,12 +265,13 @@ export const ABILITY_HELP = {
   grenade: 'Rifle squad throws a grenade at the nearest enemy in range. Hurts anyone near the blast.',
   barrage: 'Heavy squad holds still and pours out fire for six seconds, pinning whoever it hits.',
   charge: 'Assault squad shakes off suppression and sprints at the nearest enemy.',
-  sandbags: 'Engineers throw up a sandbag wall facing the enemy: instant cover. With an enemy tank close by, they plant a breaching charge on it instead.',
+  sandbags: 'Engineers throw up a sandbag wall facing the enemy: instant cover. With an enemy tank close by, they plant a breaching charge on it instead; with your own tank damaged nearby, they repair it.',
+  repair: 'Engineers run to your damaged tank and patch it up: after a few seconds of work it gets back about a third of its armour.',
   breach: 'Engineers run up to the enemy tank and plant a breaching charge: it goes off after a few seconds for heavy damage.',
   overwatch: 'The tank fires an aimed heavy shell at the best target in range (the enemy tank first).',
   mark: 'Recon marks an enemy group for ten seconds: everyone can see them and hits them more often.',
   dive: 'Jetpack squad leaps onto the nearest enemy group and lands with a stomp that hurts and pins them.',
-  vanish: 'Infiltrators go fully hidden for eight seconds, even up close: slip away or set up the next ambush.',
+  vanish: 'Infiltrators go fully hidden for eight seconds, even up close, and shake off being pinned: slip away or set up the next ambush.',
 };
 
 // The war map campaign (src/campaign). Every strategic number lives here.

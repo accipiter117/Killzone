@@ -231,7 +231,10 @@ test('reinforcements refill the weakest squad from your own lines, at a price', 
   const again = applyCommand(s, { tick: 0, side: 0, type: 'reinforce', params: { platoon: pl.id } });
   assert.equal(again.ok, false);
   assert.match(again.reason, /on their way back/);
-  s.sides[0].reinforceReadyTick = 0;
+  // The cooldown is per platoon: another platoon is not held up by it.
+  const other = s.platoons.find((x) => x.side === 0 && x !== pl);
+  assert.doesNotMatch(applyCommand(s, { tick: 0, side: 0, type: 'reinforce', params: { platoon: other.id } }).reason || '', /on their way back/);
+  pl.reinforceReadyTick = 0;
   const full = applyCommand(s, { tick: 0, side: 0, type: 'reinforce', params: { platoon: pl.id } });
   assert.equal(full.ok, false);
   assert.match(full.reason, /full strength/);

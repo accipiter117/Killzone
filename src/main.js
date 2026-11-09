@@ -2,7 +2,7 @@
 // The sim advances in fixed 1/30 second ticks; drawing happens every frame.
 
 import { CONFIG, RULES, SIDE_NAMES, ABILITY_HELP } from './config.js';
-import { ABILITY_OF } from './sim/abilities.js';
+import { ABILITY_OF, abilityCfg } from './sim/abilities.js';
 import { createMatch, issue, advance } from './sim/match.js';
 import { amendWindow, squadFreeWindow, followUpWindow } from './sim/commands.js';
 import { createAI } from './sim/ai.js';
@@ -82,7 +82,7 @@ const ui = createUI({
       const st = game.match.state;
       const sq = st.platoons[platoon].squads.map((id) => st.squads[id]).find((q) => q.role === role);
       const key = sq.abilityUsed || ABILITY_OF[role];
-      toast(ui, key === 'breach' ? st.cfg.breach.label : st.cfg.abilities[key].label, ABILITY_HELP[key]);
+      toast(ui, abilityCfg(st, key).label, ABILITY_HELP[key]);
     }
   },
   closeTray() { deselect(); },

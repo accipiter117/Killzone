@@ -5,7 +5,7 @@
 
 import { platoonStrength } from '../sim/util.js';
 import { platoonHeadline } from '../sim/squads.js';
-import { abilityKey, abilityHasTarget } from '../sim/abilities.js';
+import { abilityKey, abilityHasTarget, abilityCfg } from '../sim/abilities.js';
 import { mainGunTarget } from '../sim/vehicles.js';
 import { amendWindow, squadFreeWindow, followUpWindow } from '../sim/commands.js';
 
@@ -97,7 +97,7 @@ export function updateUI(ui, state, view) {
     const sel = view.selected !== null ? state.platoons[view.selected] : null;
     const needsPlatoon = act === 'hold' || act === 'fallback' || act === 'stance' || act === 'reinforce';
     const cost = state.cfg.orders.cost[act];
-    btn.disabled = view.replay || view.watch || (needsPlatoon && (!sel || sel.broken)) || op + 1e-9 < cost || (act === 'artillery' && state.tick < me.artReadyTick) || (act === 'reinforce' && state.tick < me.reinforceReadyTick);
+    btn.disabled = view.replay || view.watch || (needsPlatoon && (!sel || sel.broken)) || op + 1e-9 < cost || (act === 'artillery' && state.tick < me.artReadyTick) || (act === 'reinforce' && sel && state.tick < (sel.reinforceReadyTick || 0));
   }
 
   // Selecting or letting go of a unit redraws straight away (the tray must
@@ -128,7 +128,10 @@ export function updateUI(ui, state, view) {
   e.speed.textContent = `${view.speed}x`;
   const art = me.noArtillery ? 'none' : state.tick < me.artReadyTick ? `${Math.ceil((me.artReadyTick - state.tick) / state.cfg.tickRate)}s` : `${state.cfg.orders.cost.artillery} pts`;
   e.actions.artillery.querySelector('small').textContent = art;
-  e.actions.reinforce.querySelector('small').textContent = state.tick < me.reinforceReadyTick ? `${Math.ceil((me.reinforceReadyTick - state.tick) / state.cfg.tickRate)}s` : `${state.cfg.orders.cost.reinforce} pts`;
+  // Reinforcements recharge per platoon: the button shows the selected one's.
+  const rsel = view.selected !== null ? state.platoons[view.selected] : null;
+  const rready = rsel ? rsel.reinforceReadyTick || 0 : 0;
+  e.actions.reinforce.querySelector('small').textContent = state.tick < rready ? `${Math.ceil((rready - state.tick) / state.cfg.tickRate)}s` : `${state.cfg.orders.cost.reinforce} pts`;
 
   // Unit chips (the player's side, or ISA when watching): strength bar,
   // selection, broken, pinned, and a countdown badge while a fresh order can
@@ -252,7 +255,7 @@ export function updateUI(ui, state, view) {
     const { sq } = r;
     const dead = sq.mode === 'dead';
     const k = abilityKey(state, sq);
-    const ab = k === 'breach' ? state.cfg.breach : state.cfg.abilities[k];
+    const ab = abilityCfg(state, k);
     const wait = Math.ceil((sq.abilityReady - state.tick) / state.cfg.tickRate);
     r.name.textContent = ab.label;
     r.sub.textContent = dead ? 'Wiped out' : wait > 0 ? `${wait}s` : state.cfg.roles[sq.role].label;
