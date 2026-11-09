@@ -39,17 +39,6 @@ All in `CAMPAIGN` in [`src/config.js`](src/config.js).
 
 `node tools/campaign-balance.mjs 6 4 90` plays six AI against AI campaigns (4 nights, 90 second battles) and reports win rates, how wars end and how many battles are fought. Last run: 50/50, a third won by taking the capital.
 
-## Switching on GitHub Pages (from a phone)
-
-The GitHub app cannot change Pages settings, so use the website in your phone's browser (tick "Desktop site" if the menu is cramped):
-
-1. Open github.com/accipiter117/Killzone and tap **Settings** (top of the repo page, swipe the tab row if you cannot see it).
-2. In the left menu (or the dropdown on a phone), tap **Pages**.
-3. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
-4. Set **Branch** to `main` and the folder to `/ (root)`, then tap **Save**.
-5. Wait a minute or two and refresh: the page shows the live address (https://accipiter117.github.io/Killzone/).
-
-The prototype currently lives on the branch `claude/killzone-battle-prototype-eib5jq`. Either merge it into `main` first, or to test straight away pick that branch in step 4 instead of `main`.
 
 ## How to play
 
@@ -88,7 +77,7 @@ The prototype currently lives on the branch `claude/killzone-battle-prototype-ei
 - **Sound** is synthesised in code: gunfire, explosions, the artillery whistle, a chime when an objective changes hands and a horn when a platoon breaks or rallies. It starts on your first tap and can be switched off in the menu.
 - **Reading the battle:** a platoon's badge turns red with a "!" when one of its squads is pinned; soldiers flash when hit; enemies marked by recon get red brackets.
 - **Press and hold** anything (ground, wire, a post, an enemy squad) to see its one rule or what that squad is doing.
-- Drag to pan, pinch to zoom, tap or drag the minimap to jump.
+- Drag to pan, pinch to zoom, tap or drag the minimap to jump. In a desktop browser, the space bar pauses and resumes.
 
 ### What the squads do by themselves
 

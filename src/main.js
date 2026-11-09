@@ -628,6 +628,21 @@ document.getElementById('st-quick').addEventListener('click', () => { closeOverl
 document.getElementById('st-import').addEventListener('click', () => campaignUI.openImport());
 document.getElementById('st-help').addEventListener('click', () => openOverlay('overlay-chelp'));
 
+// ---- Keyboard (browser play) ----------------------------------------------------
+
+// Space pauses and resumes a battle, like the pause button. Ignored while
+// typing, while a menu or sheet is open, on the war map, and once the
+// battle is over.
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+  if (!game.match || game.match.state.result || campaignUI.visible()) return;
+  if ([...document.querySelectorAll('.overlay')].some((o) => !o.hidden)) return;
+  e.preventDefault(); // no page scroll, and no "click" on a focused button
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  ui.handlers.togglePause();
+});
+
 // ---- Screen wake lock -------------------------------------------------------
 
 let wakeLock = null;
