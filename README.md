@@ -67,6 +67,7 @@ All in `CAMPAIGN` in [`src/config.js`](src/config.js).
 - **Focus fire:** with a platoon selected, tap an enemy soldier your side can see: all three squads shoot that squad first for 40 seconds (1 order point), shown by a red target. The AI focuses enemy heavy squads near its platoons.
 - **Cover preview:** while a unit is selected, grid tiles are tinted by the best cover a squad could find there: green good (trench, ruins, sandbags), amber some (crater, rubble, high ground).
 - **Breaking and rallying:** a platoon that loses too many men breaks and runs back to its own lines. The first time, the survivors regroup there for 25 seconds and then rejoin the fight (a countdown shows). A rallied platoon that loses half of what was left breaks for good and leaves the field.
+- **Placing squads:** for 10 seconds after a paid platoon order, picking one of its squads and placing it is free (it counts as part of the same order); the tray stays open and counts down.
 - **Changing your mind:** for 5 seconds after giving a platoon a movement order you can tap again to change it for free; the chip shows a green countdown. Slow motion ends as soon as you order, and the tray puts itself away when the free window closes.
 - **Grid:** while a platoon is selected a faint grid of tiles shows (as in Bad North). Move orders snap to the centre of a tile, and the platoon's three squads take that tile and the ones above and below (highlighted). Fighting is not limited to tiles: soldiers shoot, throw and charge at enemies nearby. The grid can be switched off in the menu.
 - **Reinforce** (2 points, 35 second cooldown): up to five fresh soldiers refill the selected platoon's weakest squad. They arrive at the nearest objective or post you hold (or your own lines) and run to rejoin. A platoon that is regrouping after breaking can be reinforced too.
@@ -77,7 +78,7 @@ All in `CAMPAIGN` in [`src/config.js`](src/config.js).
 - **Sound** is synthesised in code: gunfire, explosions, the artillery whistle, a chime when an objective changes hands and a horn when a platoon breaks or rallies. It starts on your first tap and can be switched off in the menu.
 - **Reading the battle:** a platoon's badge turns red with a "!" when one of its squads is pinned; soldiers flash when hit; enemies marked by recon get red brackets.
 - **Press and hold** anything (ground, wire, a post, an enemy squad) to see its one rule or what that squad is doing.
-- Drag to pan, pinch to zoom, tap or drag the minimap to jump. In a desktop browser, the space bar pauses and resumes.
+- Drag to pan, pinch to zoom, tap or drag the minimap to jump. In a desktop browser, the space bar pauses and resumes and the arrow keys move the view (on the war map too).
 
 ### What the squads do by themselves
 

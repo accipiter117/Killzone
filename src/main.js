@@ -4,13 +4,13 @@
 import { CONFIG, RULES, SIDE_NAMES, ABILITY_HELP } from './config.js';
 import { ABILITY_OF } from './sim/abilities.js';
 import { createMatch, issue, advance } from './sim/match.js';
-import { amendWindow } from './sim/commands.js';
+import { amendWindow, squadFreeWindow, followUpWindow } from './sim/commands.js';
 import { createAI } from './sim/ai.js';
 import { fingerprint } from './sim/battle.js';
 import { seedFrom } from './sim/rng.js';
 import { wireAt, heightAt } from './sim/map.js';
 import { isActive, coverName, dist } from './sim/util.js';
-import { createCamera, setViewport, toWorld, toScreen, centreOn, clampCamera, rotateAt } from './render/camera.js';
+import { createCamera, setViewport, toWorld, toScreen, centreOn, clampCamera, rotateAt, panBy } from './render/camera.js';
 import { buildTerrain } from './render/terrain.js';
 import { buildTiltTerrain, liftAt, LIFT } from './render/terrain-tilt.js';
 import { createRenderer, drawFrame, drawMinimap } from './render/renderer.js';
@@ -643,6 +643,27 @@ document.addEventListener('keydown', (e) => {
   ui.handlers.togglePause();
 });
 
+// Arrow keys pan the view (battle and war map) while held. Screen
+// directions, so they still make sense when the map is turned.
+const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+const held = new Set();
+document.addEventListener('keydown', (e) => {
+  if (!ARROWS[e.code] || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+  if ([...document.querySelectorAll('.overlay')].some((o) => !o.hidden)) return;
+  e.preventDefault();
+  held.add(e.code);
+});
+document.addEventListener('keyup', (e) => held.delete(e.code));
+window.addEventListener('blur', () => held.clear());
+function keyPan(cam, dt) {
+  if (!cam || !held.size) return;
+  let dx = 0, dy = 0;
+  for (const k of held) { dx += ARROWS[k][0]; dy += ARROWS[k][1]; }
+  const speed = 700 * dt; // screen pixels per second
+  if (dx || dy) panBy(cam, -dx * speed, -dy * speed);
+}
+
 // ---- Screen wake lock -------------------------------------------------------
 
 let wakeLock = null;
@@ -681,7 +702,9 @@ function frame(t) {
   const dt = Math.min(0.25, now - game.last / 1000);
   game.last = t;
   // The war map (or the start menu) is up: no battle to run or draw.
+  if (campaignUI.visible() && campaignUI.cm) keyPan(campaignUI.debug.cam, dt);
   if (campaignUI.draw(now) || !game.match) { requestAnimationFrame(frame); return; }
+  keyPan(game.cam, dt);
   const m = game.match;
   const st = m.state;
   const tickDt = 1 / st.cfg.tickRate;
@@ -721,7 +744,10 @@ function frame(t) {
     const target = r.kind === 'tank' ? st.vehicles[r.id] : r.kind === 'squad' ? st.squads[r.id] : st.platoons[r.id];
     const still = r.kind === 'tank' ? game.vehicle : r.kind === 'squad' ? game.scope === r.id : game.selected === r.id;
     if (!still) game.release = null;
-    else if (amendWindow(st, target) <= 0) deselect();
+    // The tray stays up while anything is still free to change: the order
+    // itself, or (after a platoon order) placing its squads one by one.
+    const left = r.kind === 'squad' ? squadFreeWindow(st, target) : r.kind === 'platoon' ? Math.max(amendWindow(st, target), followUpWindow(st, target)) : amendWindow(st, target);
+    if (left <= 0) deselect();
   }
 
   prune(game.fxs, now);

@@ -57,6 +57,7 @@ export const CONFIG = {
     cap: 6,
     regenSec: 6, // seconds per order point
     amendSec: 5, // a movement order can be changed free for this long after giving it
+    squadFollowUpSec: 10, // after a paid platoon order, its squads can be placed one by one free for this long (part of the same order)
     commsRegenMult: 1.75, // owning the comms post speeds refill by this much
     cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0, focus: 1, squad: 1 },
   },

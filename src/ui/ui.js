@@ -7,7 +7,7 @@ import { platoonStrength } from '../sim/util.js';
 import { platoonHeadline } from '../sim/squads.js';
 import { abilityKey, abilityHasTarget } from '../sim/abilities.js';
 import { mainGunTarget } from '../sim/vehicles.js';
-import { amendWindow } from '../sim/commands.js';
+import { amendWindow, squadFreeWindow, followUpWindow } from '../sim/commands.js';
 
 const $ = (sel) => document.querySelector(sel);
 const TANK_ICON = '<svg width="26" height="18" viewBox="0 0 26 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 11h22l-2 5H4z"/><path d="M6 11l2-4h9l2 4"/><path d="M17 8.5h8"/></svg>';
@@ -220,8 +220,8 @@ export function updateUI(ui, state, view) {
     e.trayTitle.textContent = sel.name;
     e.traySub.textContent = `${state.cfg.roles[scoped.role].label} squad \u00b7 ${scoped.order ? 'own orders' : 'with the platoon'} \u00b7 ${scoped.status}`;
     e.traySub.classList.toggle('pinned', scoped.pinned);
-    const free = Math.ceil(amendWindow(state, scoped) / state.cfg.tickRate);
-    e.trayHint.textContent = free > 0 ? `Tap again to change, free (${free}s)` : `${state.cfg.roles[scoped.role].label} only: tap ground or an objective`;
+    const free = Math.ceil(squadFreeWindow(state, scoped) / state.cfg.tickRate);
+    e.trayHint.textContent = free > 0 ? `Place this squad, free (${free}s)` : `${state.cfg.roles[scoped.role].label} only: tap ground or an objective`;
   } else if (sel) {
     e.trayTitle.textContent = sel.name;
     const head = platoonHeadline(state, sel);
@@ -229,7 +229,8 @@ export function updateUI(ui, state, view) {
     e.traySub.textContent = `${state.cfg.stances[sel.stance].label} \u00b7 ${Math.round(platoonStrength(state, sel) * 100)}% \u00b7 ${head}${focus}`;
     e.traySub.classList.toggle('pinned', head.startsWith('Pinned') || head === 'Routing');
     const free = Math.ceil(amendWindow(state, sel) / state.cfg.tickRate);
-    e.trayHint.textContent = free > 0 ? `Tap again to change, free (${free}s)` : 'Tap ground, an objective or an enemy';
+    const squadsFree = Math.ceil(followUpWindow(state, sel) / state.cfg.tickRate);
+    e.trayHint.textContent = free > 0 ? `Tap again to change, free (${free}s)` : squadsFree > 0 ? `Pick a squad above to place it, free (${squadsFree}s)` : 'Tap ground, an objective or an enemy';
   } else if (open) {
     e.trayTitle.textContent = 'Tank';
     e.traySub.textContent = `${Math.ceil((100 * tank.hp) / tank.maxHp)}% \u00b7 ${tank.alive ? tank.status : 'Knocked out'}`;
