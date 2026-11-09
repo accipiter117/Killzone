@@ -168,7 +168,7 @@ export const CONFIG = {
   // both sides (only the look differs). damageFrom says how much of each
   // kind of hit gets through its armour.
   tank: {
-    hp: 1000, speed: 26, radius: 28, sight: 380, rampSpeed: 0.6, deployX: 110,
+    hp: 1000, speed: 30, radius: 28, sight: 380, rampSpeed: 0.6, deployX: 110,
     // Toned down against infantry after playtesting (tank shells were over half the kills): a smaller burst
     // and a slower reload after firing at troops; unchanged against the other tank.
     mainGun: { range: 430, reloadSec: 5.5, reloadVsInfantrySec: 8, accuracy: 0.7, vsTank: 160, blastRadius: 26, blastDamage: 52, suppress: 30 },
