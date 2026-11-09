@@ -523,7 +523,7 @@ const spriteScale25 = (px) => Math.max(1, 0.7 * px);
 
 // Work out each soldier's facing and animation frame. Bookkeeping runs for
 // everyone (seen or not) so animation stays in step when they come into view.
-const vehicleSeen = (state, v, opts) => v.side === opts.playerSide || opts.reveal || v.spotted[opts.playerSide];
+const vehicleSeen = (state, v, opts) => !v.absent && (v.side === opts.playerSide || opts.reveal || v.spotted[opts.playerSide]);
 
 // One tank: sprite frame from how far it has driven, a firing frame just
 // after a shot, a burnt wreck once destroyed, smoke when badly damaged.
