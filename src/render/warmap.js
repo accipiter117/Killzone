@@ -51,7 +51,7 @@ export function createWarmap(state) {
   base.height = H * SCALE;
   // A margin round the map, so the top bar and the screen edges never hide
   // the outermost sites. The camera's world is the map plus this margin.
-  const ox = 40, oy = 110;
+  const ox = 110, oy = 110; // room for the top bar, whichever way the map is turned
   return { W, H, ox, oy, CW: W + ox * 2, CH: H + oy + 50, paths, outlines, labels, base, sig: null, hits: [], siteHits: [] };
 }
 

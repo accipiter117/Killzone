@@ -8,7 +8,7 @@ import { createCampaignMatch, issueCampaign, aiPlan } from '../campaign/match.js
 import { reachable, attackable, strengthOf, sectorOwner, incomeFor, siteValue } from '../campaign/state.js';
 import { saveCampaign, exportCode, importCode } from '../campaign/save.js';
 import { createResolver } from '../campaign/resolver.js';
-import { createCamera, setViewport, toWorld, clampCamera } from '../render/camera.js';
+import { createCamera, setViewport, toWorld, centreOn } from '../render/camera.js';
 import { createWarmap, drawWarmap, pick, SITE_LABEL } from '../render/warmap.js';
 import { attachMapInput } from './input.js';
 
@@ -37,10 +37,23 @@ export function createCampaignUI({ fightBattle, watchReplay, toMenu, toggleSound
     ui.dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.round(w * ui.dpr);
     canvas.height = Math.round(h * ui.dpr);
-    // A map fitted to the screen stays fitted when the phone turns.
-    const fitted = ui.cam.vw > 1 && ui.cam.z <= ui.cam.minZ + 1e-6;
     setViewport(ui.cam, w, h);
-    if (fitted) { ui.cam.z = ui.cam.minZ; clampCamera(ui.cam); }
+    // Turning the phone resets to the default view for that way up.
+    if (ui.cm && (h > w) !== ui.viewTall) defaultView();
+  }
+
+  // The default view: the whole map, filling the screen. On an upright
+  // phone the map is turned so it runs top to bottom, with your (ISA) side
+  // at the bottom; on a sideways phone it lies flat. Twisting two fingers
+  // still turns it any way you like.
+  function defaultView() {
+    const c = ui.cam;
+    const tall = c.vh > c.vw;
+    ui.viewTall = tall;
+    c.rot = tall ? Math.PI * 1.5 : 0;
+    const z = tall ? Math.min(c.vw / c.H, c.vh / c.W) : Math.min(c.vw / c.W, c.vh / c.H);
+    c.z = Math.max(c.minZ, Math.min(c.maxZ, z));
+    centreOn(c, c.W / 2, c.H / 2);
   }
   new ResizeObserver(resize).observe(canvas);
 
@@ -75,7 +88,7 @@ export function createCampaignUI({ fightBattle, watchReplay, toMenu, toggleSound
   // One camera for the life of the page (the map input holds on to it); a
   // new campaign resets it in place.
   ui.cam = createCamera(1, 1);
-  ui.cam.canRotate = false;
+  ui.cam.canRotate = true;
   attachMapInput(canvas, ui.cam, {
     onTap,
     onLongPress(sx, sy) {
@@ -476,14 +489,13 @@ export function createCampaignUI({ fightBattle, watchReplay, toMenu, toggleSound
     ui.resolving = new Set();
     ui.handed = new Set();
     ui.wm = createWarmap(cm.state);
-    Object.assign(ui.cam, createCamera(ui.wm.CW, ui.wm.CH), { canRotate: false });
+    Object.assign(ui.cam, createCamera(ui.wm.CW, ui.wm.CH), { canRotate: true });
+    ui.viewTall = null;
     ui.histFrom = cm.state.history.length;
     ui.nightFrom = cm.state.night;
     ui.roundFrom = cm.state.round;
     show();
-    // Start fitted to the whole map.
-    ui.cam.z = ui.cam.minZ;
-    clampCamera(ui.cam);
+    defaultView();
     renderTray();
     if (cm.state.phase === 'battles') { showBattles(); startResolving(); } else if (cm.state.phase === 'over') showVictory();
   }
