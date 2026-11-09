@@ -7,6 +7,7 @@ import { T, cellIndex, canStep, forCells } from './map.js';
 import { findPath, straightClear } from './path.js';
 import { isActive, dist, feed, sideName, nearObjective } from './util.js';
 import { fireShot, damageSoldier, suppress, losClear } from './combat.js';
+import { breakWalls } from './features.js';
 
 export function createVehicles(state) {
   const t = state.cfg.tank;
@@ -149,7 +150,7 @@ function fireMainGun(state, v, dt) {
   const t = mainGunTarget(state, v);
   if (!t) { v.gunReady = state.tick + 6; return; }
   shell(state, v, t, { vsTank: g.vsTank, blastDamage: g.blastDamage, accuracy: g.accuracy });
-  v.gunReady = state.tick + Math.round(g.reloadSec * state.cfg.tickRate);
+  v.gunReady = state.tick + Math.round((t.tank ? g.reloadSec : g.reloadVsInfantrySec) * state.cfg.tickRate);
 }
 
 // One main gun shell: against a tank it hits or misses; against infantry
@@ -174,6 +175,7 @@ export function shell(state, v, t, { vsTank, blastDamage, accuracy }) {
     for (const s of state.soldiers) if (isActive(s) && s.side !== v.side && Math.hypot(s.x - x, s.y - y) < g.blastRadius * 1.8) hit.add(s.squad);
     for (const id of [...hit].sort((a, b) => a - b)) suppress(state, state.squads[id], g.suppress, 'blast', v);
   }
+  breakWalls(state, x, y, state.cfg.walls.tankShell);
   state.events.push({ type: 'tankShot', side: v.side, x1: v.x + v.facing * 40, y1: v.y - 22, x2: x, y2: y });
 }
 

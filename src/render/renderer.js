@@ -2,8 +2,8 @@
 // the labels that explain what is going on. Reads the sim state, never writes it.
 
 import { isActive, members, centroid, coverName } from '../sim/util.js';
-import { heightAt } from '../sim/map.js';
-import { toScreen } from './camera.js';
+import { heightAt, T } from '../sim/map.js';
+import { toScreen, worldMatrix, viewBounds } from './camera.js';
 import { sideColours, drawSmoke, drawEffects } from './effects.js';
 import { getSprite, dirIndex, SPRITE_SIZE } from './sprites.js';
 import { getSprite25, W25, H25, ANCHOR_X, ANCHOR_Y } from './sprites25d.js';
@@ -19,10 +19,23 @@ const lifted = (o) => ({ ...o, y: LY(o.x, o.y) });
 // Detailed troopers: each faction and role has its own sprite set.
 const FACTION = ['isa', 'hgh'];
 export const spriteScalePixel = (px) => Math.max(0.42, 0.3 * px);
-function drawTrooper(g, side, frame, ang, x, y, ps, role) {
-  const facing = Math.cos(ang) >= 0 ? 1 : -1;
+// The view being drawn (camera, pixel ratio, shake), for sprites.
+const VIEW = { cam: null, dpr: 1, sh: { x: 0, y: 0 }, m: [1, 0, 0, 1, 0, 0] };
+const setWorld = (g) => { const m = VIEW.m, d = VIEW.dpr; g.setTransform(d * m[0], d * m[1], d * m[2], d * m[3], (m[4] + VIEW.sh.x) * d, (m[5] + VIEW.sh.y) * d); };
+// When the view is turned, figures stay upright on screen (billboards): the
+// drawing origin moves to the figure's spot on screen, scaled but not turned.
+function billboard(g, x, y) {
+  const p = toScreen(VIEW.cam, x, y), z = VIEW.cam.z, d = VIEW.dpr;
+  g.setTransform(d * z, 0, 0, d * z, (p.x + VIEW.sh.x) * d, (p.y + VIEW.sh.y) * d);
+}
+// up: how far above the spot to draw (world units, always straight up the screen).
+function drawTrooper(g, side, frame, ang, x, y, ps, role, up = 0) {
+  const rot = VIEW.cam ? VIEW.cam.rot : 0;
+  const facing = Math.cos(ang + rot) >= 0 ? 1 : -1;
   const fx = facing === 1 ? PT_FOOT[0] : PT_W - 1 - PT_FOOT[0];
-  g.drawImage(getPixelTrooper(FACTION[side], frame, facing, role), x - fx * ps, y - PT_FOOT[1] * ps, PT_W * ps, PT_H * ps);
+  if (rot) { billboard(g, x, y); x = 0; y = 0; }
+  g.drawImage(getPixelTrooper(FACTION[side], frame, facing, role), x - fx * ps, y - up - PT_FOOT[1] * ps, PT_W * ps, PT_H * ps);
+  if (rot) setWorld(g);
 }
 
 export const OWNER = { 0: '#7fb6ff', 1: '#ff6a2a', null: '#d8d2c0' };
@@ -46,11 +59,13 @@ export function drawFrame(g, r, state, cam, opts) {
   g.fillStyle = '#1d1a15';
   g.fillRect(0, 0, g.canvas.width, g.canvas.height);
   const sh = opts.shake || { x: 0, y: 0 };
-  g.setTransform(dpr * z, 0, 0, dpr * z, (-cam.x * z + sh.x) * dpr, (-cam.y * z + sh.y) * dpr);
+  VIEW.cam = cam; VIEW.dpr = dpr; VIEW.sh = sh; VIEW.m = worldMatrix(cam);
+  setWorld(g);
 
   LY = opts.tilt ? (x, y) => y - liftAt(state.map, x, y) : (x, y) => y;
   g.drawImage(terrain.canvas, 0, 0);
   drawWire(g, r, state, cam);
+  drawWalls(g, state, cam, opts);
   drawSitesWorld(g, state, now, px, fxs);
   drawBodies(g, r, state, fxs, now, px, opts.view);
   drawTanks(g, state, now);
@@ -199,9 +214,74 @@ function drawMarks(g, state, cam, opts) {
   }
 }
 
+// Wall colours per map: shipping containers and steel on the industrial
+// site, brick and concrete in the city.
+const WALL_TONES = {
+  industrial: [['#8a4b36', '#6e3a2a'], ['#3f6f74', '#2f5458'], ['#a08a3c', '#7d6b2c'], ['#6c6f73', '#505357']],
+  city: [['#857c6e', '#665e52'], ['#7a6a5c', '#5c5045'], ['#8e877a', '#6d675c']],
+};
+
+// Walls are drawn live, cell by cell, so knocked-down sections disappear at
+// once (and leave rubble). From above: a shadow, the top, and a bevel. In
+// the tilted look they stand up with a shaded front.
+function drawWalls(g, state, cam, opts) {
+  const map = state.map;
+  if (!map.wallCells || !map.wallCells.length) return;
+  const vb = viewBounds(cam);
+  const c = map.cell, cols = map.cols;
+  const tones = WALL_TONES[map.kind] || WALL_TONES.city;
+  const isWall = (i) => map.grid[i] === T.wall;
+  const vis = [];
+  for (const i of map.wallCells) {
+    const x = (i % cols) * c, y = ((i / cols) | 0) * c;
+    if (x < vb.x0 - c || x > vb.x1 + c || y < vb.y0 - 40 || y > vb.y1 + 40) continue;
+    vis.push(i);
+  }
+  // Rubble where walls have come down.
+  if (map.broken) {
+    g.fillStyle = '#6f6a5c';
+    for (const i of vis) {
+      if (!map.broken[i]) continue;
+      const x = (i % cols) * c, y = LY((i % cols) * c, ((i / cols) | 0) * c);
+      g.fillRect(x + (i % 3) * 2, y + 2 + (i % 2) * 3, 5, 4);
+      g.fillRect(x + 5 - (i % 2) * 3, y + 6, 4, 3);
+    }
+  }
+  const tone = (i) => tones[Math.floor((i % cols) / 7 + Math.floor(i / cols / 3) * 3) % tones.length];
+  if (opts.tilt) {
+    const WH = 14;
+    for (const i of vis) {
+      if (!isWall(i)) continue;
+      const x = (i % cols) * c, y0 = ((i / cols) | 0) * c, y = LY(x + c / 2, y0 + c / 2) - c / 2;
+      const [top, side] = tone(i);
+      if (!isWall(i + cols)) { g.fillStyle = side; g.fillRect(x, y + c - WH, c, WH); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x, y + c - 3, c, 3); }
+      g.fillStyle = top;
+      g.fillRect(x, y - WH, c, c);
+      if (!isWall(i - cols)) { g.fillStyle = 'rgba(255,248,226,0.3)'; g.fillRect(x, y - WH, c, 1.5); }
+    }
+    return;
+  }
+  g.fillStyle = 'rgba(20,18,14,0.4)';
+  for (const i of vis) if (isWall(i)) g.fillRect((i % cols) * c + 3, ((i / cols) | 0) * c + 3, c, c);
+  for (const i of vis) {
+    if (!isWall(i)) continue;
+    const x = (i % cols) * c, y = ((i / cols) | 0) * c;
+    const [top, side] = tone(i);
+    g.fillStyle = top;
+    g.fillRect(x, y, c, c);
+    g.fillStyle = side;
+    if (!isWall(i + 1)) g.fillRect(x + c - 2, y, 2, c);
+    if (!isWall(i + cols)) g.fillRect(x, y + c - 2, c, 2);
+    g.fillStyle = 'rgba(255,248,226,0.28)';
+    if (!isWall(i - 1)) g.fillRect(x, y, 1.5, c);
+    if (!isWall(i - cols)) g.fillRect(x, y, c, 1.5);
+  }
+}
+
 function drawWire(g, r, state, cam) {
   const m = state.map;
-  const x0 = cam.x - 20, x1 = cam.x + cam.vw / cam.z + 20;
+  const vb = viewBounds(cam);
+  const x0 = vb.x0 - 20, x1 = vb.x1 + 20;
   g.strokeStyle = '#1e1c19';
   g.lineWidth = 1.3;
   g.beginPath();
@@ -332,8 +412,9 @@ function platoonCentre(state, pl) {
 function drawGrid(g, state, cam, opts, px) {
   if (!opts.grid) return;
   const t = state.cfg.ui.tile;
-  const x0 = Math.floor(cam.x / t) * t, y0 = Math.floor(cam.y / t) * t;
-  const x1 = cam.x + cam.vw / cam.z, y1 = cam.y + cam.vh / cam.z;
+  const vb = viewBounds(cam);
+  const x0 = Math.floor(vb.x0 / t) * t, y0 = Math.floor(vb.y0 / t) * t;
+  const x1 = vb.x1, y1 = vb.y1;
   // Each tile sits at the height of its middle (so tiles on a hill rise with it).
   const ty = (x, y) => LY(x + t / 2, y + t / 2) - t / 2;
   g.strokeStyle = 'rgba(240,236,220,0.13)';
@@ -442,8 +523,16 @@ function drawVehicle(g, r, state, v, ps, opts) {
   if (!v.alive) frame = 'wreck';
   else if (ticks >= 0 && ticks < 5) frame = 'fire';
   else if (v.moved > 0) frame = 'move' + (1 + (Math.floor(r.vdist[v.id] / 4) % 4));
-  const fx = v.facing === 1 ? TANK_FOOT[0] : TANK_W - TANK_FOOT[0];
   v = lifted(v);
+  const rot = VIEW.cam ? VIEW.cam.rot : 0;
+  if (rot) {
+    // Turned view: the tank stays upright on screen, facing whichever way
+    // its gun points on screen.
+    const sxDir = Math.cos(rot) * v.facing;
+    billboard(g, v.x, v.y);
+    v = { ...v, x: 0, y: 0, facing: Math.abs(sxDir) < 0.2 ? v.facing : sxDir > 0 ? 1 : -1 };
+  }
+  const fx = v.facing === 1 ? TANK_FOOT[0] : TANK_W - TANK_FOOT[0];
   const x0 = v.x - fx * ps, y0 = v.y - TANK_FOOT[1] * ps;
   g.fillStyle = 'rgba(15,12,8,0.35)';
   g.beginPath();
@@ -484,6 +573,7 @@ function drawVehicle(g, r, state, v, ps, opts) {
     g.fillStyle = v.hp / v.maxHp > 0.5 ? OWNER[v.side] : v.hp / v.maxHp > 0.25 ? '#e8c04a' : '#e0412a';
     g.fillRect(bx, by, w * Math.max(0, v.hp / v.maxHp), h);
   }
+  if (rot) setWorld(g);
 }
 
 function animate(r, state, opts) {
@@ -574,13 +664,13 @@ function drawSoldiers(g, r, state, opts, px) {
       const role = state.cfg.roles[s.role];
       const hidden = role.hidden && (sq.vanishUntil > state.tick || state.tick - s.lastShotTick > role.revealSec * state.cfg.tickRate);
       if (hidden) g.globalAlpha = 0.5;
-      drawTrooper(g, s.side, frame, ang, s.x, sy - lift, ps, s.role);
+      drawTrooper(g, s.side, frame, ang, s.x, sy, ps, s.role, lift);
       if (hidden) g.globalAlpha = 1;
       // Hit flash: draw the soldier again, added on top, for a split second.
       if (opts.now - (opts.fxs.lastHit.get(s.id) ?? -9) < 0.1) {
         g.globalCompositeOperation = 'lighter';
         g.globalAlpha = 0.7;
-        drawTrooper(g, s.side, frame, ang, s.x, sy - lift, ps, s.role);
+        drawTrooper(g, s.side, frame, ang, s.x, sy, ps, s.role, lift);
         g.globalCompositeOperation = 'source-over';
         g.globalAlpha = 1;
       }
@@ -810,5 +900,9 @@ export function drawMinimap(g, r, state, cam, opts) {
   }
   g.strokeStyle = '#ffffff';
   g.lineWidth = 1.5;
-  g.strokeRect(cam.x * sx, cam.y * sy, (cam.vw / cam.z) * sx, (cam.vh / cam.z) * sy);
+  const vc = viewBounds(cam).corners;
+  g.beginPath();
+  vc.forEach((p, i) => (i ? g.lineTo(p.x * sx, p.y * sy) : g.moveTo(p.x * sx, p.y * sy)));
+  g.closePath();
+  g.stroke();
 }

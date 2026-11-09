@@ -3,11 +3,20 @@
 // Helghast always fight over identical ground (fair for balance testing).
 
 import { range, int } from './rng.js';
+import { industrialMap, cityMap } from './maps.js';
 
-export const T = { open: 0, trench: 1, rubble: 2, crater: 3, building: 4, sandbag: 5 };
-export const T_NAMES = ['open', 'trench', 'rubble', 'crater', 'building', 'sandbag'];
+export const T = { open: 0, trench: 1, rubble: 2, crater: 3, building: 4, sandbag: 5, wall: 6 };
+export const T_NAMES = ['open', 'trench', 'rubble', 'crater', 'building', 'sandbag', 'wall'];
 
+// Which map to build: the trench line (the original), an industrial site or
+// a ruined city (src/sim/maps.js).
 export function generateMap(seedInt, cfg) {
+  if (cfg.map.type === 'industrial') return industrialMap(seedInt, cfg);
+  if (cfg.map.type === 'city') return cityMap(seedInt, cfg);
+  return trenchMap(seedInt, cfg);
+}
+
+function trenchMap(seedInt, cfg) {
   const { width: W, height: H, cell } = cfg.world;
   const m = cfg.map;
   const g = { rng: (seedInt ^ 0x9e3779b9) >>> 0 }; // map has its own stream
@@ -20,7 +29,7 @@ export function generateMap(seedInt, cfg) {
     elev: new Array(cols * rows).fill(0), // 0 low ground, 1 and 2 raised ground
     ramp: new Array(cols * rows).fill(0), // 1 where you can walk between heights
     hills: [], // plateau outlines for drawing
-    trenches: [], wires: [], buildings: [], craters: [], sites: [], tanks: [],
+    trenches: [], wires: [], buildings: [], craters: [], sites: [], tanks: [], kind: 'trenches',
   };
   const mir = (p) => ({ x: W - p.x, y: H - p.y });
 
@@ -51,17 +60,17 @@ export function generateMap(seedInt, cfg) {
   const B = { x: W / 2, y: H / 2 };
   const C = mir(A);
   const objR = m.objectiveRadius;
-  map.sites.push(site('A', 'objective', A, objR), site('B', 'objective', B, objR), site('C', 'objective', C, objR));
+  map.sites.push(siteAt('A', 'objective', A, objR), siteAt('B', 'objective', B, objR), siteAt('C', 'objective', C, objR));
 
   // Capturable features. Anything on the centre line is equally far from both
   // edges, so the comms post and arc tower sit on it (one top, one bottom).
   const topY = range(g, 130, 190);
   const commsTop = g.rng % 2 === 0;
   const fR = m.featureRadius;
-  map.sites.push(site('comms', 'comms', { x: W / 2, y: commsTop ? topY : H - topY }, fR));
-  map.sites.push(site('arc', 'arc', { x: W / 2, y: commsTop ? H - topY : topY }, fR));
+  map.sites.push(siteAt('comms', 'comms', { x: W / 2, y: commsTop ? topY : H - topY }, fR));
+  map.sites.push(siteAt('arc', 'arc', { x: W / 2, y: commsTop ? H - topY : topY }, fR));
   const mg = { x: A.x + range(g, 130, 210), y: Math.min(H - 120, A.y + range(g, 150, 230)) };
-  map.sites.push(site('mg1', 'mg', mg, fR), site('mg2', 'mg', mir(mg), fR));
+  map.sites.push(siteAt('mg1', 'mg', mg, fR), siteAt('mg2', 'mg', mir(mg), fR));
 
   // Ruins around each objective (B's cluster is built on its left and mirrored).
   const ruinsAround = (c, xMin, xMax) => {
@@ -108,6 +117,22 @@ export function generateMap(seedInt, cfg) {
     });
   }
   addHighGround(map, g, cfg, [A, B]);
+  return finishMap(map, cfg);
+}
+
+// Last checks for any map: everything must be reachable (if not, flatten
+// the high ground, then as a last resort knock the walls down), and note
+// what it has, for the rules and the drawing.
+export function finishMap(map) {
+  if (!connected(map)) {
+    map.elev.fill(0);
+    map.ramp.fill(0);
+    if (!connected(map)) for (let i = 0; i < map.grid.length; i++) if (map.grid[i] === T.wall) map.grid[i] = T.rubble;
+  }
+  map.hasHeight = map.elev.some((h) => h > 0);
+  map.wallCells = [];
+  for (let i = 0; i < map.grid.length; i++) if (map.grid[i] === T.wall) map.wallCells.push(i);
+  map.hasWalls = map.wallCells.length > 0;
   return map;
 }
 
@@ -120,7 +145,8 @@ export const heightAt = (map, x, y) => { const i = cellIndex(map, x, y); return 
 export const rampAt = (map, x, y) => { const i = cellIndex(map, x, y); return i < 0 ? 0 : map.ramp[i]; };
 
 // Can a soldier step from fine cell a to fine cell b?
-export const canStep = (map, a, b) => a < 0 || b < 0 || map.elev[a] === map.elev[b] || map.ramp[a] === 1 || map.ramp[b] === 1;
+// Walls block everyone on foot or in a tank (jetpacks fly over them).
+export const canStep = (map, a, b) => a < 0 || b < 0 || (map.grid[b] !== T.wall && (map.elev[a] === map.elev[b] || map.ramp[a] === 1 || map.ramp[b] === 1));
 
 function addHighGround(map, g, cfg, [A, B]) {
   const hc = cfg.map.hills;
@@ -209,13 +235,13 @@ function connected(map) {
   return targets.every(([x, y]) => seen[cellIndex(map, x, y)]);
 }
 
-function site(id, kind, p, r) {
+export function siteAt(id, kind, p, r) {
   const names = { comms: 'comms post', arc: 'arc tower', mg1: 'MG nest', mg2: 'MG nest' };
   return { id, kind, name: names[id] || id, x: Math.round(p.x), y: Math.round(p.y), r, owner: null, capSide: null, cap: 0, fireCd: 0 };
 }
 
 // Deterministic per cell noise for decoration choices.
-function hash(x, y, s) {
+export function hash(x, y, s) {
   let h = Math.imul((x * 73856093) ^ (y * 19349663) ^ s, 0x27d4eb2d);
   h ^= h >>> 15;
   return (h >>> 0) / 4294967296;
@@ -276,7 +302,7 @@ export function findCover(map, x, y, radius, score, mirror = false) {
   let best = null, bestScore = -Infinity;
   forCells(map, x - radius, y - radius, x + radius, y + radius, (i, cx, cy) => {
     const t = map.grid[i];
-    if (t === T.open || map.wire[i] > 0) return;
+    if (t === T.open || t === T.wall || map.wire[i] > 0) return;
     if ((cx - x) ** 2 + (cy - y) ** 2 > radius * radius) return;
     const s = score(cx, cy, t);
     if (s > bestScore || (mirror && s === bestScore)) { bestScore = s; best = { x: cx, y: cy }; }

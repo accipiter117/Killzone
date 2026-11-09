@@ -27,6 +27,7 @@
 
       <div id="hud-tr">
         <div id="op" class="glass" aria-label="Order points"><span id="op-num">3</span><div id="op-pips"></div></div>
+        <button id="btn-compass" class="hud-btn" aria-label="Turn the view back to north" hidden><svg id="compass-needle" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l4 9h-8z" fill="#ff6a46"/><path d="M12 21l-4-9h8z" fill="currentColor" opacity="0.6"/></svg></button>
         <button id="btn-minimap" class="hud-btn" aria-label="Show minimap"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg></button>
         <button id="btn-pause" class="hud-btn" aria-label="Pause">&#10074;&#10074;</button>
         <button id="btn-speed" class="hud-btn" aria-label="Speed">1x</button>
@@ -84,6 +85,7 @@
         <li><b>Jetpack</b> troopers fly straight over cliffs, wire and trenches (but get no cover in the air). <b>Infiltrators</b> stay hidden until they fire or an enemy gets close; their first shots hit hardest. A recon Mark exposes them.</li>
         <li>Each side has one <b>tank</b> (its own card). Tap the card, then the ground to drive there (1 point). Its main gun shells groups of infantry and the enemy tank; its machine gun sprays anyone close. <b>Overwatch</b> fires an aimed heavy shell. Infantry close behind their tank are covered, and it flattens wire.</li>
         <li>Rifles barely scratch a tank. Hurt it with <b>heavies</b>, grenades, artillery, the arc tower, jetpack dives, your own tank, and <b>engineers</b>: with an enemy tank close, their ability becomes a <b>breaching charge</b>. A knocked out tank stays as a wreck you can hide behind.</li>
+        <li><b>Maps</b> (menu): Trenches, an Industrial site or a Ruined city. On the built-up maps <b>walls</b> block movement and sight and shelter anyone beside them; artillery, grenades and tank shells blow holes in them.</li>
         <li><b>High ground</b> gives range and accuracy. Cliffs can only be climbed at ramps, so hills make chokepoints.</li>
         <li>Time slows right down while a platoon is selected, so you can think. Tap the card again to let go.</li>
         <li>Tapped the wrong spot? For 5 seconds after an order you can tap again to change it for free (the card counts down).</li>
@@ -91,7 +93,7 @@
         <li><b>Reinforce</b> (2 points) sends up to five fresh soldiers from your lines to refill the selected platoon's weakest squad.</li>
         <li>A platoon that loses too many men <b>breaks</b> and runs back to its own lines. The first time, it regroups there and rejoins the fight; break it again and it is gone.</li>
         <li><b>Reading the fight:</b> the bar by the score is troops left on each side. A red arc on your squad points at who is shooting it. Red arrows at the screen edge point to your platoons in trouble off screen: tap one to look. Tap a message with › to jump to where it happened.</li>
-        <li>Drag to pan, pinch to zoom, tap the minimap to jump. Press and hold anything to see what it does.</li>
+        <li>Drag to pan, pinch to zoom, <b>twist two fingers to turn the map</b> (the compass turns it back to north; the tilted look keeps north up), tap the minimap to jump. Press and hold anything to see what it does.</li>
       </ul>
       <button class="primary" data-close>Got it</button>
     </div>
@@ -101,6 +103,14 @@
     <div class="sheet">
       <h2>Menu</h2>
       <div class="row"><span>Map seed</span><input id="seed-input" inputmode="text" maxlength="24" aria-label="Map seed"></div>
+      <div class="row"><span>Map (next battle)</span>
+        <select id="map-select" aria-label="Map">
+          <option value="trenches">Trenches</option>
+          <option value="industrial">Industrial site</option>
+          <option value="city">Ruined city</option>
+          <option value="random">Random</option>
+        </select>
+      </div>
       <div class="row"><span>Battle length</span>
         <select id="length-select" aria-label="Battle length">
           <option value="300">5 minutes</option>
@@ -109,7 +119,7 @@
         </select>
       </div>
       <label class="row toggle"><span>Watch mode (AI plays both sides)</span><input type="checkbox" id="watch-toggle"></label>
-      <label class="row toggle"><span>Tilted battlefield (hills and ruins stand up)</span><input type="checkbox" id="tilt-toggle"></label>
+      <label class="row toggle"><span>Tilted look (hills and walls stand up; keeps north up, no turning)</span><input type="checkbox" id="tilt-toggle"></label>
       <div class="row"><span>Soldier style</span>
         <select id="view-select" aria-label="Soldier style">
           <option value="pixel">Detailed troopers</option>

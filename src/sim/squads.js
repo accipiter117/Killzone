@@ -1,7 +1,7 @@
 // Squad behaviour. The player orders platoons; each squad works out how to
 // carry the order out according to its role and the platoon's stance.
 
-import { findCover, wireAt, forCells, cellIndex, canStep, rampAt, heightAt } from './map.js';
+import { T, findCover, wireAt, forCells, cellIndex, canStep, rampAt, heightAt } from './map.js';
 import { nextStep, straightClear, findPath } from './path.js';
 import {
   members, centroid, clamp, dist, sideDir, edgeX, siteLabel, nearObjective, isActive, coverName,
@@ -75,7 +75,9 @@ function formUp(state, sq, list, dest, snapCover) {
   const ca = Math.cos(ang), sa = Math.sin(ang);
   const W = state.map.width, H = state.map.height;
   for (const s of list) {
-    const [ox, oy] = WEDGE[sq.soldiers.indexOf(s.id) % WEDGE.length];
+    // Places by rank among the living, so a squad that has lost men still
+    // has a point man and a lone survivor goes where the squad is going.
+    const [ox, oy] = WEDGE[list.indexOf(s) % WEDGE.length];
     let x = clamp(dest.x + ox * ca - oy * sa, 5, W - 5);
     let y = clamp(dest.y + ox * sa + oy * ca, 5, H - 5);
     if (snapCover && coverName(state, x, y) === 'open') {
@@ -85,13 +87,20 @@ function formUp(state, sq, list, dest, snapCover) {
     }
     // On broken ground a soldier's own spot can be across a cliff from
     // them: then they follow the squad's point, or find their own way.
-    if (state.map.hasHeight && !state.cfg.roles[s.role].flies && !straightClear(state.map, s, { x, y }, true)) {
+    // Never aim a soldier at the inside of a wall: use the nearest open spot.
+    if (state.map.hasWalls && state.map.grid[cellIndex(state.map, x, y)] === T.wall) {
+      const free = nearestFree(state.map, x, y, s);
+      x = free.x; y = free.y;
+    }
+    if ((state.map.hasHeight || state.map.hasWalls) && !state.cfg.roles[s.role].flies && !straightClear(state.map, s, { x, y }, true)) {
       if (straightClear(state.map, s, dest, true)) { x = dest.x; y = dest.y; }
       else {
         let p = findPath(state.map, s, dest, { maxNodes: 12000, mirror: s.side === 1 });
         // No way to the squad's destination from here: rejoin the squad.
         if (!p || !p.length) p = findPath(state.map, s, { x: sq.cx, y: sq.cy }, { maxNodes: 12000, mirror: s.side === 1 });
-        let pt = p && p[0] ? p[Math.min(p.length - 1, 6)] : { x: s.x, y: s.y };
+        // Start from the route's first step (always reachable), then look
+        // as far along it as can be walked in a straight line.
+        let pt = p && p[0] ? p[0] : { x: s.x, y: s.y };
         for (let k = Math.min(p ? p.length - 1 : 0, 30); k > 0; k--) {
           if (straightClear(state.map, s, p[k], true)) { pt = p[k]; break; }
         }
@@ -100,6 +109,24 @@ function formUp(state, sq, list, dest, snapCover) {
     }
     s.tx = x; s.ty = y;
   }
+}
+
+// The nearest cell that is not wall, searching outwards in rings (towards
+// the soldier first, so they do not cross the wall to reach it).
+function nearestFree(map, x, y, from) {
+  for (let r = 10; r <= 60; r += 10) {
+    let best = null, bd = Infinity;
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+      const i = cellIndex(map, px, py);
+      if (i < 0 || map.grid[i] === T.wall) continue;
+      const d = Math.hypot(px - from.x, py - from.y);
+      if (d < bd) { bd = d; best = { x: px, y: py }; }
+    }
+    if (best) return best;
+  }
+  return { x: from.x, y: from.y };
 }
 
 const stopAll = (list) => list.forEach((s) => { s.tx = s.x; s.ty = s.y; });
@@ -149,6 +176,14 @@ export function thinkSquad(state, sq) {
     let best = list[0];
     for (const s of list) if (dist(s, c) < dist(best, c)) best = s;
     c = { x: best.x, y: best.y };
+  }
+  // Stalled and pushing on: lead from the soldier furthest along, so a
+  // straggler caught behind a wall or on a heap cannot hold the squad's
+  // position (and so its route) back. The others find their own way after.
+  if (sq.pushUntil > state.tick && sq.lastGoal) {
+    let lead = list[0];
+    for (const s of list) if (dist(s, sq.lastGoal) < dist(lead, sq.lastGoal)) lead = s;
+    c = { x: lead.x, y: lead.y };
   }
   sq.cx = c.x; sq.cy = c.y;
   const dir = sideDir(sq.side);
@@ -285,6 +320,7 @@ function advance(state, sq, pl, list, c, firing, order) {
     if (cv) goal = cv;
   }
   const d = dist(c, goal);
+  sq.lastGoal = goal;
   // Arrived when close; also when nearly there but blocked from getting
   // closer for a while (say the last few yards are up a cliff), rather than
   // pressing against the edge for the rest of the battle.

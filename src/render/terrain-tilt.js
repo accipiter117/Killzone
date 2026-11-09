@@ -11,6 +11,7 @@
 
 import { makeFxRandom } from './fx-random.js';
 import { T } from '../sim/map.js';
+import { GROUND } from './terrain.js';
 
 export const LIFT = 20; // screen rise per level of height, in world units
 
@@ -47,21 +48,24 @@ export function buildTiltTerrain(map, seedInt) {
 
   // Ground: a calm base, big soft tone changes, then small life: tyre ruts,
   // tufts of grass and pebbles, all sparse so units stay readable.
-  g.fillStyle = P.ground;
+  const pal = GROUND[map.kind] || GROUND.trenches;
+  g.fillStyle = pal.base;
   g.fillRect(0, 0, map.width, map.height);
   for (let i = 0; i < 140; i++) {
     g.globalAlpha = 0.5;
-    g.fillStyle = r.pick(P.groundSoft);
+    g.fillStyle = r.pick(pal.soft);
     g.beginPath();
     g.ellipse(r() * map.width, r() * map.height, r.range(80, 220), r.range(60, 160), r() * 3.14, 0, Math.PI * 2);
     g.fill();
   }
   g.globalAlpha = 1;
-  const t0 = map.trenches[0], t1 = map.trenches[1];
-  const x0 = t0.reduce((a, p) => a + p.x, 0) / t0.length + 60;
-  const x1 = t1.reduce((a, p) => a + p.x, 0) / t1.length - 60;
-  g.fillStyle = P.nomans;
-  g.fillRect(x0, 0, x1 - x0, map.height);
+  if (map.trenches.length) {
+    const t0 = map.trenches[0], t1 = map.trenches[1];
+    const x0 = t0.reduce((a, p) => a + p.x, 0) / t0.length + 60;
+    const x1 = t1.reduce((a, p) => a + p.x, 0) / t1.length - 60;
+    g.fillStyle = P.nomans;
+    g.fillRect(x0, 0, x1 - x0, map.height);
+  }
   g.strokeStyle = P.rut;
   g.lineWidth = 3;
   for (let i = 0; i < 26; i++) {
@@ -197,6 +201,7 @@ function drawRuin(g, b, r, lift) {
   g.fillRect(bx, by, b.w, b.h);
   g.fillStyle = P.floorTile;
   for (let y = by + 3; y < by + b.h - 2; y += 7) for (let x = bx + 3 + ((y - by) % 14 ? 3 : 0); x < bx + b.w - 3; x += 7) if (r() < 0.6) g.fillRect(x, y, 5, 5);
+  if (b.walls === false) return; // built-up maps: real walls are drawn live
 
   const T_ = 5;
   const runs = [];
