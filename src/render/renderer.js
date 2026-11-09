@@ -10,6 +10,8 @@ import { getSprite25, W25, H25, ANCHOR_X, ANCHOR_Y } from './sprites25d.js';
 import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './pixel-troopers.js';
 import { getTank, TANK_W, TANK_H, TANK_FOOT } from './tanks.js';
 import { liftAt } from './terrain-tilt.js';
+import { SPRITES, drawUnit, dirFromAngle } from './unit-sprites.js';
+import { fx } from './fx-random.js';
 
 // In the tilted view, anything standing on raised ground is drawn higher up
 // the screen. LY gives the screen y for a ground point (unchanged when flat).
@@ -31,6 +33,17 @@ function billboard(g, x, y) {
 // up: how far above the spot to draw (world units, always straight up the screen).
 function drawTrooper(g, side, frame, ang, x, y, ps, role, up = 0) {
   const rot = VIEW.cam ? VIEW.cam.rot : 0;
+  // The ChatGPT sprites, facing any of 8 ways, for every infantry squad
+  // except jetpack troopers (who keep their own look until they get a set).
+  if (SPRITES.ready && role !== 'jump') {
+    const d = dirFromAngle(ang + rot);
+    if (rot) { billboard(g, x, y); x = 0; y = 0; }
+    const ok = drawUnit(g, side === 0 ? 'isa' : 'hgh', frame, d, x, y - up, ps);
+    if (rot) setWorld(g);
+    if (ok) return;
+  }
+  if (frame === 'aim') frame = 'stand';
+  else if (frame.startsWith('throw')) frame = 'fire';
   const facing = Math.cos(ang + rot) >= 0 ? 1 : -1;
   const fx = facing === 1 ? PT_FOOT[0] : PT_W - 1 - PT_FOOT[0];
   if (rot) { billboard(g, x, y); x = 0; y = 0; }
@@ -601,6 +614,13 @@ function animate(r, state, opts) {
     if (sq.pinned && sq.mode !== 'rout') frame = sq.mode === 'crawl' && moved > 0.01 && Math.floor(stride / 3) % 2 ? 'prone2' : 'prone1';
     else if (opts.now - (lastShot.get(s.id) ?? -9) < 0.09) frame = 'fire';
     else if (moved > 0.01) frame = top ? WALK[Math.floor(stride / 3.5) % 4] : WALK25[Math.floor(stride / 3) % 4];
+    if (opts.view === 'pixel' && !frame.startsWith('prone')) {
+      // A grenade just thrown: the three throwing frames; standing with a
+      // target in sight: the aiming pose rather than at ease.
+      const thrown = opts.now - (opts.fxs.lastThrow.get(s.id) ?? -9);
+      if (thrown < 0.9) frame = thrown < 0.3 ? 'throw1' : thrown < 0.6 ? 'throw2' : 'throw3';
+      else if (frame === 'stand' && s.target >= 0) frame = 'aim';
+    }
     // Jetpack troopers fly when moving (or diving): jets on, held aloft.
     if (!top && state.cfg.roles[s.role].flies && (moved > 0.01 || sq.mode === 'dive') && !frame.startsWith('prone')) frame = (Math.floor(opts.now * 12) % 2) ? 'fly2' : 'fly1';
     out.push({ s, sq, frame, dir: dirIndex(ang), ang });
@@ -637,6 +657,13 @@ function drawSoldiers(g, r, state, opts, px) {
   const foot = pixel ? 2.4 : 1; // shadows and rings scale with the figure
   list.sort((a, b) => a.s.y - b.s.y || a.s.id - b.s.id);
   const tanks = (state.vehicles || []).filter((v) => vehicleSeen(state, v, opts)).sort((a, b) => a.y - b.y);
+  // Grapples: a few pairs of enemies who have run into each other are drawn
+  // locked together (see updateGrapples); their own sprites are skipped.
+  const pairs = pixel && SPRITES.ready ? updateGrapples(r, state, opts) : [];
+  if (pairs.length) {
+    const busy = new Set(pairs.flatMap((p) => [p.a, p.b]));
+    for (let k = list.length - 1; k >= 0; k--) if (busy.has(list[k].s.id)) list.splice(k, 1);
+  }
   for (const { s, sq } of list) {
     const sy = LY(s.x, s.y);
     g.fillStyle = 'rgba(15,12,8,0.35)';
@@ -652,9 +679,11 @@ function drawSoldiers(g, r, state, opts, px) {
       g.stroke();
     }
   }
-  let ti = 0;
+  let ti = 0, pi = 0;
+  const pairList = pairs.map((p) => ({ ...p, y: (state.soldiers[p.a].y + state.soldiers[p.b].y) / 2 })).sort((a, b) => a.y - b.y);
   for (const { s, sq, frame, dir, ang } of list) {
     while (ti < tanks.length && tanks[ti].y <= s.y) drawVehicle(g, r, state, tanks[ti++], pixel ? ps : ps * 1.4, opts);
+    while (pi < pairList.length && pairList[pi].y <= s.y) drawGrapple(g, state, pairList[pi++], ps, opts);
     g.globalAlpha = sq.mode === 'rout' ? 0.6 : 1;
     const sy = LY(s.x, s.y);
     if (pixel) {
@@ -679,7 +708,74 @@ function drawSoldiers(g, r, state, opts, px) {
     g.drawImage(getSprite25(s.side, s.role, frame, dir), s.x - ANCHOR_X * ps, sy - ANCHOR_Y * ps, W25 * ps, H25 * ps);
   }
   g.globalAlpha = 1;
+  while (pi < pairList.length) drawGrapple(g, state, pairList[pi++], ps, opts);
   while (ti < tanks.length) drawVehicle(g, r, state, tanks[ti++], pixel ? ps : ps * 1.4, opts);
+}
+
+// ---- Grapples -----------------------------------------------------------------
+// When the armies collide, an ISA and a Helghast soldier who end up right on
+// top of each other are drawn wrestling over their rifles. Only a few per
+// patch of ground (2 or 3), so a clash still looks like a firefight and not
+// one big brawl; each starts on a random frame so neighbours never move in
+// step. Purely a picture: the fight itself carries on in the rules as usual.
+const GRAPPLE = { start: 30, keep: 42, patch: 170 };
+function updateGrapples(r, state, opts) {
+  const sol = state.soldiers;
+  r.grapples = r.grapples || new Map();
+  const ok = (s) => {
+    if (!isActive(s) || !visible(state, s, opts)) return false;
+    const sq = state.squads[s.squad];
+    return !state.cfg.roles[s.role].flies && !sq.pinned && sq.mode !== 'rout' && sq.mode !== 'dive';
+  };
+  const busy = new Set();
+  const perPatch = new Map();
+  const patchOf = (a, b) => `${Math.floor((a.x + b.x) / 2 / GRAPPLE.patch)},${Math.floor((a.y + b.y) / 2 / GRAPPLE.patch)}`;
+  for (const [key, p] of r.grapples) {
+    const a = sol[p.a], b = sol[p.b];
+    if (!ok(a) || !ok(b) || Math.hypot(a.x - b.x, a.y - b.y) > GRAPPLE.keep) { r.grapples.delete(key); continue; }
+    busy.add(p.a); busy.add(p.b);
+    const k = patchOf(a, b);
+    perPatch.set(k, (perPatch.get(k) || 0) + 1);
+  }
+  const cand = [];
+  for (const a of sol) {
+    if (a.side !== 0 || busy.has(a.id) || !ok(a)) continue;
+    let best = null, bd = GRAPPLE.start;
+    for (const b of sol) {
+      if (b.side !== 1 || busy.has(b.id) || !ok(b)) continue;
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d < bd) { bd = d; best = b; }
+    }
+    if (best) cand.push({ a, b: best, d: bd });
+  }
+  cand.sort((p, q) => p.d - q.d);
+  for (const { a, b } of cand) {
+    if (busy.has(a.id) || busy.has(b.id)) continue;
+    const k = patchOf(a, b);
+    const cap = 2 + ((k.length * 7 + k.charCodeAt(0)) % 2); // 2 or 3 per patch
+    if ((perPatch.get(k) || 0) >= cap) continue;
+    perPatch.set(k, (perPatch.get(k) || 0) + 1);
+    busy.add(a.id); busy.add(b.id);
+    r.grapples.set(`${a.id}-${b.id}`, { a: a.id, b: b.id, off: fx() * 4, rate: 2.6 + fx() * 0.9 });
+  }
+  return [...r.grapples.values()];
+}
+
+function drawGrapple(g, state, p, ps, opts) {
+  const a = state.soldiers[p.a], b = state.soldiers[p.b];
+  const x = (a.x + b.x) / 2, y = LY(x, (a.y + b.y) / 2);
+  const rot = VIEW.cam ? VIEW.cam.rot : 0;
+  // The pair faces the way the ISA soldier faces his opponent.
+  const d = dirFromAngle(Math.atan2(b.y - a.y, b.x - a.x) + rot);
+  const f = `grapple${1 + (Math.floor(opts.now * p.rate + p.off) % 4)}`;
+  g.fillStyle = 'rgba(15,12,8,0.35)';
+  g.beginPath();
+  g.ellipse(x, y + 0.5 * ps, 22 * ps, 4.5 * ps, 0, 0, Math.PI * 2);
+  g.fill();
+  let dx = x, dy = y;
+  if (rot) { billboard(g, x, y); dx = 0; dy = 0; }
+  drawUnit(g, 'grapple', f, d, dx, dy, ps);
+  if (rot) setWorld(g);
 }
 
 // The fallen: a quick topple, then they stay where they dropped.

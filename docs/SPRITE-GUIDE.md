@@ -83,3 +83,13 @@ bottom: [ROWS]. [RULES]"
   shooting; prone1 and prone2 when pinned (alternating while crawling); hit,
   fall, dead when killed; throw1 to throw3 for a grenade.
 - Battle size: a standing soldier is about 34 world units tall.
+- Atlases in the game (src/render/unit-sprites.js): `isa-rifle-blue` (the ISA
+  set with its grey armour tinted towards ISA blue, the owner's chosen look),
+  `hgh-rifle`, and `grapple`. Jetpack troopers keep the code-drawn look
+  until their own set exists.
+- Grapple: one sprite of an ISA and a Helghast soldier wrestling, 8
+  directions (the way the ISA soldier faces), 4 frame loop. Shown when
+  opposing soldiers end up within 30 units of each other, at most 2 or 3
+  pairs per patch of ground (about 170 units square) so a clash stays a
+  firefight, each pair starting on a random frame. Picture only: the rules
+  carry on as normal underneath.
