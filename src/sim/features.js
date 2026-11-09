@@ -54,6 +54,18 @@ export function updateEmplacements(state, dt) {
   const f = state.cfg.features;
   for (const site of state.sites) {
     if (site.owner === null || (site.kind !== 'mg' && site.kind !== 'arc')) continue;
+    if (site.kind === 'mg') {
+      // Suppression on the nest wears off; too much and it falls silent
+      // until it has eased well back down.
+      const m = f.mgSilence;
+      site.supp = Math.max(0, (site.supp || 0) - m.decay * dt);
+      if (!site.silenced && site.supp >= m.silencedAt) {
+        site.silenced = true;
+        feed(state, `${sideName(site.owner)} MG nest${nearObjective(state, site) ? ` near ${nearObjective(state, site).id}` : ''} silenced`, 1 - site.owner, site);
+        state.events.push({ type: 'silenced', side: site.owner, x: site.x, y: site.y });
+      } else if (site.silenced && site.supp < m.silencedAt * m.recoverShare) site.silenced = false;
+      if (site.silenced) continue;
+    }
     site.fireCd -= dt;
     if (site.fireCd > 0) continue;
     const w = f[site.kind];
@@ -61,7 +73,8 @@ export function updateEmplacements(state, dt) {
     if (!targets.length && !(site.kind === 'arc' && state.vehicles.some((o) => o.alive && o.side !== site.owner && dist(o, site) <= w.range && o.spotted[site.owner]))) { site.fireCd = 0.3; continue; }
     if (site.kind === 'mg') {
       fireShot(state, { x: site.x, y: site.y, side: site.owner }, targets[0], w, w.range, false, 'mg');
-      site.fireCd = w.fireInterval;
+      site.lastShotTick = state.tick;
+      site.fireCd = w.fireInterval * (1 + (f.mgSilence.fireMult * (site.supp || 0)) / 100);
     } else {
       for (const t of targets) {
         damageSoldier(state, t, w.damage, 'arc');
@@ -107,6 +120,10 @@ export function blast(state, x, y, radius, damage, suppRadius, suppAmount, sourc
     const sq = state.squads[id];
     const lead = state.soldiers[sq.soldiers[0]];
     suppress(state, sq, suppAmount * coverAt(state, lead.x, lead.y).supp, source, { x, y });
+  }
+  // Blasts on or beside an MG nest rattle its crew.
+  for (const site of state.sites) {
+    if (site.kind === 'mg' && site.owner !== null && Math.hypot(site.x - x, site.y - y) <= radius + site.r) site.supp = Math.min(100, (site.supp || 0) + state.cfg.features.mgSilence.blast);
   }
 }
 

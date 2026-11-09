@@ -4,7 +4,7 @@
 import { T, findCover, wireAt, forCells, cellIndex, canStep, rampAt, heightAt } from './map.js';
 import { nextStep, straightClear, findPath } from './path.js';
 import {
-  members, centroid, clamp, dist, sideDir, edgeX, siteLabel, nearObjective, isActive, coverName,
+  members, centroid, clamp, dist, sideDir, edgeX, siteLabel, nearObjective, isActive, coverName, coverAt, feed,
 } from './util.js';
 import { weaponRange } from './combat.js';
 
@@ -259,11 +259,46 @@ export function thinkSquad(state, sq) {
       sq.status = 'Pinned, crawling back';
       formUp(state, sq, list, { x: edgeX(state, sq.side) + dir * 110, y: c.y }, false);
     } else {
-      sq.mode = 'pinned';
-      sq.status = pinnedText(state, sq, c);
-      stopAll(list);
+      const crawl = pinnedCrawl(state, sq, c, order);
+      if (crawl) {
+        sq.mode = 'crawl';
+        sq.status = crawl.status;
+        formUp(state, sq, list, crawl.to, false);
+      } else {
+        sq.mode = 'pinned';
+        sq.status = pinnedText(state, sq, c);
+        stopAll(list);
+      }
     }
     return;
+  }
+  // Engineers patching up their own tank (the Repair ability).
+  if (sq.repairUntil > state.tick) {
+    const v = state.vehicles[sq.repairVehicle];
+    const r = cfg.repair;
+    if (v && v.alive && v.hp < v.maxHp) {
+      if (list.some((s) => dist(s, v) <= r.reach + v.radius)) {
+        if (!sq.repairDoneTick) sq.repairDoneTick = state.tick + Math.round(r.workSec * cfg.tickRate);
+        if (state.tick >= sq.repairDoneTick) {
+          v.hp = Math.min(v.maxHp, v.hp + v.maxHp * r.heal);
+          sq.repairUntil = 0;
+          sq.repairDoneTick = 0;
+          state.events.push({ type: 'repaired', side: sq.side, x: v.x, y: v.y });
+          feed(state, `${sq.side === 0 ? '' : 'Helghast '}${pl.name}: engineers patched up the tank`, sq.side, v);
+        } else {
+          sq.mode = 'repair';
+          sq.status = `Repairing the tank (${Math.ceil((sq.repairDoneTick - state.tick) / cfg.tickRate)}s)`;
+          formUp(state, sq, list, { x: v.x - dir * (v.radius + 14), y: v.y }, true);
+          return;
+        }
+      } else {
+        sq.repairDoneTick = 0;
+        sq.mode = 'move';
+        sq.status = 'Running to repair the tank';
+        formUp(state, sq, list, nextStep(state, sq, c, { x: v.x, y: v.y }), false);
+        return;
+      }
+    } else sq.repairUntil = 0;
   }
   const firing = state.tick - sq.lastFiredTick < cfg.tickRate * 1.5;
 
@@ -304,6 +339,48 @@ export function thinkSquad(state, sq) {
   advance(state, sq, pl, list, c, firing, order);
 }
 
+// A pinned squad is not frozen for good: one at the edge of the post it is
+// taking crawls in so the capture keeps going, and one pinned out in the
+// open crawls to the nearest cover (a little back rather than forward).
+function pinnedCrawl(state, sq, c, order) {
+  const sc = state.cfg.squad;
+  if (order.type === 'take') {
+    const site = goalOf(state, order);
+    if (site && site.owner !== sq.side) {
+      const d = dist(c, site);
+      if (d > site.r * 0.6 && d < site.r + sc.crawlOnReach) {
+        const k = (site.r * 0.45) / d;
+        return { to: { x: site.x + (c.x - site.x) * k, y: site.y + (c.y - site.y) * k }, status: `Pinned, crawling onto ${siteLabel(site)}` };
+      }
+    }
+  }
+  if (coverAt(state, c.x, c.y).hit > 0) return null;
+  const dir = sideDir(sq.side);
+  const cv = findCover(state.map, c.x, c.y, sc.crawlCoverReach, (x, y) => -Math.hypot(x - c.x, y - c.y) - Math.max(0, dir * (x - c.x)) * 0.6, sq.side === 1);
+  if (!cv || dist(cv, c) < 14) return null;
+  return { to: cv, status: 'Pinned, crawling to cover' };
+}
+
+// Where a squad should go to help a pinned squad of its own platoon: within
+// its own range of whoever is pinning it (the last place the fire came
+// from). Null when no platoon mate is pinned, or the shooter is unknown.
+function supportSpot(state, sq, pl, c, list) {
+  const cfg = state.cfg;
+  let mate = null;
+  for (const id of pl.squads) {
+    const q = state.squads[id];
+    if (q !== sq && q.pinned && q.mode !== 'dead' && q.mode !== 'rout') { mate = q; break; }
+  }
+  if (!mate || !mate.hitFrom || state.tick - mate.hitFrom.tick > 3 * cfg.tickRate) return null;
+  const threat = mate.hitFrom;
+  const range = weaponRange(state, list[0]) * cfg.squad.supportShare;
+  const d = dist(c, threat);
+  if (d <= range) return { mate, to: c, inRange: true };
+  const spot = { x: threat.x + ((c.x - threat.x) / d) * range, y: threat.y + ((c.y - threat.y) / d) * range };
+  const cv = findCover(state.map, spot.x, spot.y, 50, (x, y) => -Math.hypot(x - spot.x, y - spot.y), sq.side === 1);
+  return { mate, to: cv || spot, inRange: false };
+}
+
 function advance(state, sq, pl, list, c, firing, order) {
   const cfg = state.cfg;
   const sc = cfg.squad;
@@ -312,6 +389,24 @@ function advance(state, sq, pl, list, c, firing, order) {
   const goalSite = goalOf(state, order);
   const label = order.type === 'take' ? siteLabel(goalSite) : null;
   let goal = slotFor(state, pl, sq, goalSite);
+  // A platoon mate pinned down: move up to fire at whoever is pinning it,
+  // rather than hanging back or waiting for it.
+  const help = sq.order ? null : supportSpot(state, sq, pl, c, list);
+  if (help) {
+    const who = `the ${cfg.roles[help.mate.role].label} squad`;
+    sq.lastGoal = help.to;
+    if (help.inRange) {
+      sq.mode = 'support';
+      sq.status = `Covering ${who}`;
+      const cv = findCover(state.map, c.x, c.y, 40, (x, y) => -Math.hypot(x - c.x, y - c.y), sq.side === 1);
+      formUp(state, sq, list, cv || c, true);
+    } else {
+      sq.mode = 'move';
+      sq.status = `Moving up to help ${who}`;
+      formUp(state, sq, list, nextStep(state, sq, c, help.to), false);
+    }
+    return;
+  }
   if (sq.role === 'recon' && !sq.order) {
     // Recon hangs back behind the platoon's goal and spots for everyone.
     const back = goal.x - dir * sc.reconBackoff;
@@ -562,7 +657,7 @@ export function platoonHeadline(state, pl) {
   if (!sqs.length) return 'Wiped out';
   const pinned = sqs.find((sq) => sq.pinned);
   if (pinned) return pinned.status;
-  const order = ['cut', 'wait', 'suppress', 'cover', 'move', 'arrived', 'hold', 'fallback', 'idle'];
+  const order = ['repair', 'cut', 'wait', 'suppress', 'support', 'cover', 'move', 'arrived', 'hold', 'fallback', 'idle'];
   sqs.sort((a, b) => order.indexOf(a.mode) - order.indexOf(b.mode));
   const lead = sqs.find((sq) => sq.role !== 'recon') || sqs[0];
   return lead.status;

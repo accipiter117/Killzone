@@ -31,16 +31,29 @@ export function breachTarget(state, sq, c) {
   return v && dist(v, c) <= state.cfg.breach.range ? v : null;
 }
 
+// Or for a field repair when their own tank is damaged and close.
+export function repairTarget(state, sq, c) {
+  if (sq.role !== 'engineer') return null;
+  const r = state.cfg.repair;
+  const v = state.vehicles.find((o) => o.alive && !o.absent && o.side === sq.side);
+  return v && v.hp < v.maxHp * r.needBelow && dist(v, c) <= r.range ? v : null;
+}
+
 export const abilityKey = (state, sq) => {
   const key = ABILITY_OF[sq.role];
   if (key !== 'sandbags') return key;
   const list = members(state, sq);
-  return list.length && breachTarget(state, sq, centroid(list)) ? 'breach' : key;
+  if (!list.length) return key;
+  const c = centroid(list);
+  return breachTarget(state, sq, c) ? 'breach' : repairTarget(state, sq, c) ? 'repair' : key;
 };
+
+// The numbers for an ability (breach and repair live at the top level).
+export const abilityCfg = (state, key) => (key === 'breach' || key === 'repair' ? state.cfg[key] : state.cfg.abilities[key]);
 
 export function useAbility(state, sq) {
   const key = abilityKey(state, sq);
-  const a = key === 'breach' ? state.cfg.breach : state.cfg.abilities[key];
+  const a = abilityCfg(state, key);
   const list = members(state, sq);
   if (!list.length) return fail('That squad is gone');
   if (sq.mode === 'rout') return fail('That squad is routing');
@@ -129,8 +142,19 @@ export function useAbility(state, sq) {
       sq.pinned = false;
       break;
     }
+    case 'repair': {
+      const v = repairTarget(state, sq, c);
+      sq.repairVehicle = v.id;
+      sq.repairUntil = state.tick + ticks(a.runSec);
+      sq.repairDoneTick = 0;
+      break;
+    }
     case 'vanish': {
       sq.vanishUntil = state.tick + ticks(a.durationSec);
+      // Out of sight, out of trouble: being pinned falls away.
+      const sp = state.cfg.suppression;
+      sq.supp = Math.min(sq.supp, sp.pinAt * sp.unpinShare * 0.5);
+      sq.pinned = false;
       for (const s of list) s.lastShotTick = -9999; // no longer given away by their last shots
       state.events.push({ type: 'vanish', side: sq.side, x: c.x, y: c.y });
       break;
@@ -148,7 +172,7 @@ export function useAbility(state, sq) {
 // interface: buttons only light up when tapping them would work.)
 export function abilityHasTarget(state, sq) {
   const key = abilityKey(state, sq);
-  if (key === 'sandbags' || key === 'breach') return true;
+  if (key === 'sandbags' || key === 'breach' || key === 'repair') return true;
   const list = members(state, sq);
   if (!list.length) return false;
   const c = centroid(list);

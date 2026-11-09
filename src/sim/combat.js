@@ -178,6 +178,14 @@ export function updateFiring(state, dt) {
       sq.lastFiredTick = state.tick;
       continue;
     }
+    // Heavies turn on an enemy MG nest that is firing; everyone else shoots
+    // at one only when there is no soldier to shoot.
+    if ((s.role === 'heavy' || !t) && fireAtNest(state, s, base, range, sq.pinned && !barrage)) {
+      s.lastShotTick = state.tick;
+      s.cd = base.fireInterval * (0.85 + 0.3 * next(state));
+      sq.lastFiredTick = state.tick;
+      continue;
+    }
     if (!t) { s.cd = 0.2; continue; }
     // An infiltrator firing from hiding: the first shots hit much harder.
     if (base.hidden && state.tick - s.lastShotTick > base.revealSec * cfg.tickRate) base = { ...base, damage: base.damage * base.ambushMult };
@@ -189,6 +197,24 @@ export function updateFiring(state, dt) {
     s.cd = (role.fireInterval / (barrage ? b.fireMult : 1)) * (pinned ? cfg.combat.pinnedFireSlow : 1) * (0.85 + 0.3 * next(state));
     sq.lastFiredTick = state.tick;
   }
+}
+
+// Fire at an enemy MG nest's crew: no kills, but it piles suppression on
+// the nest (see updateEmplacements). Heavies only bother while it is firing.
+function fireAtNest(state, s, w, range, pinned) {
+  let best = null, bd = range;
+  for (const site of state.sites) {
+    if (site.kind !== 'mg' || site.owner === null || site.owner === s.side) continue;
+    if (s.role === 'heavy' && !(state.tick - (site.lastShotTick ?? -9999) < 2 * state.cfg.tickRate)) continue;
+    const d = dist(s, site);
+    if (d < bd && losClear(state, s.x, s.y, site.x, site.y)) { bd = d; best = site; }
+  }
+  if (!best) return false;
+  const m = state.cfg.features.mgSilence;
+  best.supp = Math.min(100, (best.supp || 0) + w.suppress * m.perShot * (pinned ? state.cfg.combat.pinnedAccuracy : 1));
+  const a = next(state) * Math.PI * 2;
+  state.events.push({ type: 'shot', id: s.id, side: s.side, x1: s.x, y1: s.y, x2: best.x + Math.cos(a) * 10, y2: best.y + Math.sin(a) * 10, hit: false, src: 'fire' });
+  return true;
 }
 
 // One shot from a soldier or an MG nest at a target soldier.

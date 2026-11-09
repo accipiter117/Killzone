@@ -15,7 +15,9 @@ import { members, centroid, feed } from './util.js';
 function reinforce(state, pl) {
   const cfg = state.cfg;
   const sd = state.sides[pl.side];
-  if (state.tick < sd.reinforceReadyTick) return fail(`Reinforcements are on their way back (${Math.ceil((sd.reinforceReadyTick - state.tick) / cfg.tickRate)}s)`);
+  // Each platoon has its own reinforcements, recharging separately.
+  const ready = pl.reinforceReadyTick || 0;
+  if (state.tick < ready) return fail(`${pl.name}'s reinforcements are on their way back (${Math.ceil((ready - state.tick) / cfg.tickRate)}s)`);
   const squads = pl.squads.map((id) => state.squads[id]);
   const weakest = squads.reduce((a, b) => (members(state, b).length < members(state, a).length ? b : a));
   const dead = weakest.soldiers.map((id) => state.soldiers[id]).filter((s) => !s.alive || s.fled);
@@ -46,7 +48,7 @@ function reinforce(state, pl) {
   });
   if (weakest.mode === 'dead') weakest.mode = 'move';
   weakest.path = null;
-  sd.reinforceReadyTick = state.tick + Math.round(cfg.reinforce.cooldownSec * cfg.tickRate);
+  pl.reinforceReadyTick = state.tick + Math.round(cfg.reinforce.cooldownSec * cfg.tickRate);
   sd.reinforcements = (sd.reinforcements || 0) + 1;
   feed(state, `${pl.side === 0 ? '' : 'Helghast '}${pl.name}: reinforcements on their way`, pl.side);
   state.events.push({ type: 'reinforce', side: pl.side, platoon: pl.id });

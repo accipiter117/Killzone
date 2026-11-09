@@ -70,7 +70,7 @@ All in `CAMPAIGN` in [`src/config.js`](src/config.js).
 - **Placing squads:** for 10 seconds after a paid platoon order, picking one of its squads and placing it is free (it counts as part of the same order); the tray stays open and counts down.
 - **Changing your mind:** for 5 seconds after giving a platoon a movement order you can tap again to change it for free; the chip shows a green countdown. Slow motion ends as soon as you order, and the tray puts itself away when the free window closes.
 - **Grid:** while a platoon is selected a faint grid of tiles shows (as in Bad North). Move orders snap to the centre of a tile, and the platoon's three squads take that tile and the ones above and below (highlighted). Fighting is not limited to tiles: soldiers shoot, throw and charge at enemies nearby. The grid can be switched off in the menu.
-- **Reinforce** (2 points, 35 second cooldown): up to five fresh soldiers refill the selected platoon's weakest squad. They arrive at the nearest objective or post you hold (or your own lines) and run to rejoin. A platoon that is regrouping after breaking can be reinforced too.
+- **Reinforce** (2 points, 35 second cooldown for each platoon separately): up to five fresh soldiers refill the selected platoon's weakest squad. They arrive at the nearest objective or post you hold (or your own lines) and run to rejoin. A platoon that is regrouping after breaking can be reinforced too.
 - **Landscape** is the main way to play: the battlefield takes the full height and the controls sit in a column on the right. Portrait works too.
 - **Slow motion:** time slows to a quarter while a platoon is selected or a strike is being aimed, so you can think. Tap the chip again, or the tray's close button, to let go (switch it off in the menu).
 - **Abilities:** each squad has one, shown as a button in the order tray. They are free but recharge. Grenade (Rifle), Barrage (Heavy), Charge (Assault), Sandbags (Engineer), Mark (Recon). A button turns blue when using it would work right now.
@@ -81,6 +81,9 @@ All in `CAMPAIGN` in [`src/config.js`](src/config.js).
 - Drag to pan, pinch to zoom, tap or drag the minimap to jump. In a desktop browser, the space bar pauses and resumes and the arrow keys move the view (on the war map too).
 
 ### What the squads do by themselves
+
+When a squad is pinned it is not frozen for good: if it is at the edge of the post it was sent to take, it crawls onto it so the capture keeps going; if it is pinned out in the open, it crawls to the nearest cover (a little back rather than forward). Meanwhile the rest of its platoon moves up to within range of whoever is pinning it and fires back, instead of hanging back or waiting for it.
+
 
 | Squad | Behaviour |
 | --- | --- |
@@ -100,7 +103,8 @@ All in `CAMPAIGN` in [`src/config.js`](src/config.js).
 | Sandbags | Engineer | Builds a sandbag wall facing the enemy: instant cover as good as a trench. |
 | Mark | Recon | Tags an enemy group for ten seconds: everyone can see them and hits them more often. |
 | Dive | Jetpack | Leaps onto the nearest enemy group and lands with a stomp that hurts and pins them. |
-| Vanish | Infiltrator | Goes fully hidden for eight seconds, even up close, to slip away or set up the next ambush. |
+| Vanish | Infiltrator | Goes fully hidden for eight seconds, even up close, and shakes off being pinned, to slip away or set up the next ambush. |
+| Repair | Engineer | Replaces Sandbags while your own tank is damaged and close (and no enemy tank is): the squad runs to it and after four seconds' work it gets back about a third of its armour. |
 | Breach | Engineer | Replaces Sandbags while an enemy tank is within reach: the squad sprints to the tank and plants a charge that goes off a few seconds later for heavy damage. |
 | Overwatch | Tank | An aimed heavy shell at the best target in range (the enemy tank first). |
 
@@ -117,7 +121,7 @@ Platoon mixes: 1st (Rifle, Heavy, Engineer), 2nd (Jetpack, Assault, Engineer), 3
 - **Trenches, rubble, craters**: cover. Fewer hits land and suppression builds more slowly.
 - **Ruined buildings**: longer range and good cover, but artillery does double damage inside.
 - **Wire**: slows infantry to a crawl until an engineer squad cuts it.
-- **MG nest**: capture it and it fires on enemies in range, pinning them.
+- **MG nest**: capture it and it fires on enemies in range, pinning them. Fire and blasts on an enemy nest slow it down, and enough of them silence it for a while (heavies turn on a firing nest first).
 - **Arc tower**: capture it and it zaps nearby enemies every few seconds.
 - **Comms post**: capture it and your order points refill faster.
 - **Petrusite tanks** (glowing orange cylinders): explode when hit by stray fire or shells, hurting everyone nearby.
