@@ -1,7 +1,8 @@
-// Paints the battlefield once onto an offscreen canvas, in a clean, calm
-// style (after Bad North): quiet ground, raised plateaus with visible cliff
-// faces and soft shadows, striped ramps, chunky 2.5D ruins, crisp trenches.
-// Light comes from the upper left. New craters and sandbags are painted on
+// Paints the battlefield once onto an offscreen canvas, seen straight from
+// above so it reads the same however the view is turned: quiet ground,
+// raised ground with a dark edge, a lit rim and a soft shadow, striped
+// ramps, ruins as wall tops, crisp trenches. Light comes from the upper left
+// of the map (like a sun, it stays put when the view turns). New craters and sandbags are painted on
 // as they appear; wire is drawn live by the renderer because it gets cut.
 
 import { makeFxRandom } from './fx-random.js';
@@ -23,7 +24,13 @@ const P = {
   wallTop: '#a29d8c', wallFace: '#6b675b', floor: '#4b493f',
   trenchLip: '#8b8061', trench: '#2e2a20', trenchFloor: '#1f1c15', duck: '#4b4232',
 };
-const FACE = 12; // cliff face height in pixels
+// Ground colours per map: mud for the trenches, concrete for the industrial
+// site, ash and broken paving for the city.
+export const GROUND = {
+  trenches: { base: '#595747', soft: ['#5e5c4b', '#555343', '#5b5948', '#575545'] },
+  industrial: { base: '#5c5d58', soft: ['#62635d', '#575852', '#5f5f58', '#54554f'] },
+  city: { base: '#5d5a52', soft: ['#625f56', '#57544c', '#605c53', '#5a564c'] },
+};
 
 export function buildTerrain(map, seedInt) {
   const canvas = document.createElement('canvas');
@@ -35,21 +42,24 @@ export function buildTerrain(map, seedInt) {
   const cellXY = (i) => [(i % map.cols) * c + c / 2, Math.floor(i / map.cols) * c + c / 2];
 
   // Quiet ground: a flat colour with a few big, soft tone changes.
-  g.fillStyle = P.ground;
+  const pal = GROUND[map.kind] || GROUND.trenches;
+  g.fillStyle = pal.base;
   g.fillRect(0, 0, map.width, map.height);
   for (let i = 0; i < 140; i++) {
     g.globalAlpha = 0.5;
-    g.fillStyle = r.pick(P.groundSoft);
+    g.fillStyle = r.pick(pal.soft);
     g.beginPath();
     g.ellipse(r() * map.width, r() * map.height, r.range(80, 220), r.range(60, 160), r() * 3.14, 0, Math.PI * 2);
     g.fill();
   }
   g.globalAlpha = 1;
-  const t0 = map.trenches[0], t1 = map.trenches[1];
-  const x0 = t0.reduce((a, p) => a + p.x, 0) / t0.length + 60;
-  const x1 = t1.reduce((a, p) => a + p.x, 0) / t1.length - 60;
-  g.fillStyle = P.nomans;
-  g.fillRect(x0, 0, x1 - x0, map.height);
+  if (map.trenches.length) {
+    const t0 = map.trenches[0], t1 = map.trenches[1];
+    const x0 = t0.reduce((a, p) => a + p.x, 0) / t0.length + 60;
+    const x1 = t1.reduce((a, p) => a + p.x, 0) / t1.length - 60;
+    g.fillStyle = P.nomans;
+    g.fillRect(x0, 0, x1 - x0, map.height);
+  }
 
   // Raised ground, level by level: shadow, cliff face, then the top.
   const disc = (x, y, rad, col) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill(); };
@@ -59,14 +69,11 @@ export function buildTerrain(map, seedInt) {
     const cells = [];
     for (let i = 0; i < map.elev.length; i++) if (map.elev[i] >= level) cells.push(i);
     if (!cells.length) continue;
-    // Shadow cast down and to the right, then the cliff face (lit at the
-    // top, darkest at the foot), then a light rim and the flat top.
-    for (const i of cells) { if (isRamp(i)) continue; const [x, y] = cellXY(i); disc(x + 8, y + FACE + 5, R, P.shadow); }
-    for (let k = FACE; k >= 1; k--) {
-      const col = k > FACE - 3 ? P.faceDark : k < 4 ? P.faceLight : P.face;
-      for (const i of cells) { if (isRamp(i)) continue; const [x, y] = cellXY(i); disc(x, y + k, R, col); }
-    }
-    for (const i of cells) { const [x, y] = cellXY(i); disc(x - 0.5, y - 1, R, P.rim); }
+    // Seen from above: a soft shadow down and to the right, a dark edge
+    // (the drop), a lit rim on the upper left, then the flat top.
+    for (const i of cells) { if (isRamp(i)) continue; const [x, y] = cellXY(i); disc(x + 7, y + 7, R, P.shadow); }
+    for (const i of cells) { if (isRamp(i)) continue; const [x, y] = cellXY(i); disc(x + 1.5, y + 1.5, R + 1.5, P.faceDark); }
+    for (const i of cells) { const [x, y] = cellXY(i); disc(x - 1.2, y - 1.2, R, P.rim); }
     for (const i of cells) { const [x, y] = cellXY(i); disc(x, y, R, P.top[level]); }
     // Ramps on this level: a smooth slope blending down to the ground.
     for (let i = 0; i < map.ramp.length; i++) {
@@ -135,6 +142,13 @@ function drawRuin(g, b, r) {
   g.fillRect(b.x + 6, b.y + 8, b.w, b.h);
   g.fillStyle = P.floor;
   g.fillRect(b.x, b.y, b.w, b.h);
+  // Built-up maps: the walls are real (drawn live, they can be knocked
+  // down); here only the floor, with broken tiles.
+  if (b.walls === false) {
+    g.fillStyle = 'rgba(255,250,230,0.05)';
+    for (let y = b.y + 3; y < b.y + b.h - 2; y += 8) for (let x = b.x + 3; x < b.x + b.w - 3; x += 8) if (r() < 0.55) g.fillRect(x, y, 6, 6);
+    return;
+  }
   const T_ = 5, H = 7;
   const walls = [];
   const side = (ax, ay, bx, by) => {
@@ -152,12 +166,15 @@ function drawRuin(g, b, r) {
   for (const [ax, ay, bx, by] of walls) {
     const x = Math.min(ax, bx) - T_ / 2, y = Math.min(ay, by) - T_ / 2;
     const w = Math.abs(bx - ax) + T_, h = Math.abs(by - ay) + T_;
+    // Wall tops from above: a shadow, a dark edge, the lit top.
+    g.fillStyle = 'rgba(20,18,14,0.45)';
+    g.fillRect(x + 3, y + 3, w, h);
     g.fillStyle = P.wallFace;
-    g.fillRect(x, y + h - H / 2, w, H);
+    g.fillRect(x - 0.8, y - 0.8, w + 1.6, h + 1.6);
     g.fillStyle = P.wallTop;
-    g.fillRect(x, y - H / 2, w, h);
+    g.fillRect(x, y, w, h);
     g.fillStyle = 'rgba(255,248,226,0.25)';
-    g.fillRect(x, y - H / 2, w, 1.5);
+    g.fillRect(x, y, w, 1.2);
   }
 }
 

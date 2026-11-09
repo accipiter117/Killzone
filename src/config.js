@@ -18,6 +18,9 @@ export const CONFIG = {
   },
 
   world: { width: 3000, height: 1100, cell: 10 },
+  // Each map's size: the trench line is long and thin; the built-up maps are
+  // deeper (the view can be turned to suit).
+  mapSizes: { trenches: { width: 3000, height: 1100 }, industrial: { width: 2400, height: 1500 }, city: { width: 2200, height: 1700 } },
 
   map: {
     trenchX: [300, 360], // ISA trench centre line (Helghast is mirrored)
@@ -166,10 +169,12 @@ export const CONFIG = {
   // kind of hit gets through its armour.
   tank: {
     hp: 1000, speed: 26, radius: 28, sight: 380, rampSpeed: 0.6, deployX: 110,
-    mainGun: { range: 430, reloadSec: 5.5, accuracy: 0.7, vsTank: 160, blastRadius: 34, blastDamage: 70, suppress: 30 },
+    // Toned down against infantry after playtesting (tank shells were over half the kills): a smaller burst
+    // and a slower reload after firing at troops; unchanged against the other tank.
+    mainGun: { range: 430, reloadSec: 5.5, reloadVsInfantrySec: 8, accuracy: 0.7, vsTank: 160, blastRadius: 26, blastDamage: 52, suppress: 30 },
     mg: { range: 280, fireInterval: 0.25, damage: 7, accuracy: 0.28, suppress: 7 },
     damageFrom: { rifle: 0.04, heavy: 0.35, other: 0.06, blast: 1.6, arc: 1.2 },
-    overwatch: { label: 'Overwatch', cooldownSec: 20, vsTank: 280, blastDamage: 110 },
+    overwatch: { label: 'Overwatch', cooldownSec: 20, vsTank: 280, blastDamage: 80 },
     coverRadius: 55, // infantry this close to their own tank, with it between them and the shooter, are covered
     coverHit: 0.5,
     crushRadius: 36, // wire this close under the tank is flattened (a lane a squad can walk through)

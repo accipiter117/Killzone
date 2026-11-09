@@ -102,6 +102,14 @@
     <div class="sheet">
       <h2>Menu</h2>
       <div class="row"><span>Map seed</span><input id="seed-input" inputmode="text" maxlength="24" aria-label="Map seed"></div>
+      <div class="row"><span>Map (next battle)</span>
+        <select id="map-select" aria-label="Map">
+          <option value="trenches">Trenches</option>
+          <option value="industrial">Industrial site</option>
+          <option value="city">Ruined city</option>
+          <option value="random">Random</option>
+        </select>
+      </div>
       <div class="row"><span>Battle length</span>
         <select id="length-select" aria-label="Battle length">
           <option value="300">5 minutes</option>
@@ -110,7 +118,7 @@
         </select>
       </div>
       <label class="row toggle"><span>Watch mode (AI plays both sides)</span><input type="checkbox" id="watch-toggle"></label>
-      <label class="row toggle"><span>Tilted battlefield (hills and ruins stand up)</span><input type="checkbox" id="tilt-toggle"></label>
+      <label class="row toggle"><span>Tilted look (hills and walls stand up; keeps north up, no turning)</span><input type="checkbox" id="tilt-toggle"></label>
       <div class="row"><span>Soldier style</span>
         <select id="view-select" aria-label="Soldier style">
           <option value="pixel">Detailed troopers</option>

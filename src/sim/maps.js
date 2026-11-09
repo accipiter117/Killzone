@@ -92,6 +92,7 @@ function addTanks(map, list) {
 export function industrialMap(seedInt, cfg) {
   const { width: W, height: H, cell } = cfg.world;
   const map = blankMap(W, H, cell);
+  map.kind = 'industrial';
   const g = { rng: (seedInt ^ 0x51ed270b) >>> 0 };
   const t = tools(map, g, seedInt);
   const B = { x: W / 2, y: H / 2 };
@@ -174,6 +175,7 @@ export function industrialMap(seedInt, cfg) {
 export function cityMap(seedInt, cfg) {
   const { width: W, height: H, cell } = cfg.world;
   const map = blankMap(W, H, cell);
+  map.kind = 'city';
   const g = { rng: (seedInt ^ 0x2545f491) >>> 0 };
   const t = tools(map, g, seedInt);
   const B = { x: W / 2, y: H / 2 };

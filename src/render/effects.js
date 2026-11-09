@@ -80,6 +80,9 @@ export function ingest(fxs, events, now) {
       case 'charge':
         fxs.marks.push({ x: e.x, y: e.y, r: 30, t0: now, life: e.sec });
         break;
+      case 'wallBroken':
+        boom(fxs, e.x, e.y, 30, now, '200,190,170');
+        break;
       case 'crater':
         if (fxs.terrain) fxs.terrain.addCrater({ x: e.x, y: e.y, r: e.r });
         break;

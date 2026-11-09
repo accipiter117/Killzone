@@ -35,7 +35,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tilt', true), lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), mapChoice: store.get('mapType', 'trenches'), mapType: 'trenches', lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, scope: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -118,9 +118,15 @@ function controllersFor(watch) {
   return watch ? [createAI(0), createAI(1)] : [createAI(1)];
 }
 
-function startBattle(seed, { replayLog = null } = {}) {
+const MAP_KINDS = ['trenches', 'industrial', 'city'];
+function startBattle(seed, { replayLog = null, mapType = null } = {}) {
   game.seed = seed;
-  game.options = replayLog ? replayLog.options : { config: { battle: { durationSec: game.lengthSec } } };
+  if (!replayLog) {
+    const choice = mapType || game.mapChoice;
+    game.mapType = choice === 'random' ? MAP_KINDS[Math.floor(Math.random() * MAP_KINDS.length)] : MAP_KINDS.includes(choice) ? choice : 'trenches';
+  }
+  const size = CONFIG.mapSizes[game.mapType];
+  game.options = replayLog ? replayLog.options : { config: { battle: { durationSec: game.lengthSec }, map: { type: game.mapType }, world: { width: size.width, height: size.height } } };
   game.replay = !!replayLog;
   game.match = createMatch({ seed, options: game.options, controllers: replayLog ? [] : controllersFor(game.watch), replayLog });
   const st = game.match.state;
@@ -129,6 +135,7 @@ function startBattle(seed, { replayLog = null } = {}) {
   paintTerrain();
   game.fxs.reduced = reduceMotion.matches;
   game.cam = createCamera(st.map.width, st.map.height);
+  miniCanvas.style.aspectRatio = `${st.map.width} / ${st.map.height}`;
   applyRotationRule();
   game.selected = null;
   game.vehicle = false;
@@ -152,14 +159,15 @@ function startBattle(seed, { replayLog = null } = {}) {
   clampCamera(game.cam);
   centreOn(game.cam, 260, st.map.height / 2);
   keepAwake(true);
-  try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}`); } catch { /* file:// */ }
+  try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}&map=${game.mapType}`); } catch { /* file:// */ }
 }
 
 // The tilted look only works with north up, so it locks turning.
 function applyRotationRule() {
   if (!game.cam) return;
-  game.cam.canRotate = !game.tilt;
+  game.cam.canRotate = true;
   if (game.tilt && game.cam.rot) rotateAt(game.cam, game.cam.vw / 2, game.cam.vh / 2, 0);
+  game.cam.canRotate = !game.tilt;
 }
 
 // The battlefield picture: tilted three quarter view (default) or flat.
@@ -437,7 +445,7 @@ attachMapInput(mapCanvas, new Proxy({}, { get: (_, k) => game.cam[k], set: (_, k
   onTap,
   onLongPress: inspect,
 });
-attachMinimapInput(miniCanvas, new Proxy({}, { get: (_, k) => game.cam[k], set: (_, k, v) => { game.cam[k] = v; return true; } }), 3000, 1100);
+attachMinimapInput(miniCanvas, new Proxy({}, { get: (_, k) => game.cam[k], set: (_, k, v) => { game.cam[k] = v; return true; } }));
 
 // ---- Menu and end screen ----------------------------------------------------
 
@@ -450,6 +458,7 @@ function openMenu() {
   document.getElementById('watch-toggle').checked = game.watch;
   document.getElementById('labels-toggle').checked = game.labelsAll;
   document.getElementById('view-select').value = game.view;
+  document.getElementById('map-select').value = game.mapChoice;
   document.getElementById('tilt-toggle').checked = game.tilt;
   document.getElementById('slowmo-toggle').checked = game.slowMo;
   document.getElementById('sound-toggle').checked = audio.enabled;
@@ -487,9 +496,13 @@ document.getElementById('slowmo-toggle').addEventListener('change', (e) => {
   game.slowMo = e.target.checked;
   store.set('slowMo', game.slowMo);
 });
+document.getElementById('map-select').addEventListener('change', (e) => {
+  game.mapChoice = e.target.value;
+  store.set('mapType', game.mapChoice);
+});
 document.getElementById('tilt-toggle').addEventListener('change', (e) => {
   game.tilt = e.target.checked;
-  store.set('tilt', game.tilt);
+  store.set('tiltView', game.tilt);
   paintTerrain();
   applyRotationRule();
 });
@@ -503,7 +516,7 @@ document.getElementById('labels-toggle').addEventListener('change', (e) => {
 });
 const menuSeed = () => document.getElementById('seed-input').value.trim() || newSeed();
 document.getElementById('btn-new').addEventListener('click', () => { closeOverlay('overlay-menu'); startBattle(newSeed()); });
-document.getElementById('btn-restart').addEventListener('click', () => { closeOverlay('overlay-menu'); startBattle(menuSeed()); });
+document.getElementById('btn-restart').addEventListener('click', () => { closeOverlay('overlay-menu'); startBattle(menuSeed(), { mapType: game.mapType }); });
 document.getElementById('btn-help').addEventListener('click', () => { closeOverlay('overlay-menu'); openOverlay('overlay-help'); });
 document.getElementById('btn-replay').addEventListener('click', () => {
   const src = game.replay ? game.original : { log: game.match.log, print: fingerprint(game.match.state) };
@@ -511,7 +524,7 @@ document.getElementById('btn-replay').addEventListener('click', () => {
   startBattle(src.log.seed, { replayLog: JSON.parse(JSON.stringify(src.log)) });
   game.speed = 2;
 });
-document.getElementById('btn-end-restart').addEventListener('click', () => startBattle(game.replay ? game.original.log.seed : game.seed));
+document.getElementById('btn-end-restart').addEventListener('click', () => startBattle(game.replay ? game.original.log.seed : game.seed, { mapType: game.replay ? game.original.log.options.config.map?.type : game.mapType }));
 document.getElementById('btn-end-new').addEventListener('click', () => startBattle(newSeed()));
 
 // ---- Screen wake lock -------------------------------------------------------
@@ -615,8 +628,9 @@ document.getElementById('rotate-ok').addEventListener('click', () => { store.set
 portrait.addEventListener('change', showRotateHint);
 showRotateHint();
 
-const urlSeed = new URLSearchParams(location.search).get('seed');
-startBattle(urlSeed || newSeed());
+const params = new URLSearchParams(location.search);
+const urlSeed = params.get('seed');
+startBattle(urlSeed || newSeed(), { mapType: params.get('map') });
 if (!store.get('seenHelp', false)) {
   pausedBeforeMenu = game.paused; // stay in planning after the help closes
   game.paused = true;

@@ -29,7 +29,7 @@ function trenchMap(seedInt, cfg) {
     elev: new Array(cols * rows).fill(0), // 0 low ground, 1 and 2 raised ground
     ramp: new Array(cols * rows).fill(0), // 1 where you can walk between heights
     hills: [], // plateau outlines for drawing
-    trenches: [], wires: [], buildings: [], craters: [], sites: [], tanks: [],
+    trenches: [], wires: [], buildings: [], craters: [], sites: [], tanks: [], kind: 'trenches',
   };
   const mir = (p) => ({ x: W - p.x, y: H - p.y });
 

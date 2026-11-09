@@ -171,6 +171,7 @@ export function playEvents(a, events, cam, playerSide) {
         SOUNDS.horn(a, 1, e.side !== playerSide);
         a.budget -= 2;
         break;
+      case 'wallBroken': SOUNDS.thump(a, Math.max(0.3, nearness(cam, e.x, e.y))); break;
       case 'zap': SOUNDS.zap(a, Math.max(0.2, nearness(cam, e.x1, e.y1))); a.budget--; break;
       case 'throw': SOUNDS.thump(a, nearness(cam, e.x1, e.y1)); break;
       case 'smoke': SOUNDS.smoke(a, Math.max(0.3, nearness(cam, e.x, e.y))); break;

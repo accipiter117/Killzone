@@ -96,11 +96,11 @@ export function attachMapInput(el, cam, { onTap, onLongPress }) {
 }
 
 // Tap or drag on the minimap to jump the view there.
-export function attachMinimapInput(el, cam, worldW, worldH) {
+export function attachMinimapInput(el, cam) {
   let down = false;
   const jump = (e) => {
     const r = el.getBoundingClientRect();
-    centreOn(cam, ((e.clientX - r.left) / r.width) * worldW, ((e.clientY - r.top) / r.height) * worldH);
+    centreOn(cam, ((e.clientX - r.left) / r.width) * cam.W, ((e.clientY - r.top) / r.height) * cam.H);
   };
   el.addEventListener('pointerdown', (e) => { e.stopPropagation(); down = true; el.setPointerCapture(e.pointerId); jump(e); });
   el.addEventListener('pointermove', (e) => { if (down) jump(e); });
