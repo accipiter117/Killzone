@@ -87,6 +87,11 @@ bottom: [ROWS]. [RULES]"
   set with its grey armour tinted towards ISA blue, the owner's chosen look),
   `hgh-rifle`, and `grapple`. Jetpack troopers keep the code-drawn look
   until their own set exists.
+- ISA colour: the blue tint is the official ISA look. Any sheet with an ISA
+  soldier in it alongside a Helghast (such as the grapple) cannot be tinted
+  afterwards without tinting the Helghast too, so brief ChatGPT with
+  `docs/sprite-refs/isa-rifle-stand-blue.png` (the blue ISA standing sheet)
+  as the ISA reference.
 - Grapple: one sprite of an ISA and a Helghast soldier wrestling, 8
   directions (the way the ISA soldier faces), 4 frame loop. Shown when
   opposing soldiers end up within 30 units of each other, at most 2 or 3
