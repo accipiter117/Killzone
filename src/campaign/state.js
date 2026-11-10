@@ -16,7 +16,8 @@ export function createCampaign(seed, options = {}) {
   const board = generateBoard(st, cc);
   const state = {
     version: cc.version, seed, cc, rng: st.rng,
-    turn: 1, finalTurn: options.turns || cc.turns, phase: 'turn', active: 0,
+    turn: 1, finalTurn: options.turns || cc.turns, phase: 'turn',
+    first: options.firstSide ?? 0, active: options.firstSide ?? 0, // who moves first each turn (the player, in the game)
     playerSide: options.playerSide ?? 0,
     width: board.width, height: board.height, rows: board.rows, cols: board.cols, provinces: board.provinces,
     armies: [], nextArmy: [1, 1], nextPlatoon: 1, sergeantNext: [0, 0],

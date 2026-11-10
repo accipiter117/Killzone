@@ -15,19 +15,22 @@ const wars = Number(process.argv[2]) || 4;
 const turns = Number(process.argv[3]) || 18;
 const battleSec = Number(process.argv[4]) || 90;
 const t0 = Date.now();
-const tally = { wins: [0, 0], capital: 0, turns: 0, battles: 0 };
+const tally = { wins: [0, 0], capital: 0, turns: 0, battles: 0, firstWins: 0 };
 for (let k = 1; k <= wars; k++) {
-  const cm = createCampaignMatch(`balance-${k}`, { turns, playerSide: -1, config: { battle: { durationSec: battleSec }, pushSupply: 0, objective: { reward: 0 } } });
+  // Odd wars the ISA move first each turn, even wars the Helghast.
+  const first = (k + 1) % 2;
+  const cm = createCampaignMatch(`balance-${Math.ceil(k / 2)}`, { turns, playerSide: -1, firstSide: first, config: { battle: { durationSec: battleSec }, pushSupply: 0, objective: { reward: 0 } } });
   const s = cm.state;
   while (s.phase !== 'over' && s.turn <= turns + 1) aiRound(cm);
   tally.wins[s.winner]++;
+  if (s.winner === first) tally.firstWins++;
   if (/capital/.test(s.winReason)) tally.capital++;
   tally.turns += Math.min(s.turn, turns);
   tally.battles += s.history.length;
-  console.log(`war ${k}: ${s.winner === 0 ? 'ISA' : 'Helghast'} won on turn ${Math.min(s.turn, turns)}: ${s.winReason}; provinces ${held(s, 0)} to ${held(s, 1)}; ${s.history.length} battles`);
+  console.log(`war ${k} (${first === 0 ? 'ISA' : 'Helghast'} first): ${s.winner === 0 ? 'ISA' : 'Helghast'} won on turn ${Math.min(s.turn, turns)}: ${s.winReason}; provinces ${held(s, 0)} to ${held(s, 1)}; ${s.history.length} battles`);
 }
 const pct = (n) => `${Math.round((100 * n) / wars)}%`;
 console.log(`\nWars: ${wars} (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
-console.log(`ISA ${pct(tally.wins[0])}  Helghast ${pct(tally.wins[1])}`);
+console.log(`ISA ${pct(tally.wins[0])}  Helghast ${pct(tally.wins[1])}  (the side moving first won ${pct(tally.firstWins)})`);
 console.log(`Won by taking the capital: ${pct(tally.capital)}  on provinces at the end: ${pct(wars - tally.capital)}`);
 console.log(`Average length ${(tally.turns / wars).toFixed(1)} turns, ${(tally.battles / wars).toFixed(1)} battles`);

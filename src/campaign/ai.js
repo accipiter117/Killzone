@@ -56,7 +56,6 @@ export function nextCommand(state, side) {
       const p = state.provinces[id];
       return p.supply + (p.site === 'capital' ? 20 : 0) + (p.home === side ? 2 : 0);
     };
-    const takes = orders.filter((o) => o.kind === 'take').sort((a, b) => value(b.to) - value(a.to) || tie(side, a.to, b.to));
     const here = state.provinces[army.at];
     const threatened = here.neighbours.some((n) => { const e = armyAt(state, n); return e && e.side !== side; });
     // The capital's guard stays put while the enemy is near.
@@ -65,9 +64,13 @@ export function nextCommand(state, side) {
       if (!army.dug && threatened && supply >= cc.costs.dig) return { side, type: 'dig', params: { army: army.id } };
       continue;
     }
-    if (takes.length) return { side, type: 'attack', params: { army: army.id, to: takes[0].to } };
-    const fights = orders.filter((o) => o.kind === 'fight' && o.odds >= need).sort((a, b) => b.odds * value(b.to) - a.odds * value(a.to) || tie(side, a.to, b.to));
-    if (fights.length) return { side, type: 'attack', params: { army: army.id, to: fights[0].to } };
+    // Empty ground and good fights weighed together: what it is worth times
+    // the chance of taking it (a likely win at their capital beats any
+    // empty field).
+    const gains = orders.filter((o) => o.kind === 'take' || (o.kind === 'fight' && o.odds >= need))
+      .map((o) => ({ ...o, score: value(o.to) * (o.kind === 'take' ? 1 : o.odds) }))
+      .sort((a, b) => b.score - a.score || tie(side, a.to, b.to));
+    if (gains.length) return { side, type: 'attack', params: { army: army.id, to: gains[0].to } };
     if (threatened) {
       if (!army.dug && supply >= cc.costs.dig) return { side, type: 'dig', params: { army: army.id } };
       continue; // hold the line

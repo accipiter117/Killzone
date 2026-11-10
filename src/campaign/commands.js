@@ -118,7 +118,7 @@ export function applyCampaignCommand(state, cmd) {
       return ok();
     }
     case 'endTurn': {
-      if (side === 0) { state.active = 1; return ok(); }
+      if (side === state.first) { state.active = 1 - side; return ok(); }
       upkeep(state);
       return ok();
     }
@@ -244,7 +244,7 @@ function upkeep(state) {
   }
   for (const a of state.armies) a.moved = false;
   state.turn++;
-  state.active = 0;
+  state.active = state.first;
   if (state.turn > state.finalTurn) {
     const h = [held(state, 0), held(state, 1)];
     const w = h[0] !== h[1] ? (h[0] > h[1] ? 0 : 1) : incomeOf(state, 0) >= incomeOf(state, 1) ? 0 : 1;

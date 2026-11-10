@@ -21,13 +21,14 @@ Modelled on Roma Invicta: a war table of named provinces, armies you move one at
 - **Victory:** take the Helghast capital, or hold the most provinces when the last turn ends (12 turns for a short war, 18 for a full one).
 - **Saving:** the war saves itself after every order. Menu, "Save as a code" gives a text code to carry it to another device. (Wars from the old sector map cannot be continued.)
 
+
 ### Campaign numbers worth trying first
 
 All in `CAMPAIGN` in [`src/config.js`](src/config.js).
 
 | What | Where | Try | Effect on play |
 | --- | --- | --- | --- |
-| Starting armies | `armies` | 4 platoons in the first army | Bigger opening clashes |
+| Starting armies | `armies` | more platoons in the first army | Bigger opening clashes |
 | Supply | `supply`, `start` | lower | Every refill and platoon becomes a real choice |
 | Costs | `costs` (refill 1 a soldier, platoon 12, dig in 4) | | How often digging in and recruiting are worth it |
 | Home ground | `homeBonus` (0.25) | 0.4 | Harder to push deep into enemy ground; more comebacks |
@@ -39,25 +40,6 @@ All in `CAMPAIGN` in [`src/config.js`](src/config.js).
 | Battle length | `battle.durationSec` (360) | 300 | Shorter battles, quicker turns |
 
 `node tools/campaign-balance.mjs 6 18 360` plays six AI against AI wars (push and objectives off, so both sides play by the same rules) and reports win rates, how wars end and how many battles are fought.
-
-## Campaign numbers worth trying first
-
-All in `CAMPAIGN` in [`src/config.js`](src/config.js).
-
-| What | Where | Try | Effect on play |
-| --- | --- | --- | --- |
-| How far the front moves | `push` (narrow 22, clear 55 cells; breakthrough 45 more) | narrow 12, clear 40 | Smaller numbers make a slower, grinding war where defences matter more. |
-| Site defences | `sites[].defence` (capital 3, cities and factories 1 to 2) | +1 each | Higher makes capitals much harder to rush; wars go to the final night more often. |
-| Battle length | `battle.durationSec` (360) | 300 or 480 | Shorter battles are quicker to play and decide fewer cells per fight. |
-| Income | `income`, `regionBonus`, `start` | | How quickly losses can be refilled; low income makes every soldier count. |
-| Costs | `costs.refillPerSoldier`, `costs.fortify`, `costs.recruit` | | How often digging in and recruiting are worth it. |
-| Supply attrition | `attrition` (1 soldier a round) | 2 | How dangerous it is to be cut off. |
-| War length | `nights` (8), `roundsPerNight` (3) | | Also picked on the start menu (4 or 8 nights). |
-| Platoon limit | `maxPlatoons` (8), `maxPerSide` (3 per battle) | | How big the armies and battles get. |
-| Movement | `moveRange` (2 sectors) | 1 or 3 | How fast reserves can reach a breach. |
-
-`node tools/campaign-balance.mjs 6 4 90` plays six AI against AI campaigns (4 nights, 90 second battles) and reports win rates, how wars end and how many battles are fought. Last run: 50/50, a third won by taking the capital.
-
 
 ## How to play
 

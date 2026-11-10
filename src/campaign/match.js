@@ -55,6 +55,7 @@ function settle(cm, resolve) {
 
 // One whole turn with the AI on both sides (for tests and the balance tool).
 export function aiRound(cm, resolve = null) {
-  aiTurn(cm, 0, resolve);
-  aiTurn(cm, 1, resolve);
+  const first = cm.state.first;
+  aiTurn(cm, first, resolve);
+  aiTurn(cm, 1 - first, resolve);
 }
