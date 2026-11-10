@@ -201,6 +201,7 @@ function fireMachineGun(state, v, dt) {
 
 export function damageVehicle(state, v, amount, source) {
   if (!v.alive) return;
+  if (state.tb && !state.tb.applying) { state.events.push({ type: 'vehicleHit', id: v.id, x: v.x, y: v.y }); return; }
   v.hp -= amount;
   state.events.push({ type: 'vehicleHit', id: v.id, x: v.x, y: v.y });
   if (v.hp > 0) return;

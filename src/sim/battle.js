@@ -162,8 +162,8 @@ export function step(state) {
   updateDives(state);
   updateSmokes(state);
   updateSuppression(state, dt);
-  updateSites(state, dt);
-  checkMorale(state);
+  // Turn-based battles: objectives, morale and the end are the turn rules' job.
+  if (!state.tb) { updateSites(state, dt); checkMorale(state); }
 
   state.tick++;
   // Strength over time, for the end screen's chart.
@@ -172,12 +172,12 @@ export function step(state) {
     for (const s of state.soldiers) if (s.alive && !s.fled) alive[s.side]++;
     state.history.push([state.tick, alive[0], alive[1], state.sides[0].score, state.sides[1].score]);
   }
-  if (state.tick % cfg.tickRate === 0) {
+  if (state.tick % cfg.tickRate === 0 && !state.tb) {
     for (const site of state.sites) {
       if (site.kind === 'objective' && site.owner !== null) state.sides[site.owner].score += cfg.battle.scorePerObjectiveSec;
     }
   }
-  checkEnd(state);
+  if (!state.tb) checkEnd(state);
 }
 
 // Morale. A platoon that falls below its break point routs to its own edge.
@@ -253,7 +253,7 @@ function checkEnd(state) {
   }
 }
 
-function finish(state, winner, reason) {
+export function finish(state, winner, reason) {
   const cfg = state.cfg.battle;
   const [s0, s1] = state.sides.map((s) => s.score);
   let margin = 'draw';

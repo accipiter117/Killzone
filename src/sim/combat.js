@@ -254,6 +254,9 @@ export function suppress(state, sq, amount, source, from = null) {
 
 export function damageSoldier(state, s, dmg, cause = 'rifle') {
   if (!isActive(s)) return;
+  // Turn-based battles: the live fight is only a picture; losses come from
+  // the turn rules alone (which set state.tb.applying while they apply them).
+  if (state.tb && !state.tb.applying) { state.events.push({ type: 'hit', id: s.id, x: s.x, y: s.y, side: s.side }); return; }
   s.hp -= dmg;
   s.lastCause = cause;
   state.events.push({ type: 'hit', id: s.id, x: s.x, y: s.y, side: s.side });
@@ -263,7 +266,7 @@ export function damageSoldier(state, s, dmg, cause = 'rifle') {
   // Bullets leave a soldier down (a medic can still get them up); blasts
   // and shells kill outright.
   const med = state.cfg.medic;
-  s.downed = !med.killOutright.includes(cause);
+  s.downed = !state.tb && !med.killOutright.includes(cause);
   if (s.downed) { s.bleedUntil = state.tick + Math.round(med.bleedSec * state.cfg.tickRate); s.medicBy = -1; }
   state.sides[s.side].casualties++;
   const lb = state.sides[s.side].lossBy;
@@ -293,6 +296,7 @@ export function updateSuppression(state, dt) {
     const pl = state.platoons[sq.platoon];
     const stance = state.cfg.stances[pl.stance];
     const pinAt = c.pinAt * stance.pinMult;
+    if (state.tb) { sq.pinned = false; continue; } // turn-based: squads always carry out their moves
     if (!sq.pinned && sq.supp >= pinAt) sq.pinned = true;
     else if (sq.pinned && sq.supp < pinAt * (stance.unpinShare ?? c.unpinShare)) sq.pinned = false;
     for (const k in sq.tally) sq.tally[k] *= 0.995;

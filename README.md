@@ -43,6 +43,20 @@ All in `CAMPAIGN` in [`src/config.js`](src/config.js).
 
 `node tools/campaign-balance.mjs 6 18 360` plays six AI against AI wars (push and objectives off, so both sides play by the same rules) and reports win rates, how wars end and how many battles are fought.
 
+## Turn-based battles
+
+Pick **Battle mode: Turn-based** in the battle menu (or **Quick battle (turn-based)** on the start menu); it applies to war map battles too. Real time stays as it was.
+
+- The same maps, platoons, tanks and look, on a grid of tiles (one platoon or tank a tile). The soldiers keep moving and firing on screen the whole time, but only the turn rules decide who is lost.
+- **Whole-side turns, XCOM style:** you act with every platoon and the tank, then press **End turn** and the Helghast act. Each unit has **two actions**: move (blue tiles, one action), dash (amber, both), fire, overwatch or grenades.
+- **Fire:** tap a marked enemy to see the hit chance and every reason for it (range, full or half cover, flanking, high ground, pinned), then fire (it ends that unit's turn). A hit kills soldiers (more from a strong platoon or one with heavies; the tank gun 3) or takes armour off a tank; a miss pins them, so they get one action next turn.
+- **Flanking:** cover faces the enemy; a shot from the side ignores it.
+- **Overwatch:** the unit waits and fires at the first enemy to move into its sights.
+- **Grenades** (platoons with riflemen): always land within two tiles, ignore cover, kill 2 and pin; ready again three turns later.
+- **Breaking:** a platoon below 30% runs for its own edge and is out of the fight.
+- **Winning:** objectives belong to whoever alone stands on or next to them and score 10 points a round; most points after 10 turns wins, or rout every enemy unit.
+- Numbers in `TACTICS` in [`src/config.js`](src/config.js). `node tools/tb-balance.mjs 6` plays AI against AI on all three maps (each seed twice, each side moving first once): last run 50/50, and moving first made no difference.
+
 ## How to play
 
 - You command the **ISA** (left, steel blue). The **Helghast** hold the right (dark grey, orange highlights).

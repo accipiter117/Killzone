@@ -20,6 +20,8 @@ import { createAudio, unlockAudio, newFrame, playEvents, uiClick } from './rende
 import { attachMapInput, attachMinimapInput } from './ui/input.js';
 import { createUI, updateUI, toast, flashOrderPoints, openOverlay, closeOverlay, showEnd, resetFeed } from './ui/ui.js';
 import { createCampaignUI } from './ui/campaign.js';
+import { createTactics } from './tactics/tactics.js';
+import { createTacticsUI } from './ui/tactics-ui.js';
 import { battleOptions } from './campaign/battles.js';
 import { loadCampaign, hasSave } from './campaign/save.js';
 
@@ -39,7 +41,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), mapChoice: store.get('mapType', 'trenches'), mapType: 'trenches', lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), battleMode: store.get('battleMode', 'rt'), labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), mapChoice: store.get('mapType', 'trenches'), mapType: 'trenches', lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, scope: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -53,6 +55,7 @@ document.addEventListener('click', (e) => { if (e.target.closest('button')) uiCl
 
 const ui = createUI({
   selectCard(i) {
+    if (game.match.state.tb) { tacticsUI.selectCard(i); return; }
     if (i === 3) {
       const v = game.match.state.vehicles.find((o) => o.side === PLAYER);
       if (!v || game.replay) return;
@@ -113,6 +116,8 @@ const ui = createUI({
   },
   openMenu,
 });
+const tacticsUI = createTacticsUI({ player: PLAYER, toast: (title, body = '', bad = false) => toast(ui, title, body, bad) });
+window.__kzTactics = tacticsUI; // for browser tests
 
 function newSeed() {
   return String(Math.floor(Math.random() * 900000) + 100000);
@@ -124,7 +129,9 @@ function controllersFor(watch) {
 
 const MAP_KINDS = ['trenches', 'industrial', 'city'];
 // campaign: { rec, onEnd } for a war map battle (rec is its battle record).
-function startBattle(seed, { replayLog = null, mapType = null, campaign = null } = {}) {
+function startBattle(seed, { replayLog = null, mapType = null, campaign = null, mode = null } = {}) {
+  // Real time, or turn-based (the same battle, taken in turns on a grid).
+  const turnBased = !replayLog && (mode || game.battleMode) === 'tb';
   game.seed = seed;
   game.campaign = campaign;
   // Campaign battles are always yours to command (watch mode stays a
@@ -139,7 +146,9 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null }
   const size = CONFIG.mapSizes[game.mapType];
   game.options = replayLog ? replayLog.options : campaign ? battleOptions(campaign.rec) : { config: { battle: { durationSec: game.lengthSec }, map: { type: game.mapType }, world: { width: size.width, height: size.height } } };
   game.replay = !!replayLog;
-  game.match = createMatch({ seed, options: game.options, controllers: replayLog ? [] : controllersFor(game.watch), replayLog });
+  game.match = createMatch({ seed, options: game.options, controllers: replayLog || turnBased ? [] : controllersFor(game.watch), replayLog });
+  if (turnBased) createTactics(game.match.state);
+  document.body.classList.toggle('tb-mode', turnBased);
   closeOverlay('overlay-start');
   document.getElementById('stage').hidden = false;
   const st = game.match.state;
@@ -158,8 +167,9 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null }
   game.endShown = false;
   // Battles open paused for planning (not replays or watch mode): give your
   // opening orders, then press play.
-  game.planning = !replayLog && !game.watch;
+  game.planning = !replayLog && !game.watch && !turnBased;
   game.paused = game.planning;
+  if (turnBased) tacticsUI.reset(st, { watch: game.watch });
   game.acc = 0;
   if (!game.replay) game.speed = 1;
   resetFeed(ui);
@@ -354,6 +364,7 @@ function onTap(sx, sy) {
   // An off-screen alert arrow: jump there.
   const edge = (game.renderer.edges || []).find((a) => Math.hypot(a.x - sx, a.y - sy) < 24);
   if (edge) { lookAt(edge.wx, edge.wy); return; }
+  if (st.tb) { tacticsUI.tap(w); return; }
   if (!game.replay && !game.watch) {
     if (game.armed) {
       const type = game.armed;
@@ -480,6 +491,7 @@ function openMenu() {
   document.getElementById('seed-input').value = game.seed;
   document.getElementById('length-select').value = String(game.lengthSec);
   document.getElementById('watch-toggle').checked = game.watch;
+  document.getElementById('mode-select').value = game.battleMode;
   document.getElementById('labels-toggle').checked = game.labelsAll;
   document.getElementById('view-select').value = game.view;
   document.getElementById('map-select').value = game.mapChoice;
@@ -576,6 +588,8 @@ window.__kzCampaign = campaignUI; // for browser tests
 function endButtons() {
   const c = !!game.campaign;
   for (const id of ['btn-replay', 'btn-end-restart', 'btn-end-new']) document.getElementById(id).hidden = c;
+  // Turn-based battles are not replayed (their results come from the turn rules, not the recorded orders).
+  if (game.match && game.match.state.tb) document.getElementById('btn-replay').hidden = true;
   document.getElementById('btn-end-campaign').hidden = !c;
 }
 
@@ -583,7 +597,8 @@ function endButtons() {
 function backToCampaign(result) {
   const c = game.campaign;
   if (!c) return;
-  const log = game.match.log.commands;
+  // Turn-based battles have no replay (their losses come from the turn rules).
+  const log = game.match.state.tb ? [] : game.match.log.commands;
   game.campaign = null;
   game.match = null;
   game.watch = store.get('watch', false);
@@ -624,7 +639,16 @@ function startCampaign(turns) {
 }
 document.getElementById('st-new').addEventListener('click', () => startCampaign(18));
 document.getElementById('st-new-short').addEventListener('click', () => startCampaign(12));
-document.getElementById('st-quick').addEventListener('click', () => { closeOverlay('overlay-start'); startBattle(newSeed()); });
+document.getElementById('st-quick').addEventListener('click', () => { closeOverlay('overlay-start'); setBattleMode('rt'); startBattle(newSeed()); });
+document.getElementById('st-quick-tb').addEventListener('click', () => { closeOverlay('overlay-start'); setBattleMode('tb'); startBattle(newSeed()); });
+function setBattleMode(m) {
+  game.battleMode = m;
+  store.set('battleMode', m);
+}
+document.getElementById('mode-select').addEventListener('change', (e) => {
+  setBattleMode(e.target.value);
+  toast(ui, e.target.value === 'tb' ? 'Turn-based battles' : 'Real-time battles', 'From the next battle (war map battles too).');
+});
 document.getElementById('st-import').addEventListener('click', () => campaignUI.openImport());
 document.getElementById('st-help').addEventListener('click', () => openOverlay('overlay-chelp'));
 
@@ -755,9 +779,12 @@ function frame(t) {
   const reveal = game.watch || game.replay;
   const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, scope: game.scope, vehicleSelected: game.vehicle, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, tilt: game.tilt, grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null) };
   drawFrame(g, game.renderer, st, game.cam, view);
+  if (st.tb) tacticsUI.draw(g, game.cam, game.dpr, now);
   if (game.minimap && miniCanvas.width > 0) drawMinimap(mg, game.renderer, st, game.cam, view);
+  // Turn-based: the chips light up for the unit picked on the grid.
+  const tbSel = st.tb && tacticsUI.selected ? st.tb.units.find((u) => u.id === tacticsUI.selected) : null;
   updateUI(ui, st, {
-    now, playerSide: PLAYER, selected: game.selected, scope: game.scope, vehicle: game.vehicle, armed: game.armed, paused: game.paused, speed: game.speed,
+    now, playerSide: PLAYER, selected: st.tb ? (tbSel && tbSel.kind === 'platoon' ? tbSel.pl : null) : game.selected, scope: game.scope, vehicle: st.tb ? !!(tbSel && tbSel.kind === 'tank') : game.vehicle, armed: game.armed, paused: game.paused, speed: game.speed,
     replay: game.replay, watch: game.watch, hint: hintText(),
     banner: game.replay ? 'REPLAY' : game.watch ? 'WATCH MODE' : game.planning ? 'PLANNING' : game.paused ? 'PAUSED' : slow ? 'SLOW MOTION' : '',
   });

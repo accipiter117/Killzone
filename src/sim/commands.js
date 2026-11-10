@@ -80,6 +80,7 @@ function applyInner(state, cmd) {
   const cfg = state.cfg;
   let cost = cfg.orders.cost[type];
   if (cost === undefined) return fail('Unknown order');
+  if (state.tb) cost = 0; // turn-based: the turn rules ration actions instead
   const sd = state.sides[side];
   if (!sd) return fail('Unknown side');
 
