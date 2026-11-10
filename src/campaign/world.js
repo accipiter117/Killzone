@@ -1,113 +1,76 @@
-// The war map: one invented stretch of planet, generated from a seed. A fine
-// grid of cells (who holds the ground, cell by cell) is grouped into
-// sectors (where platoons stand and battles are fought), sectors into named
-// regions. Like the battle maps, the ISA (west) half is generated and the
-// Helghast (east) half is its mirror image turned through 180 degrees, so
-// both sides start with identical ground, sites and distances.
+// The war map board: a grid of provinces with wandering borders, generated
+// from a seed. The ISA (bottom) half is generated and the Helghast (top)
+// half is its exact mirror turned through 180 degrees, so both sides start
+// with identical ground, sites and distances.
 //
 // Pure: no DOM, no Math.random. Uses the campaign's own seeded RNG.
 
 import { range } from '../sim/rng.js';
 
-// Deterministic per cell noise, for wobbly borders.
-function noise(x, y, s) {
-  let h = Math.imul((x * 73856093) ^ (y * 19349663) ^ s, 0x27d4eb2d);
-  h ^= h >>> 15;
-  return (h >>> 0) / 4294967296;
-}
-
-export function generateWorld(st, cc, seedInt) {
-  const { cols, rows, sectorCols, sectorRows } = cc.grid;
-  const n = cols * rows, half = cols / 2;
-  const mirror = (i) => n - 1 - i;
-  const xy = (i) => [i % cols, Math.floor(i / cols)];
-  const perSide = sectorCols * sectorRows;
-
-  // Sector seeds on the ISA half: a jittered grid.
-  const seeds = [];
-  for (let c = 0; c < sectorCols; c++) {
-    for (let r = 0; r < sectorRows; r++) {
-      seeds.push({
-        x: ((c + 0.5) / sectorCols) * half + range(st, -2.2, 2.2),
-        y: ((r + 0.5) / sectorRows) * rows + range(st, -3, 3),
+export function generateBoard(st, cc) {
+  const { rows, cols, width: W, height: H, jitter, wiggle } = cc.board;
+  // Corner points of the grid, nudged about (except on the edge); each
+  // point's mirror is set at the same time so the halves match exactly.
+  const V = new Map();
+  const vk = (r, c) => r * (cols + 1) + c;
+  for (let r = 0; r <= rows; r++) {
+    for (let c = 0; c <= cols; c++) {
+      if (V.has(vk(r, c))) continue;
+      const mr = rows - r, mc = cols - c;
+      const self = mr === r && mc === c;
+      let x = (c / cols) * W, y = (r / rows) * H;
+      if (!self && c > 0 && c < cols) x += range(st, -jitter[0], jitter[0]);
+      if (!self && r > 0 && r < rows) y += range(st, -jitter[1], jitter[1]);
+      V.set(vk(r, c), [x, y]);
+      V.set(vk(mr, mc), [W - x, H - y]);
+    }
+  }
+  // Each border bends at its middle, the same bend seen from both sides.
+  const M = new Map();
+  const mid = (a, b) => {
+    const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+    if (M.has(key)) return M.get(key);
+    const [x1, y1] = V.get(a), [x2, y2] = V.get(b);
+    let mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const onEdge = (x1 === x2 && (x1 === 0 || x1 === W)) || (y1 === y2 && (y1 === 0 || y1 === H));
+    const ma = (rows + 1) * (cols + 1) - 1 - a, mb = (rows + 1) * (cols + 1) - 1 - b;
+    const mkey = ma < mb ? `${ma}-${mb}` : `${mb}-${ma}`;
+    if (!onEdge) {
+      const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, w = range(st, -wiggle, wiggle);
+      mx += (-dy / L) * w;
+      my += (dx / L) * w;
+    }
+    M.set(key, [mx, my]);
+    if (mkey !== key) M.set(mkey, [W - mx, H - my]);
+    return M.get(key);
+  };
+  const half = rows / 2;
+  const provinces = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const a = vk(r, c), b = vk(r, c + 1), d = vk(r + 1, c + 1), e = vk(r + 1, c);
+      const pts = [V.get(a), mid(a, b), V.get(b), mid(b, d), V.get(d), mid(d, e), V.get(e), mid(e, a)].map(([x, y]) => [Math.round(x * 10) / 10, Math.round(y * 10) / 10]);
+      const corners = [V.get(a), V.get(b), V.get(d), V.get(e)];
+      const home = r < half ? 1 : 0;
+      // The ISA's own rows count from the front (row 0) to the rear; the
+      // Helghast half takes the mirror province's site.
+      const lr = home === 0 ? r - half : half - 1 - r;
+      const lc = home === 0 ? c : cols - 1 - c;
+      const def = cc.provinces[lr][lc];
+      const id = r * cols + c;
+      const nb = [];
+      if (r > 0) nb.push(id - cols);
+      if (c > 0) nb.push(id - 1);
+      if (c < cols - 1) nb.push(id + 1);
+      if (r < rows - 1) nb.push(id + cols);
+      provinces.push({
+        id, row: r, col: c, home, owner: home, site: def.site, name: home === 0 ? def.isa : def.hgh,
+        kit: cc.kit[def.site], supply: cc.supply[def.site], pts,
+        cx: Math.round((corners.reduce((s, p) => s + p[0], 0) / 4) * 10) / 10,
+        cy: Math.round((corners.reduce((s, p) => s + p[1], 0) / 4) * 10) / 10,
+        neighbours: nb.sort((x, y) => x - y),
       });
     }
   }
-  // Each ISA half cell joins its nearest seed, measured through a little
-  // noise so the borders wander; the east half mirrors it.
-  const sector = new Array(n).fill(-1);
-  for (let i = 0; i < n; i++) {
-    const [x, y] = xy(i);
-    if (x >= half) continue;
-    const wx = x + (noise(x >> 1, y >> 1, seedInt) - 0.5) * 3.5, wy = y + (noise(y >> 1, x >> 1, seedInt ^ 99) - 0.5) * 3.5;
-    let best = 0, bd = Infinity;
-    seeds.forEach((s, k) => { const d = (wx - s.x) ** 2 + (wy - s.y) ** 2; if (d < bd) { bd = d; best = k; } });
-    sector[i] = best;
-  }
-  for (let i = 0; i < n; i++) if (sector[i] < 0) sector[i] = sector[mirror(i)] + perSide;
-
-  // Sector records: cells, centre cell, neighbours, region, terrain kit.
-  const sectors = [];
-  for (let k = 0; k < perSide * 2; k++) {
-    const side = k < perSide ? 0 : 1, local = k % perSide;
-    const col = Math.floor(local / sectorRows), row = local % sectorRows;
-    sectors.push({ id: k, half: side, col, row, region: side === 0 ? cc.regions.isa[col] : cc.regions.hgh[col], kit: 'trenches', centre: -1, neighbours: [], cells: 0 });
-  }
-  const sum = sectors.map(() => [0, 0, 0]);
-  for (let i = 0; i < n; i++) { const [x, y] = xy(i); const s = sum[sector[i]]; s[0] += x; s[1] += y; s[2]++; }
-  for (const s of sectors) {
-    const [sx, sy, c] = sum[s.id];
-    s.cells = c;
-    const mx = sx / c, my = sy / c;
-    let best = -1, bd = Infinity;
-    for (let i = 0; i < n; i++) {
-      if (sector[i] !== s.id) continue;
-      const [x, y] = xy(i);
-      const d = (x - mx) ** 2 + (y - my) ** 2;
-      if (d < bd) { bd = d; best = i; }
-    }
-    s.centre = best;
-  }
-  // Keep centres exact mirrors (the search above can tie differently).
-  for (let k = 0; k < perSide; k++) sectors[k + perSide].centre = mirror(sectors[k].centre);
-  const nb = sectors.map(() => new Set());
-  for (let i = 0; i < n; i++) {
-    const [x, y] = xy(i);
-    for (const j of [x + 1 < cols ? i + 1 : -1, y + 1 < rows ? i + cols : -1]) {
-      if (j >= 0 && sector[j] !== sector[i]) { nb[sector[i]].add(sector[j]); nb[sector[j]].add(sector[i]); }
-    }
-  }
-  sectors.forEach((s) => { s.neighbours = [...nb[s.id]].sort((a, b) => a - b); });
-
-  // Sites (ISA half from the config, mirrored), and the terrain kit each
-  // sector's battles are fought on.
-  const sites = [];
-  const kitOf = { capital: 'city', city: 'city', factory: 'industrial', tankworks: 'industrial', power: 'industrial' };
-  for (let k = 0; k < perSide; k++) {
-    const roll = range(st, 0, 1);
-    sectors[k].kit = roll < 0.5 ? 'trenches' : roll < 0.75 ? 'industrial' : 'city';
-  }
-  for (const def of cc.sites) {
-    const local = def.at[0] * sectorRows + def.at[1];
-    if (kitOf[def.kind]) sectors[local].kit = kitOf[def.kind];
-  }
-  for (let k = 0; k < perSide; k++) sectors[k + perSide].kit = sectors[k].kit;
-  for (const side of [0, 1]) {
-    cc.sites.forEach((def, idx) => {
-      const local = def.at[0] * sectorRows + def.at[1];
-      const sec = sectors[local + side * perSide];
-      sites.push({ id: sites.length, kind: def.kind, home: side, sector: sec.id, cell: sec.centre, defence: def.defence, maxDefence: def.defence, pair: idx, name: siteName(def.kind, side, idx) });
-    });
-  }
-
-  const owner = new Array(n);
-  for (let i = 0; i < n; i++) owner[i] = xy(i)[0] < half ? 0 : 1;
-  return { cols, rows, sector, owner, sectors, sites };
+  return { width: W, height: H, rows, cols, provinces };
 }
-
-// Invented place names, one per site and side.
-const NAMES = [
-  ['Fort Corvane', 'Kessra Hold'], ['Arden', 'Vosk'], ['Halvard Works', 'Brennic Foundry'], ['Tamsin Yard', 'Grael Yard'],
-  ['Elden Station', 'Morvek Plant'], ['Relay Nine', 'Spire Relay'], ['Highfield', 'Ashfall Strip'], ['Calder Mill', 'Drosk Mill'], ['Port Sefton', 'Ulmar'],
-];
-const siteName = (kind, side, idx) => NAMES[idx % NAMES.length][side];

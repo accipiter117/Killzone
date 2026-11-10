@@ -614,16 +614,16 @@ document.getElementById('st-continue').addEventListener('click', () => {
   closeOverlay('overlay-start');
   campaignUI.open(cm);
 });
-function startCampaign(nights) {
+function startCampaign(turns) {
   if (hasSave()) {
     const old = loadCampaign();
-    if (old && old.state.phase !== 'over' && !window.confirm('Start a new campaign? The one saved in this browser will be replaced.')) return;
+    if (old && old.state.phase !== 'over' && !window.confirm('Start a new war? The one saved in this browser will be replaced.')) return;
   }
   closeOverlay('overlay-start');
-  campaignUI.newCampaign(newSeed(), nights);
+  campaignUI.newCampaign(newSeed(), turns);
 }
-document.getElementById('st-new').addEventListener('click', () => startCampaign(8));
-document.getElementById('st-new-short').addEventListener('click', () => startCampaign(4));
+document.getElementById('st-new').addEventListener('click', () => startCampaign(18));
+document.getElementById('st-new-short').addEventListener('click', () => startCampaign(12));
 document.getElementById('st-quick').addEventListener('click', () => { closeOverlay('overlay-start'); startBattle(newSeed()); });
 document.getElementById('st-import').addEventListener('click', () => campaignUI.openImport());
 document.getElementById('st-help').addEventListener('click', () => openOverlay('overlay-chelp'));

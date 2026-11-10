@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createCampaignMatch, aiRound } from '../src/campaign/match.js';
 import { packSave, unpackSave, upgradeSave, exportCode, importCode } from '../src/campaign/save.js';
 
-const quick = { nights: 1, config: { battle: { durationSec: 40 } } };
+const quick = { turns: 3, config: { battle: { durationSec: 40 } } };
 
 test('a saved campaign loads and plays on exactly as before', () => {
   const a = createCampaignMatch('save-1', quick);
@@ -30,8 +30,9 @@ test('a campaign code round-trips', async () => {
 test('saves are versioned and checked', () => {
   const a = createCampaignMatch('save-3', quick);
   const data = JSON.parse(JSON.stringify(packSave(a)));
-  delete data.state.lastBattles;
-  assert.deepEqual(upgradeSave(data).state.lastBattles, []);
+  delete data.state.reports;
+  assert.deepEqual(upgradeSave(data).state.reports, [[]]);
+  assert.throws(() => upgradeSave({ ...data, version: 1 }), /old war map/);
   assert.throws(() => upgradeSave({ kind: 'something else' }), /not a Front Line/);
   assert.throws(() => upgradeSave({ ...data, version: 999 }), /newer version/);
 });

@@ -1,164 +1,160 @@
-// Campaign state: creating a campaign, and the rules everything else reads
-// (who holds what, supply, income, what a side brings to a battle).
+// Campaign state: creating a war, and the rules everything else reads (who
+// holds what, supply lines, income, what a side brings to a battle, odds).
 // Pure and JSON-serialisable: no DOM, no Math.random, no timers.
 
 import { CAMPAIGN } from '../config.js';
 import { seedFrom } from '../sim/rng.js';
 import { mergeConfig } from '../sim/battle.js';
-import { generateWorld } from './world.js';
+import { generateBoard } from './world.js';
 
 export const SIDES = ['isa', 'hgh'];
+const NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 
 export function createCampaign(seed, options = {}) {
   const cc = mergeConfig(CAMPAIGN, options.config);
-  const seedInt = seedFrom(seed);
-  const st = { rng: seedInt };
-  const world = generateWorld(st, cc, seedInt);
+  const st = { rng: seedFrom(seed) };
+  const board = generateBoard(st, cc);
   const state = {
     version: cc.version, seed, cc, rng: st.rng,
-    night: 1, round: 1, phase: 'plan', finalNight: options.nights || cc.nights,
+    turn: 1, finalTurn: options.turns || cc.turns, phase: 'turn',
+    first: options.firstSide ?? 0, active: options.firstSide ?? 0, // who moves first each turn (the player, in the game)
     playerSide: options.playerSide ?? 0,
-    cols: world.cols, rows: world.rows, owner: world.owner, sector: world.sector,
-    sectors: world.sectors, sites: world.sites,
-    platoons: [], nextPlatoon: 1, sergeantNext: [0, 0],
-    res: [{ ...cc.start }, { ...cc.start }],
-    fort: {}, key: null, ended: [false, false],
-    battles: [], // this round's battles
+    width: board.width, height: board.height, rows: board.rows, cols: board.cols, provinces: board.provinces,
+    armies: [], nextArmy: [1, 1], nextPlatoon: 1, sergeantNext: [0, 0],
+    supply: [cc.start.supply, cc.start.supply],
+    battle: null, // the battle being fought right now (an attack waits for its result)
     history: [], // every battle fought, for replays
-    dispatches: [], // per night: the lines of the newsreel
-    events: [], winner: null, winReason: null,
+    reports: [[]], // per turn: what happened, for the turn report
+    objective: null, winner: null, winReason: null, battleCount: 0,
   };
-  // Two army groups a side, three platoons each, along the front.
-  const perSide = cc.grid.sectorCols * cc.grid.sectorRows;
-  const at = (c, r) => c * cc.grid.sectorRows + r;
-  const starts = { north: [at(3, 0), at(3, 0), at(2, 1)], south: [at(3, 2), at(3, 2), at(3, 1)] };
   for (const side of [0, 1]) {
-    for (const group of ['north', 'south']) {
-      // The Helghast half is turned round, so their north is the mirror of
-      // the ISA south.
-      const locals = side === 0 ? starts[group] : starts[group === 'north' ? 'south' : 'north'];
-      locals.forEach((local, k) => addPlatoon(state, side, group, local + side * perSide, k));
-    }
+    cc.armies.forEach((a) => {
+      const army = addArmy(state, side, localProvince(state, side, a.at[0], a.at[1]));
+      for (let k = 1; k < a.platoons; k++) addPlatoon(state, army);
+    });
   }
-  refreshSupply(state);
-  state.dispatches.push([]);
+  setObjective(state);
   return state;
 }
 
-export function addPlatoon(state, side, group, sector, template) {
+// A province by (row, col) counted on a side's own half: row 0 is that
+// side's front row, columns run left to right as that side sees them.
+export function localProvince(state, side, lr, lc) {
+  const { rows, cols } = state;
+  const r = side === 0 ? rows / 2 + lr : rows / 2 - 1 - lr;
+  const c = side === 0 ? lc : cols - 1 - lc;
+  return r * cols + c;
+}
+
+export function addArmy(state, side, at) {
+  const army = { id: `${SIDES[side]}-a${state.nextArmy[side]}`, num: NUMERALS[(state.nextArmy[side] - 1) % NUMERALS.length], side, at, platoons: [], moved: false, dug: false };
+  state.nextArmy[side]++;
+  state.armies.push(army);
+  addPlatoon(state, army);
+  return army;
+}
+
+export function addPlatoon(state, army) {
   const cc = state.cc;
+  const side = army.side;
   const names = cc.sergeants[SIDES[side]];
-  const sergeant = names[state.sergeantNext[side]++ % names.length];
-  const roles = cc.templates[template % cc.templates.length];
-  const pl = {
-    id: `${SIDES[side]}-${state.nextPlatoon++}`, side, group, sector, template, roles: roles.slice(),
-    alive: roles.map(() => 5), sergeant, broken: false, order: null, cut: false, battles: 0, wins: 0,
-  };
-  state.platoons.push(pl);
+  const template = army.platoons.length % cc.templates.length;
+  const roles = cc.templates[template];
+  const pl = { id: `${SIDES[side]}-${state.nextPlatoon++}`, template, roles: roles.slice(), alive: roles.map(() => 5), sergeant: names[state.sergeantNext[side]++ % names.length], battles: 0, wins: 0 };
+  army.platoons.push(pl);
   return pl;
 }
 
-// ---- Ground, sites and supply -------------------------------------------------
-export const siteOwner = (state, site) => state.owner[site.cell];
-export const sectorOwner = (state, id) => state.owner[state.sectors[id].centre];
-export const capitalOf = (state, side) => state.sites.find((s) => s.kind === 'capital' && s.home === side);
+// ---- Reading the board ----------------------------------------------------------
+export const armyAt = (state, id) => state.armies.find((a) => a.at === id) || null;
+export const armyById = (state, id) => state.armies.find((a) => a.id === id) || null;
+export const capitalOf = (state, side) => state.provinces.find((p) => p.site === 'capital' && p.home === side);
+export const soldiers = (army) => army.platoons.reduce((s, pl) => s + pl.alive.reduce((a, n) => a + n, 0), 0);
+export const fullStrength = (army) => army.platoons.length * 15;
+export const strengthOf = (army) => (army.platoons.length ? soldiers(army) / fullStrength(army) : 0);
+export const held = (state, side) => state.provinces.filter((p) => p.owner === side).length;
 
-export function cellsOf(state, sectorId) {
-  const out = [];
-  for (let i = 0; i < state.sector.length; i++) if (state.sector[i] === sectorId) out.push(i);
-  return out;
-}
-
-// Cells each side can trace back to its capital through its own ground.
-export function connectedCells(state, side) {
-  const { cols, rows, owner } = state;
-  const seen = new Uint8Array(owner.length);
+// Provinces a side can trace back to its capital through its own ground.
+export function connected(state, side) {
+  const out = new Set();
   const cap = capitalOf(state, side);
-  if (!cap || owner[cap.cell] !== side) return seen;
-  const q = [cap.cell];
-  seen[cap.cell] = 1;
+  if (!cap || cap.owner !== side) return out;
+  const q = [cap.id];
+  out.add(cap.id);
   while (q.length) {
-    const i = q.pop();
-    const x = i % cols, y = (i / cols) | 0;
-    for (const j of [x > 0 ? i - 1 : -1, x < cols - 1 ? i + 1 : -1, y > 0 ? i - cols : -1, y < rows - 1 ? i + cols : -1]) {
-      if (j >= 0 && !seen[j] && owner[j] === side) { seen[j] = 1; q.push(j); }
-    }
+    const p = state.provinces[q.shift()];
+    for (const n of p.neighbours) if (!out.has(n) && state.provinces[n].owner === side) { out.add(n); q.push(n); }
   }
-  return seen;
+  return out;
 }
 
-// Recalculate who is in supply and which sites are connected.
-export function refreshSupply(state) {
-  const conn = [connectedCells(state, 0), connectedCells(state, 1)];
-  for (const site of state.sites) {
-    const side = siteOwner(state, site);
-    site.owner = side;
-    site.connected = !!conn[side][site.cell];
-  }
-  const supplied = [new Set(), new Set()];
-  for (let i = 0; i < state.owner.length; i++) if (conn[state.owner[i]][i]) supplied[state.owner[i]].add(state.sector[i]);
-  for (const pl of state.platoons) pl.cut = !supplied[pl.side].has(pl.sector);
-  return supplied;
+export function incomeOf(state, side) {
+  const con = connected(state, side);
+  const cc = state.cc;
+  let n = 0;
+  for (const id of con) { const p = state.provinces[id]; n += p.home === side ? p.supply : Math.min(p.supply, cc.occupiedSupply ?? p.supply); }
+  // The war economy: a side that has lost ground digs deeper.
+  const behind = held(state, 1 - side) - held(state, side);
+  if (behind > 0) n += behind * (cc.catchUp || 0);
+  return n;
 }
 
-const held = (state, side, kind) => state.sites.some((s) => s.kind === kind && s.owner === side && s.connected);
-
-// What a side brings to a battle from the sites it holds.
+// What a side brings to a battle from the sites it holds (and can supply).
 export function extrasFor(state, side) {
-  const cc = state.cc;
-  return {
-    tank: held(state, side, 'tankworks'),
-    artillery: held(state, side, 'power') && state.res[side].power >= cc.costs.artilleryPerBattle.power,
-    opBonus: held(state, side, 'comms') ? 1 : 0,
-    airfield: held(state, side, 'airfield'),
-  };
+  const con = connected(state, side);
+  const has = (site) => state.provinces.some((p) => p.site === site && p.owner === side && con.has(p.id));
+  return { tank: has('tankworks'), artillery: has('power'), opBonus: has('comms') ? 1 : 0, airfield: has('airfield') };
 }
 
-// Income for a round: every connected site, plus a bonus per whole region.
-export function incomeFor(state, side) {
+// How strong an army counts when defending a province: home ground and
+// digging in both help, and so does a capital's defences.
+export function defenceOf(state, army, prov) {
   const cc = state.cc;
-  const out = { manpower: 0, materiel: 0, power: 0 };
-  const add = (o) => { for (const k in o) out[k] += o[k]; };
-  for (const s of state.sites) if (s.owner === side && s.connected && cc.income[s.kind]) add(cc.income[s.kind]);
-  for (const region of new Set(state.sites.map((s) => regionOf(state, s)))) {
-    const inRegion = state.sites.filter((s) => regionOf(state, s) === region);
-    if (inRegion.every((s) => s.owner === side && s.connected)) add(cc.regionBonus);
+  let d = soldiers(army);
+  if (prov.home === army.side) d *= 1 + cc.homeBonus;
+  if (army.dug) d *= 1.2;
+  if (prov.site === 'capital') d *= 1.25;
+  return d;
+}
+
+// The odds (0 to 1) of an army taking a province. Empty: certain.
+export function oddsOf(state, army, provId) {
+  const prov = state.provinces[provId];
+  const def = armyAt(state, provId);
+  if (!def || def.side === army.side) return 1;
+  const a = soldiers(army) * (extrasFor(state, army.side).tank ? 1.1 : 1);
+  const d = defenceOf(state, def, prov) * (extrasFor(state, def.side).tank ? 1.1 : 1);
+  return a / (a + d || 1);
+}
+
+// Where an army can go this turn: march (own ground, nobody of ours there),
+// take (enemy ground nobody holds) or fight (enemy ground with an army).
+export function ordersFor(state, army) {
+  if (army.moved || state.phase !== 'turn' || state.active !== army.side) return [];
+  const truce = state.turn <= (state.cc.ceasefire || 0);
+  const out = [];
+  for (const n of state.provinces[army.at].neighbours) {
+    const p = state.provinces[n];
+    const there = armyAt(state, n);
+    if (p.owner === army.side) { if (!there) out.push({ to: n, kind: 'march' }); }
+    else if (truce) continue;
+    else if (!there) out.push({ to: n, kind: 'take' });
+    else if (there.side !== army.side) out.push({ to: n, kind: 'fight', odds: oddsOf(state, army, n) });
   }
   return out;
 }
 
-export const regionOf = (state, site) => state.sectors[site.sector].region;
+// Turns until the next Helghast push (0 = this turn).
+export const pushIn = (state) => (state.cc.pushEvery - (state.turn % state.cc.pushEvery)) % state.cc.pushEvery;
 
-export const strengthOf = (pl) => pl.alive.reduce((a, n) => a + n, 0) / (pl.roles.length * 5);
-
-export function siteValue(state, side) {
-  return state.sites.filter((s) => s.owner === side).reduce((a, s) => a + state.cc.siteValue[s.kind], 0);
-}
-
-// Sectors a platoon can reach this round through its own side's sectors.
-export function reachable(state, pl) {
-  const out = new Map([[pl.sector, 0]]);
-  const q = [pl.sector];
-  while (q.length) {
-    const s = q.shift();
-    const d = out.get(s);
-    if (d >= state.cc.moveRange) continue;
-    for (const nb of state.sectors[s].neighbours) {
-      if (out.has(nb) || sectorOwner(state, nb) !== pl.side) continue;
-      out.set(nb, d + 1);
-      q.push(nb);
-    }
-  }
-  out.delete(pl.sector);
-  return out;
-}
-
-// Sectors a platoon can attack: its own (if the enemy holds some of it) or a
-// neighbour where the enemy holds ground.
-export function attackable(state, pl) {
-  const enemyIn = (id) => {
-    for (let i = 0; i < state.sector.length; i++) if (state.sector[i] === id && state.owner[i] !== pl.side) return true;
-    return false;
-  };
-  return [pl.sector, ...state.sectors[pl.sector].neighbours].filter(enemyIn);
+// Every few turns the player gets an objective: the enemy provinces next to
+// the front worth most, to be taken in time for a supply reward.
+export function setObjective(state) {
+  const o = state.cc.objective;
+  const side = state.playerSide;
+  if (!o.reward || side === null || side === undefined) { state.objective = null; return; }
+  const front = state.provinces.filter((p) => p.owner !== side && p.neighbours.some((n) => state.provinces[n].owner === side));
+  front.sort((a, b) => b.supply - a.supply || (side === 0 ? b.id - a.id : a.id - b.id));
+  const targets = front.slice(0, o.count).map((p) => p.id);
+  state.objective = targets.length ? { targets, by: state.turn + o.every - 1, reward: o.reward } : null;
 }

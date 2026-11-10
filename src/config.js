@@ -285,41 +285,42 @@ export const ABILITY_HELP = {
 };
 
 // The war map campaign (src/campaign). Every strategic number lives here.
+// Roma Invicta style: a board of named provinces, armies of up to three
+// platoons, one move each per turn, attacks fought (or auto-resolved) on
+// the spot, then the Helghast take their turn.
 export const CAMPAIGN = {
-  version: 1, // save format; bump and add an upgrade step when the save shape changes
-  grid: { cols: 80, rows: 40, sectorCols: 4, sectorRows: 3 }, // per side: 4 columns of 3 sectors
-  // Region per sector column (ISA half, west to east); the Helghast half
-  // mirrors the shapes with its own names.
-  regions: { isa: ['ISA capital district', 'Landing beaches', 'Mountain line', 'Mountain line'], hgh: ['Helghast capital district', 'Industrial belt', 'Petrusite basin', 'Petrusite basin'] },
-  // Sites per side: kind, sector (column, row on that side's half), defence.
-  sites: [
-    { kind: 'capital', at: [0, 1], defence: 3 },
-    { kind: 'city', at: [1, 0], defence: 2 },
-    { kind: 'factory', at: [1, 2], defence: 2 },
-    { kind: 'tankworks', at: [0, 2], defence: 0 },
-    { kind: 'power', at: [0, 0], defence: 0 },
-    { kind: 'comms', at: [2, 1], defence: 0 },
-    { kind: 'airfield', at: [1, 1], defence: 0 },
-    { kind: 'factory', at: [2, 2], defence: 1 },
-    { kind: 'city', at: [3, 0], defence: 1 },
+  version: 2, // save format; version 1 was the old sector map (not carried over)
+  // The board: rows x cols provinces; the ISA hold the bottom half, the
+  // Helghast the top half (the Helghast half mirrors the ISA half).
+  board: { rows: 4, cols: 4, width: 360, height: 560, jitter: [18, 22], wiggle: 11 },
+  // The ISA half, row by row from the front to the rear (row 2 is the
+  // front, row 3 the rear): each province's site and its own name. The
+  // Helghast half is the same turned through 180 degrees with its own names.
+  provinces: [
+    [{ site: 'factory', isa: 'Calder Mill', hgh: 'Drosk Mill' }, { site: 'comms', isa: 'Relay Nine', hgh: 'Spire Relay' }, { site: 'airfield', isa: 'Highfield', hgh: 'Ashfall Strip' }, { site: 'city', isa: 'Port Sefton', hgh: 'Vosk' }],
+    [{ site: 'tankworks', isa: 'Tamsin Yard', hgh: 'Grael Yard' }, { site: 'capital', isa: 'Fort Corvane', hgh: 'Kessra Hold' }, { site: 'power', isa: 'Elden Station', hgh: 'Morvek Plant' }, { site: 'city', isa: 'Arden', hgh: 'Brennic Foundry' }],
   ],
-  siteValue: { capital: 6, city: 3, factory: 3, tankworks: 2, power: 2, comms: 2, airfield: 2 },
-  // Income per round from each connected site.
-  income: { capital: { manpower: 6, materiel: 2, power: 2 }, city: { manpower: 4 }, factory: { materiel: 4 }, power: { power: 4 } },
-  regionBonus: { manpower: 2, materiel: 2, power: 2 }, // holding every site in a region
-  start: { manpower: 10, materiel: 10, power: 4 },
-  costs: { refillPerSoldier: { manpower: 1 }, fortify: { materiel: 4 }, recruit: { manpower: 12, materiel: 8, power: 2 }, artilleryPerBattle: { power: 1 } },
-  maxPlatoons: 8, // per side
-  moveRange: 2, // sectors a platoon can move in one round, through its own ground
-  // Front movement (cells flipped) by margin of victory; crushing takes the
-  // whole sector and breaks through into the next.
-  push: { narrow: 22, clear: 55, crushing: 999, breakthrough: 45, defenderNarrow: 10, walkover: 999 }, // walkover: nobody defending, the whole sector falls
-  attrition: 1, // soldiers a cut-off platoon loses per round
-  minStrength: 0.25, // a platoon this weak cannot attack
+  supply: { capital: 4, city: 3, factory: 3, tankworks: 2, power: 2, comms: 2, airfield: 2, none: 1 }, // paid each turn while connected to the capital
+  kit: { capital: 'city', city: 'city', factory: 'industrial', tankworks: 'industrial', power: 'industrial', comms: 'trenches', airfield: 'trenches', none: 'trenches' }, // battle map per site
+  start: { supply: 20 },
+  // Starting armies per side: where (row, col on its own half) and platoons.
+  armies: [{ at: [0, 1], platoons: 3 }, { at: [0, 3], platoons: 2 }, { at: [1, 1], platoons: 1 }],
+  costs: { refillPerSoldier: 1, recruit: 12, dig: 4 },
+  maxArmies: 5,
+  maxPlatoons: 3, // per army (and so per side in one battle)
+  attrition: 2, // soldiers an army cut off from its capital loses each turn
+  homeBonus: 0.25, // defending your own home half: the AI counts it, and the defenders fight from trenches
+  occupiedSupply: 1, // an enemy home province you hold pays only this (its people will not work for you)
+  catchUp: 2, // supply a turn for each province a side holds fewer than the other (the war economy)
+  ceasefire: 1, // no attacks until this turn is over (both sides set up first)
+  surrenderAt: 2, // a side holding this many provinces or fewer at the end of a turn gives up
+  turns: 18, // the war ends after this many turns (most provinces wins)
+  pushEvery: 3, // every few turns the Helghast make a big push (attack at worse odds, and extra supply)
+  pushSupply: 8,
+  objective: { every: 4, reward: 8, count: 2 }, // a new objective every few turns: take N named provinces in time for a supply reward
   battle: { durationSec: 360 }, // every campaign battle, played or auto-resolved
-  maxPerSide: 3, // platoons per side in one battle
-  roundsPerNight: 3,
-  nights: 8, // the default final night
+  aiAttackOdds: 0.55, // the campaign AI attacks at these odds or better (0.4 during a push)
+  aiPushOdds: 0.4,
   templates: [['rifle', 'heavy', 'engineer'], ['jump', 'assault', 'engineer'], ['infiltrator', 'heavy', 'recon']],
   sergeants: {
     isa: ['Sgt Hale', 'Sgt Okafor', 'Sgt Brandt', 'Sgt Reyes', 'Sgt Lindqvist', 'Sgt Moreau', 'Sgt Adeyemi', 'Sgt Kowal', 'Sgt Tanaka', 'Sgt Byrne'],
@@ -328,13 +329,14 @@ export const CAMPAIGN = {
 };
 
 export const SITE_RULES = {
-  capital: ['Capital', 'Pays manpower, materiel and power. Lose it and the war is lost.'],
-  city: ['City', 'Pays manpower (refills squads) while held and connected to your capital.'],
-  factory: ['Factory', 'Pays materiel (trenches, recruiting) while held and connected to your capital.'],
-  tankworks: ['Tank works', 'Your tank joins battles while this is held and connected to your capital.'],
-  power: ['Power plant', 'Pays power; artillery is available in battle while this is held and connected.'],
+  capital: ['Capital', 'Pays 4 supply a turn and raises new platoons. Lose it and the war is lost.'],
+  city: ['City', 'Pays 3 supply a turn while connected to your capital.'],
+  factory: ['Factory', 'Pays 3 supply a turn while connected to your capital.'],
+  tankworks: ['Tank works', 'Your tank joins every battle while this is held and connected to your capital.'],
+  power: ['Power plant', 'Artillery is available in every battle while this is held and connected.'],
   comms: ['Comms hub', '+1 starting order point in every battle while held and connected.'],
   airfield: ['Airfield', 'Jetpack squads fight in your platoons while held and connected (otherwise they fight as riflemen).'],
+  none: ['Open ground', 'Pays 1 supply a turn.'],
 };
 
 export const SIDE_NAMES = ['ISA', 'Helghast'];

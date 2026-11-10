@@ -1,97 +1,122 @@
+// The war map campaign: a mirrored board, orders and their rules, battles
+// that flip provinces and push armies back, supply, and AI wars that end.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createCampaignMatch, replayCampaign, aiRound } from '../src/campaign/match.js';
-import { applyCampaignCommand } from '../src/campaign/commands.js';
-import { refreshSupply, incomeFor, capitalOf, sectorOwner, connectedCells } from '../src/campaign/state.js';
+import { createCampaignMatch, issueCampaign, aiRound, replayCampaign } from '../src/campaign/match.js';
+import { armyAt, connected, incomeOf, oddsOf, ordersFor, capitalOf, soldiers } from '../src/campaign/state.js';
 
-// Short battles keep the AI campaign tests quick.
-const FAST = { battle: { durationSec: 45 } };
+const quick = { config: { battle: { durationSec: 40 }, ceasefire: 0 } };
+const cmd = (cm, side, type, params = {}) => issueCampaign(cm, { side, type, params });
+// A battle result handed in directly, so rule tests do not run battles.
+const fake = (rec, winner, survivors = 4) => ({ winner, margin: 'clear', reason: 'time', durationSec: 40, scores: [0, 0], casualties: [0, 0], platoons: rec.forces.flatMap((f) => f.platoons.map((p) => ({ ref: p.ref, broken: false, survivors: p.alive.map(() => survivors) }))), log: [] });
 
-test('campaign map: mirrored ground, sectors and sites', () => {
-  const s = createCampaignMatch('mirror').state;
-  const n = s.owner.length;
-  for (let i = 0; i < n; i++) assert.equal(s.owner[i], 1 - s.owner[n - 1 - i]);
-  const half = s.sectors.length / 2;
-  for (let i = 0; i < n; i++) assert.equal(s.sector[n - 1 - i], (s.sector[i] + half) % s.sectors.length);
-  assert.equal(s.sites.length % 2, 0);
-  for (const site of s.sites) assert.equal(s.owner[site.cell], site.home, 'each side starts holding its own sites');
-  assert.equal(s.platoons.filter((p) => p.side === 0).length, 6);
+test('the board is mirrored: the Helghast half is the ISA half turned round', () => {
+  const s = createCampaignMatch('mirror', quick).state;
+  const n = s.provinces.length;
+  for (const p of s.provinces) {
+    const m = s.provinces[n - 1 - p.id];
+    assert.equal(m.site, p.site);
+    assert.equal(m.home, 1 - p.home);
+    p.pts.forEach(([x, y], i) => {
+      const [mx, my] = m.pts[(i + 4) % 8]; // turned round, its outline starts from the opposite corner
+      assert.ok(Math.abs(mx - (s.width - x)) < 0.11 && Math.abs(my - (s.height - y)) < 0.11, 'mirrored outline');
+    });
+  }
+  for (const a of s.armies.filter((x) => x.side === 0)) {
+    const twin = s.armies.find((b) => b.side === 1 && b.at === n - 1 - a.at);
+    assert.ok(twin && twin.platoons.length === a.platoons.length, 'mirrored armies');
+  }
 });
 
-test('same seed + same campaign command log gives the same campaign', () => {
-  const cm = createCampaignMatch('det', { nights: 1, config: FAST });
-  aiRound(cm);
-  aiRound(cm);
-  const again = replayCampaign('det', { nights: 1, config: FAST }, JSON.parse(JSON.stringify(cm.log)));
+test('orders: march on your own ground, take empty enemy ground, one move a turn', () => {
+  const cm = createCampaignMatch('orders', quick);
+  const s = cm.state;
+  const a = s.armies.find((x) => x.side === 0);
+  const orders = ordersFor(s, a);
+  assert.ok(orders.length > 0);
+  const take = orders.find((o) => o.kind === 'take');
+  assert.ok(take, 'an empty enemy province next door');
+  assert.ok(cmd(cm, 0, 'attack', { army: a.id, to: take.to }).ok);
+  assert.equal(s.provinces[take.to].owner, 0);
+  assert.equal(a.at, take.to);
+  assert.equal(cmd(cm, 0, 'march', { army: a.id, to: s.provinces[take.to].neighbours[0] }).ok, false, 'already moved');
+  assert.equal(cmd(cm, 1, 'march', { army: s.armies.find((x) => x.side === 1).id, to: 0 }).ok, false, 'not their turn');
+});
+
+test('an attack on an army starts a battle; winning takes the province and pushes the defenders back', () => {
+  const cm = createCampaignMatch('battle', quick);
+  const s = cm.state;
+  const a = s.armies.find((x) => x.side === 0);
+  const foe = s.armies.find((x) => x.side === 1);
+  // Put the enemy army on a province next to ours.
+  const target = s.provinces[a.at].neighbours.find((n) => s.provinces[n].owner === 1);
+  foe.at = target;
+  assert.ok(oddsOf(s, a, target) > 0 && oddsOf(s, a, target) < 1);
+  assert.ok(cmd(cm, 0, 'attack', { army: a.id, to: target }).ok);
+  assert.equal(s.phase, 'battle');
+  assert.equal(cmd(cm, 0, 'march', { army: s.armies[1].id, to: 0 }).ok, false, 'nothing else while a battle is on');
+  const rec = s.battle;
+  assert.ok(cmd(cm, 0, 'battleResult', { battle: rec.id, result: fake(rec, 0) }).ok);
+  assert.equal(s.provinces[target].owner, 0);
+  assert.equal(a.at, target);
+  assert.notEqual(foe.at, target, 'the beaten army fell back');
+  assert.equal(soldiers(a), a.platoons.length * 12, 'survivors carried back');
+});
+
+test('supply comes only from provinces joined to the capital; cut-off armies wither', () => {
+  const cm = createCampaignMatch('supply', quick);
+  const s = cm.state;
+  const before = incomeOf(s, 0);
+  // Cut a province off: everything round it goes to the enemy.
+  const far = s.provinces.find((p) => p.owner === 0 && p.site !== 'capital' && p.neighbours.length === 2);
+  for (const n of far.neighbours) s.provinces[n].owner = 1;
+  assert.ok(!connected(s, 0).has(far.id));
+  assert.ok(incomeOf(s, 0) < before);
+  const a = s.armies.find((x) => x.side === 0);
+  a.at = far.id;
+  const n0 = soldiers(a);
+  cmd(cm, 0, 'endTurn');
+  cmd(cm, 1, 'endTurn');
+  assert.ok(soldiers(a) < n0, 'lost soldiers while cut off');
+  assert.equal(cmd(cm, 0, 'refill', { army: a.id }).ok, false, 'no refills while cut off');
+});
+
+test('taking the enemy capital wins the war', () => {
+  const cm = createCampaignMatch('capital', quick);
+  const s = cm.state;
+  const cap = capitalOf(s, 1);
+  const a = s.armies.find((x) => x.side === 0);
+  for (const b of s.armies.filter((x) => x.side === 1)) b.at = s.provinces.find((p) => p.owner === 1 && p.id !== cap.id && !armyAt(s, p.id)).id;
+  s.armies = s.armies.filter((x) => x.side === 0 || x.at !== cap.id);
+  a.at = cap.neighbours.find((n) => !armyAt(s, n) || armyAt(s, n) === a);
+  s.provinces[a.at].owner = 0;
+  if (armyAt(s, cap.id)) armyAt(s, cap.id).at = -1;
+  assert.ok(cmd(cm, 0, 'attack', { army: a.id, to: cap.id }).ok);
+  assert.equal(s.phase, 'over');
+  assert.equal(s.winner, 0);
+});
+
+test('the same seed and orders give the same war (replay from the log)', () => {
+  const cm = createCampaignMatch('determinism', { turns: 3, ...quick });
+  for (let i = 0; i < 3 && cm.state.phase !== 'over'; i++) aiRound(cm);
+  const again = replayCampaign('determinism', { turns: 3, ...quick }, cm.log);
   assert.equal(JSON.stringify(again.state), JSON.stringify(cm.state));
 });
 
-// Cut a sector off: give the enemy a ring of cells all round it.
-function cutOff(s, sectorId, side) {
-  const { cols } = s;
-  for (let i = 0; i < s.owner.length; i++) {
-    if (s.sector[i] !== sectorId) continue;
-    for (const j of [i - 1, i + 1, i - cols, i + cols]) if (j >= 0 && j < s.owner.length && s.sector[j] !== sectorId) s.owner[j] = 1 - side;
-  }
-  refreshSupply(s);
-}
-
-test('supply: a cut off platoon cannot refill; a cut off site pays nothing', () => {
-  const s = createCampaignMatch('supply').state;
-  const pl = s.platoons.find((p) => p.side === 0);
-  pl.alive = [2, 5, 5];
-  cutOff(s, pl.sector, 0);
-  assert.ok(pl.cut);
-  const r = applyCampaignCommand(s, { side: 0, type: 'refill', params: { platoon: pl.id } });
-  assert.equal(r.ok, false);
-  const site = s.sites.find((x) => x.home === 0 && x.kind === 'factory' && x.defence === 2);
-  const before = incomeFor(s, 0).materiel;
-  cutOff(s, site.sector, 0);
-  assert.equal(site.connected, false);
-  assert.ok(incomeFor(s, 0).materiel < before);
-  assert.equal(connectedCells(s, 0)[site.cell], 0);
+test('no attacks during the opening ceasefire', () => {
+  const cm = createCampaignMatch('ceasefire', { config: { battle: { durationSec: 40 } } });
+  const s = cm.state;
+  const a = s.armies.find((x) => x.side === 0);
+  assert.ok(ordersFor(s, a).every((o) => o.kind === 'march'));
+  const enemy = s.provinces[a.at].neighbours.find((n) => s.provinces[n].owner === 1);
+  assert.match(cmd(cm, 0, 'attack', { army: a.id, to: enemy }).reason, /Ceasefire/);
 });
 
-// A hand made battle at a site's sector, won by `winner` with `margin`.
-function fight(s, sector, attacker, winner, margin) {
-  s.phase = 'battles';
-  s.battles = [{ id: 't', sector, sectorName: 'test', attacker, meeting: false, forces: [{ platoons: [] }, { platoons: [] }], result: null }];
-  s.battles[0].id = `t-${s.history.length}`;
-  return applyCampaignCommand(s, { side: attacker, type: 'battleResult', params: { battle: s.battles[0].id, result: { winner, margin, platoons: [], log: [] } } });
-}
-
-test('site defence counts down with each defeat and the site only falls at zero', () => {
-  const s = createCampaignMatch('defence', { config: FAST }).state;
-  const site = s.sites.find((x) => x.home === 0 && x.kind === 'city' && x.defence === 2);
-  // The Helghast already hold the ground round the city.
-  for (let i = 0; i < s.owner.length; i++) if (s.sector[i] === site.sector && i !== site.cell) s.owner[i] = 1;
-  for (let k = 0; k < 3; k++) {
-    assert.ok(fight(s, site.sector, 1, 1, 'crushing').ok);
-    if (k < 2) assert.equal(s.owner[site.cell], 0, `still held after ${k + 1} defeats`);
-  }
-  assert.equal(site.defence, 0);
-  assert.equal(s.owner[site.cell], 1, 'falls once its defences are gone');
-});
-
-test('the front moves further for bigger margins', () => {
-  const gained = {};
-  for (const margin of ['narrow', 'clear', 'crushing']) {
-    const s = createCampaignMatch('push', { config: FAST }).state;
-    const target = s.sectors.find((x) => x.half === 1 && sectorOwner(s, x.id) === 1 && x.neighbours.some((nb) => s.sectors[nb].half === 0) && !s.sites.some((st) => st.sector === x.id));
-    const count = () => s.owner.filter((o) => o === 0).length;
-    const before = count();
-    fight(s, target.id, 0, 0, margin);
-    gained[margin] = count() - before;
-  }
-  assert.ok(gained.narrow > 0 && gained.clear > gained.narrow && gained.crushing > gained.clear, JSON.stringify(gained));
-});
-
-test('an AI against AI campaign runs to a winner within the night limit', () => {
-  const cm = createCampaignMatch('war', { nights: 1, config: FAST });
+test('an AI against AI war reaches a winner', () => {
+  const cm = createCampaignMatch('ai-war', { turns: 8, ...quick });
   let guard = 0;
-  while (cm.state.phase !== 'over' && guard++ < 10) aiRound(cm);
+  while (cm.state.phase !== 'over' && guard++ < 20) aiRound(cm);
   assert.equal(cm.state.phase, 'over');
   assert.ok(cm.state.winner === 0 || cm.state.winner === 1);
-  assert.ok(cm.state.night <= 2);
-  assert.ok(capitalOf(cm.state, 0));
+  assert.ok(cm.state.history.length > 0, 'battles were fought');
 });

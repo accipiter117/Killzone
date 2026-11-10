@@ -6,20 +6,22 @@ Two layers, played solo against an AI: real-time **battles**, and a **campaign**
 
 Play it: **https://accipiter117.github.io/Killzone/**. The start menu offers a campaign (new, continue or load from a code) or a quick battle. Add `?seed=anything` to the address to jump straight into a quick battle on a particular map.
 
-## The campaign (war map)
+## The war (campaign)
 
-- **The map:** an invented stretch of front, 24 sectors in named regions (ISA west, Helghast east, the east half the west half turned round, so both sides start equal). Blue ground is ISA, orange Helghast; the dark trench is the front line. Each sector has a terrain kit (trenches, industrial site or ruined city) that picks the battle map fought there.
-- **Sites** give one bonus each while held and connected to your capital through your own ground: city (manpower), factory (materiel), tank works (your tank joins battles), power plant (power, and artillery in battle), comms hub (+1 starting order point), airfield (jetpack squads; without it they fight as riflemen). Holding every site in a region pays a bonus. A red dashed ring means a site is cut off and gives nothing.
-- **Defences:** cities, factories and capitals have 1 to 3 defences (gold pips). Each battle lost there knocks one off; the site can only be taken at zero.
-- **Platoons:** each side starts with two army groups of three platoons (numbered chips with a strength bar). They keep their squads, casualties and a named sergeant from battle to battle.
-- **A round** (three per night): you plan, then the battles are fought, then the front moves.
-  - Tap a platoon: pale sectors are where it can move (two sectors through your own ground), red ones where it can attack. A platoon moves or attacks, not both.
-  - **Refill** a weakened platoon (manpower, only while in supply), **dig in** on a sector of yours (materiel: its defenders get extra trenches), **recruit** a new platoon at your capital (manpower, materiel and power).
-  - **Key battle** (gold star): the one battle you fight yourself on the battle screen; your first attack each round is marked key, and you can move the star (or mark a sector of yours to fight there if attacked). Every other battle is fought by the AI for both sides in the background (a Web Worker), with your platoons, survivors, tank, artillery and order points carried in.
-  - **Results:** each battle with what changed and a Replay button. The bigger the margin, the further the front moves: narrow nudges it, clear pushes it, crushing breaks through into the sectors behind. Broken platoons fall back a sector; platoons cut off from supply lose soldiers every round.
-  - After the third round, the night's **dispatches** sum up what happened.
-- **Victory:** take the enemy capital, or hold the most site value when the final night ends (4 nights for a short war, 8 for a full one).
-- **Saving:** the campaign saves itself in the browser after every order. Menu, "Save as a code" gives a text code to copy to another device; "Load a campaign from a code" carries on from it.
+Modelled on Roma Invicta: a war table of named provinces, armies you move one at a time, and real-time battles whenever armies meet.
+
+- **The board:** 16 provinces on a painted war table, the ISA (blue) at the bottom and the Helghast (red) at the top; the Helghast half is the ISA half turned round, so both sides start equal. The trench marks the front. Upright, the board stands as drawn; sideways it turns so your side is on the left. Twist two fingers to turn it any way.
+- **Armies:** standards numbered I, II, III... each holding up to three platoons, who keep their sergeants and losses from battle to battle.
+- **Your turn:** tap an army (or its chip at the bottom). Badges show what it can do: **March** to a province of yours, **Take** empty enemy ground, or **Fight** an enemy army with the odds shown. Each army acts once a turn; then **End turn**.
+- **Battles** start the moment you attack: fight it yourself on the battle screen, or let the AI fight it (in the background). Win and the province is yours and the beaten army falls back (or is lost with nowhere to go). Every battle can be replayed from its result.
+- **The Helghast turn:** their armies march and attack; pulsing red borders show where they can strike. When they attack you, you choose to fight or let the AI defend. A turn report sums up what happened.
+- **Supply** comes in each turn from provinces joined to your capital (cities and factories pay most). Spend it in the army panel: **Refill** soldiers, **Dig in** (fight from trenches when attacked; uses the army's turn), **Raise** a platoon at your capital (or a new army there). Armies cut off from the capital lose soldiers each turn.
+- **Sites** add to every battle while held and joined to the capital: tank works (your tank), power plant (artillery), comms hub (+1 order point), airfield (jetpacks).
+- **Pressure:** defending your own home ground helps, and every few turns the Helghast make a big push (with extra supply). An **objective** (gold dashed outline) pays extra supply if taken in time.
+- **Comebacks:** enemy home ground you hold pays only 1 supply (its people will not work for you), and a side that has lost ground gets 2 extra supply a turn for each province it is behind. The war opens with a ceasefire turn (no attacks), so neither side gets a free grab.
+- **Victory:** take the Helghast capital, hold the most provinces when the last turn ends (12 turns for a short war, 18 for a full one), or push them down to two provinces, when they surrender.
+- **Saving:** the war saves itself after every order. Menu, "Save as a code" gives a text code to carry it to another device. (Wars from the old sector map cannot be continued.)
+
 
 ### Campaign numbers worth trying first
 
@@ -27,18 +29,19 @@ All in `CAMPAIGN` in [`src/config.js`](src/config.js).
 
 | What | Where | Try | Effect on play |
 | --- | --- | --- | --- |
-| How far the front moves | `push` (narrow 22, clear 55 cells; breakthrough 45 more) | narrow 12, clear 40 | Smaller numbers make a slower, grinding war where defences matter more. |
-| Site defences | `sites[].defence` (capital 3, cities and factories 1 to 2) | +1 each | Higher makes capitals much harder to rush; wars go to the final night more often. |
-| Battle length | `battle.durationSec` (360) | 300 or 480 | Shorter battles are quicker to play and decide fewer cells per fight. |
-| Income | `income`, `regionBonus`, `start` | | How quickly losses can be refilled; low income makes every soldier count. |
-| Costs | `costs.refillPerSoldier`, `costs.fortify`, `costs.recruit` | | How often digging in and recruiting are worth it. |
-| Supply attrition | `attrition` (1 soldier a round) | 2 | How dangerous it is to be cut off. |
-| War length | `nights` (8), `roundsPerNight` (3) | | Also picked on the start menu (4 or 8 nights). |
-| Platoon limit | `maxPlatoons` (8), `maxPerSide` (3 per battle) | | How big the armies and battles get. |
-| Movement | `moveRange` (2 sectors) | 1 or 3 | How fast reserves can reach a breach. |
+| Starting armies | `armies` | more platoons in the first army | Bigger opening clashes |
+| Supply | `supply`, `start` | lower | Every refill and platoon becomes a real choice |
+| Costs | `costs` (refill 1 a soldier, platoon 12, dig in 4) | | How often digging in and recruiting are worth it |
+| Home ground | `homeBonus` (0.25) | 0.4 | Harder to push deep into enemy ground; more comebacks |
+| The Helghast push | `pushEvery` (3), `pushSupply` (8), `aiPushOdds` (0.4) | | How hard the pressure comes |
+| AI boldness | `aiAttackOdds` (0.55) | 0.45 or 0.65 | How readily the Helghast attack |
+| Objectives | `objective` (every 4 turns, +8 supply) | | How much the briefings pay |
+| War length | `turns` (18) | | Also picked on the start menu (12 or 18) |
+| Cut off | `attrition` (2 soldiers a turn) | | How dangerous deep raids are |
+| Comebacks | `occupiedSupply` (1), `catchUp` (2), `surrenderAt` (2) | | How hard it is to come back from losing ground, and when a beaten side gives up |
+| Battle length | `battle.durationSec` (360) | 300 | Shorter battles, quicker turns |
 
-`node tools/campaign-balance.mjs 6 4 90` plays six AI against AI campaigns (4 nights, 90 second battles) and reports win rates, how wars end and how many battles are fought. Last run: 50/50, a third won by taking the capital.
-
+`node tools/campaign-balance.mjs 6 18 360` plays six AI against AI wars (push and objectives off, so both sides play by the same rules) and reports win rates, how wars end and how many battles are fought.
 
 ## How to play
 

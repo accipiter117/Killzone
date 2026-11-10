@@ -95,9 +95,7 @@ function formUp(state, sq, list, dest, snapCover) {
     if ((state.map.hasHeight || state.map.hasWalls) && !state.cfg.roles[s.role].flies && !straightClear(state.map, s, { x, y }, true)) {
       if (straightClear(state.map, s, dest, true)) { x = dest.x; y = dest.y; }
       else {
-        let p = findPath(state.map, s, dest, { maxNodes: 12000, mirror: s.side === 1 });
-        // No way to the squad's destination from here: rejoin the squad.
-        if (!p || !p.length) p = findPath(state.map, s, { x: sq.cx, y: sq.cy }, { maxNodes: 12000, mirror: s.side === 1 });
+        const p = soldierRoute(state, s, sq, dest);
         // Start from the route's first step (always reachable), then look
         // as far along it as can be walked in a straight line.
         let pt = p && p[0] ? p[0] : { x: s.x, y: s.y };
@@ -109,6 +107,22 @@ function formUp(state, sq, list, dest, snapCover) {
     }
     s.tx = x; s.ty = y;
   }
+}
+
+// A soldier's own route round walls and cliffs, kept for a few seconds and
+// reused while the destination stays put (finding a route through a walled
+// site is costly, and squads re-form several times a second).
+function soldierRoute(state, s, sq, dest) {
+  const r = s.route;
+  if (r && Math.hypot(r.tx - dest.x, r.ty - dest.y) < 30 && state.tick - r.tick < 90) {
+    while (r.pts.length > 1 && Math.hypot(r.pts[0].x - s.x, r.pts[0].y - s.y) < 12) r.pts.shift();
+    return r.pts;
+  }
+  let p = findPath(state.map, s, dest, { maxNodes: 12000, mirror: s.side === 1 });
+  // No way to the squad's destination from here: rejoin the squad.
+  if (!p || !p.length) p = findPath(state.map, s, { x: sq.cx, y: sq.cy }, { maxNodes: 12000, mirror: s.side === 1 });
+  s.route = p && p.length ? { tx: dest.x, ty: dest.y, tick: state.tick, pts: p } : null;
+  return p;
 }
 
 // The nearest cell that is not wall, searching outwards in rings (towards
