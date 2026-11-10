@@ -41,7 +41,11 @@ function clearForTank(map, a, b) {
 
 function nextWaypoint(state, v, to) {
   if (clearForTank(state.map, v, to)) { v.path = null; return to; }
-  const stale = !v.path || !v.pathTo || Math.hypot(v.pathTo.x - to.x, v.pathTo.y - to.y) > 40 || state.tick - v.pathTick > 150;
+  // A new route when the goal has moved (at most twice a second: the AI's
+  // tank goal shifts as the platoons move, and on a walled map every search
+  // is costly), or every five seconds anyway.
+  const age = state.tick - (v.pathTick ?? -9999);
+  const stale = !v.path || !v.pathTo || (Math.hypot(v.pathTo.x - to.x, v.pathTo.y - to.y) > 40 && age > 15) || age > 150;
   if (stale) {
     v.path = findPath(state.map, v, to, { maxNodes: 20000, mirror: v.side === 1, vehicle: true });
     v.pathTo = { x: to.x, y: to.y };

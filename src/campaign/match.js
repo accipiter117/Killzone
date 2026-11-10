@@ -4,7 +4,7 @@
 
 import { createCampaign } from './state.js';
 import { applyCampaignCommand } from './commands.js';
-import { planFor } from './ai.js';
+import { nextCommand } from './ai.js';
 
 export function createCampaignMatch(seed, options = {}) {
   return { seed, options, state: createCampaign(seed, options), log: [] };
@@ -17,7 +17,7 @@ export function issueCampaign(cm, cmd) {
     // result itself is rebuilt from it), to keep saves small and honest.
     const params = { ...(cmd.params || {}) };
     if (cmd.type === 'battleResult') {
-      const rec = cm.state.history.concat(cm.state.battles, cm.state.lastBattles || []).find((b) => b.id === params.battle);
+      const rec = cm.state.history.find((b) => b.id === params.battle);
       params.log = rec ? rec.log : params.log;
       delete params.result;
     }
@@ -32,24 +32,29 @@ export function replayCampaign(seed, options, log) {
   return cm;
 }
 
-// Plan for each AI side, then (when every side has ended planning) settle
-// every battle that is not the player's to fight. resolver(record) returns
-// a result; by default the battle is run here.
-export function aiPlan(cm, sides) {
-  for (const side of sides) for (const cmd of planFor(cm.state, side)) issueCampaign(cm, cmd);
-}
-
-export function autoResolve(cm, { skipKey = true } = {}) {
-  for (const rec of [...cm.state.battles]) {
-    if (rec.result || (skipKey && rec.key)) continue;
-    issueCampaign(cm, { side: rec.attacker, type: 'battleResult', params: { battle: rec.id } });
+// Let the AI play one side's whole turn. resolve(rec) settles each battle
+// it starts (by default the battle is run here, AI against AI).
+export function aiTurn(cm, side, resolve = null) {
+  const s = cm.state;
+  let guard = 0;
+  while (s.phase !== 'over' && s.active === side && guard++ < 200) {
+    if (s.phase === 'battle') { settle(cm, resolve); continue; }
+    const cmd = nextCommand(s, side);
+    if (!cmd) break;
+    const res = issueCampaign(cm, cmd);
+    if (!res.ok) issueCampaign(cm, { side, type: 'endTurn', params: {} });
+    if (cmd.type === 'endTurn') break;
   }
+  if (s.phase === 'battle') settle(cm, resolve);
 }
 
-// One whole round with the AI on both sides (for tests and the balance tool).
-export function aiRound(cm) {
-  const round = `${cm.state.night}.${cm.state.round}`;
-  aiPlan(cm, [0, 1]);
-  autoResolve(cm, { skipKey: false });
-  return round;
+function settle(cm, resolve) {
+  const rec = cm.state.battle;
+  issueCampaign(cm, { side: rec.attacker, type: 'battleResult', params: { battle: rec.id, result: resolve ? resolve(rec) : undefined } });
+}
+
+// One whole turn with the AI on both sides (for tests and the balance tool).
+export function aiRound(cm, resolve = null) {
+  aiTurn(cm, 0, resolve);
+  aiTurn(cm, 1, resolve);
 }

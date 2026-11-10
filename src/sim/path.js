@@ -133,7 +133,8 @@ export function nextStep(state, sq, from, to) {
   const engineer = sq.role === 'engineer';
   // Straight there if nothing is in the way (the common case on open ground).
   if (straightClear(map, from, to, engineer)) { sq.path = null; return to; }
-  const stale = !sq.path || !sq.pathTo || Math.hypot(sq.pathTo.x - to.x, sq.pathTo.y - to.y) > 40 || state.tick - sq.pathTick > 150;
+  const age = state.tick - (sq.pathTick ?? -9999);
+  const stale = !sq.path || !sq.pathTo || (Math.hypot(sq.pathTo.x - to.x, sq.pathTo.y - to.y) > 40 && age > 15) || age > 150;
   if (stale) {
     sq.path = findPath(map, from, to, { engineer, mirror: sq.side === 1 });
     sq.pathTo = { x: to.x, y: to.y };

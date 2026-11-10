@@ -10,6 +10,8 @@
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -81,15 +83,21 @@
       <div id="cp-when"></div>
       <div id="cp-res"></div>
     </div>
-    <div id="cp-actions">
-      <button id="cp-recruit" class="hud-btn wide">Recruit</button>
-      <button id="cp-end" class="hud-btn wide go">End planning</button>
-    </div>
+    <div id="cp-obj" hidden></div>
     <div id="cp-hint"></div>
+    <div id="cp-bar">
+      <div id="cp-chips"></div>
+      <button id="cp-end" class="hud-btn wide go">END TURN</button>
+    </div>
     <section id="cp-tray" class="glass" hidden>
       <div id="cp-tray-head"><b id="cp-tray-title"></b><button id="cp-tray-close" class="hud-btn bare" aria-label="Close">&#10005;</button></div>
       <div id="cp-tray-body"></div>
       <div id="cp-tray-btns"></div>
+    </section>
+    <div id="cp-shade" hidden></div>
+    <section id="cp-sheet" hidden>
+      <div id="cp-sheet-body"></div>
+      <div id="cp-sheet-btns"></div>
     </section>
     <div id="cp-toast" hidden></div>
   </section>
@@ -99,12 +107,12 @@
       <h2>Front Line</h2>
       <p class="small">ISA against Helghast. Fight a single battle, or command a whole war on the war map.</p>
       <div class="buttons">
-        <button class="primary" id="st-continue" hidden>Continue campaign</button>
-        <button id="st-new-short">New campaign (short: 4 nights)</button>
-        <button id="st-new">New campaign (full: 8 nights)</button>
+        <button class="primary" id="st-continue" hidden>Continue the war</button>
+        <button id="st-new-short">New war (short: 12 turns)</button>
+        <button id="st-new">New war (full: 18 turns)</button>
         <button id="st-quick">Quick battle</button>
         <button id="st-import">Load a campaign from a code</button>
-        <button id="st-help">How the campaign works</button>
+        <button id="st-help">How the war works</button>
       </div>
       <p class="small">Fan-made, non-commercial prototype. Not affiliated with Guerrilla Games or Sony.</p>
     </div>
@@ -122,7 +130,7 @@
         <button id="cm-sound">Sound: on</button>
         <button id="cm-main">Main menu</button>
       </div>
-      <p class="small">The campaign saves itself in this browser after every order.</p>
+      <p class="small">The war saves itself in this browser after every order.</p>
     </div>
   </div>
 
@@ -139,39 +147,20 @@
     </div>
   </div>
 
-  <div id="overlay-recruit" class="overlay" hidden>
-    <div class="sheet">
-      <h2>Raise a platoon</h2>
-      <p id="rc-cost" class="small"></p>
-      <div id="rc-list" class="buttons"></div>
-      <div class="buttons"><button data-close>Cancel</button></div>
-    </div>
-  </div>
-
-  <div id="overlay-cbattles" class="overlay" hidden>
-    <div class="sheet wide">
-      <h2 id="cb-title">Battles</h2>
-      <p id="cb-sub" class="small"></p>
-      <div id="cb-list"></div>
-      <div id="cb-btns" class="buttons"></div>
-    </div>
-  </div>
-
   <div id="overlay-chelp" class="overlay" hidden>
     <div class="sheet">
-      <h2>How the campaign works</h2>
+      <h2>How the war works</h2>
       <ul>
-        <li>The war map is split into <b>sectors</b>. Blue ground is <b class="isa-text">ISA</b>, orange is <b class="hgh-text">Helghast</b>; the dark trench is the front line.</li>
-        <li>Each <b>night</b> has three <b>rounds</b>. A round: you plan, then the battles are fought, then the front moves.</li>
-        <li><b>Planning:</b> tap one of your platoons (the numbered chips). Pale sectors are where it can <b>move</b> (up to two sectors through your own ground). Red sectors are where it can <b>attack</b>. A platoon either moves or attacks each round.</li>
-        <li><b>Key battle</b> (gold star): the one battle you fight yourself on the battle screen. Your first attack each round is marked key; change it in the platoon panel. Every other battle is fought by the AI for both sides.</li>
-        <li>Tap a sector of yours to <b>dig in</b> (materiel): its defenders fight from extra trenches. <b>Refill</b> a weakened platoon with manpower (only while it is in supply).</li>
-        <li><b>Sites</b> give one bonus each while you hold them <i>and</i> they connect to your capital through your own ground: cities pay manpower, factories materiel, the power plant power and artillery, the tank works your tank, the comms hub an extra order point, the airfield jetpacks.</li>
-        <li>Cities, factories and capitals have <b>defences</b> (gold pips). Each battle lost there knocks one off; only at zero can the site be taken.</li>
-        <li>The bigger the win, the further the front moves: narrow nudges it, clear pushes it, crushing breaks through into the sectors behind.</li>
-        <li>Platoons cut off from supply (a red dashed outline) cannot be refilled and lose soldiers every round.</li>
-        <li><b>Victory:</b> take the enemy capital, or hold the most valuable sites when the last night ends.</li>
-        <li>Drag (or use the arrow keys) to pan, pinch to zoom. Every battle can be replayed from the results.</li>
+        <li>The war table is a board of <b>provinces</b>. Blue is <b class="isa-text">ISA</b> (yours, at the bottom), red is <b class="hgh-text">Helghast</b>; the trench is the front line.</li>
+        <li>Your <b>armies</b> are the blue standards (I, II, III...). Each holds up to three platoons, who keep their sergeants and their losses from battle to battle.</li>
+        <li><b>Your turn:</b> tap an army (or its chip at the bottom). Badges show what it can do: <b>March</b> to a province of yours, <b>Take</b> an empty enemy province, or <b>Fight</b> an enemy army (the odds are shown). Each army acts once a turn. Then press <b>End turn</b>.</li>
+        <li><b>Battles</b> start as soon as you attack. Fight it yourself on the battle screen, or let the AI fight it. Win and the province is yours; the beaten army falls back, or is lost if it has nowhere to go.</li>
+        <li><b>The Helghast turn</b> comes next. Pulsing red borders show where they can strike; when they attack you, you choose to fight it or let the AI defend.</li>
+        <li><b>Supply</b> comes in every turn from the provinces joined to your capital. Spend it in the army panel: <b>Refill</b> lost soldiers, <b>Dig in</b> (fight from trenches when attacked, uses the army's turn), or <b>Raise</b> a new platoon at your capital.</li>
+        <li><b>Sites</b> add to every battle while held and joined to your capital: the tank works gives you a tank, the power plant artillery, the comms hub an order point, the airfield jetpacks.</li>
+        <li>Defending your own home ground helps, and every few turns the Helghast make a big <b>push</b>. An <b>objective</b> (gold dashed outline) pays extra supply if you take it in time.</li>
+        <li><b>Victory:</b> take the Helghast capital, or hold the most provinces when the last turn ends. Lose Fort Corvane and the war is lost.</li>
+        <li>Drag (or use the arrow keys) to pan, pinch to zoom, twist to turn the table. Every battle can be replayed from its result.</li>
       </ul>
       <button class="primary" data-close>Got it</button>
     </div>

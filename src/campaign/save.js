@@ -18,7 +18,8 @@ export function packSave(cm) {
 
 // One entry per version: how to turn a version n save into version n + 1.
 const UPGRADES = {
-  // 1: (data) => { data.state.newThing = 0; },
+  // Version 1 was the old sector map; its wars cannot be carried over.
+  1: () => { throw new Error('This war was saved on the old war map, which has been replaced. Start a new war.'); },
 };
 
 export function upgradeSave(data) {
@@ -33,8 +34,8 @@ export function upgradeSave(data) {
   data.state.version = v;
   // Fields added after version 1 went out get sensible defaults here.
   const s = data.state;
-  s.lastBattles = s.lastBattles || [];
   s.history = s.history || [];
+  s.reports = s.reports || [[]];
   s.battleCount = s.battleCount || s.history.length;
   return data;
 }
@@ -63,7 +64,7 @@ export function loadCampaign() {
 }
 
 export function hasSave() {
-  try { return !!localStorage.getItem(KEY); } catch { return false; }
+  return !!loadCampaign();
 }
 
 export function deleteSave() {

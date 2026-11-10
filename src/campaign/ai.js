@@ -1,90 +1,97 @@
-// The campaign AI: looks at the war map at the start of planning and gives
-// the same campaign commands a player could. No randomness: the same map
-// always gets the same plan. (Its battles are fought by the battle AI.)
+// The campaign AI: looks at the board and gives the same commands a player
+// could, one at a time (an attack starts a battle that must be settled
+// before the next order). No randomness: the same board always gets the
+// same orders. Its battles are fought by the battle AI.
 
-import { reachable, attackable, strengthOf, sectorOwner, extrasFor } from './state.js';
+import {
+  armyAt, capitalOf, connected, oddsOf, ordersFor, soldiers, fullStrength, pushIn,
+} from './state.js';
+import { distances } from './commands.js';
 
-export function planFor(state, side) {
+// The next command for this side, or endTurn when it has nothing left to do.
+export function nextCommand(state, side) {
   const cc = state.cc;
-  const cmds = [];
-  const res = { ...state.res[side] };
-  const mine = state.platoons.filter((p) => p.side === side).sort((a, b) => strengthOf(b) - strengthOf(a) || (a.id < b.id ? -1 : 1));
-  const per = cc.costs.refillPerSoldier.manpower;
+  const end = { side, type: 'endTurn', params: {} };
+  if (state.phase !== 'turn' || state.active !== side) return null;
+  const mine = state.armies.filter((a) => a.side === side).sort((a, b) => soldiers(b) - soldiers(a) || (a.id < b.id ? -1 : 1));
+  const supply = state.supply[side];
+  const cap = capitalOf(state, side);
+  const con = connected(state, side);
 
-  // Refill the weakest platoons in supply.
-  for (const pl of [...mine].sort((a, b) => strengthOf(a) - strengthOf(b))) {
-    if (pl.cut || strengthOf(pl) > 0.85) continue;
-    const missing = pl.alive.reduce((a, n) => a + (5 - n), 0);
-    if (res.manpower < per) break;
-    cmds.push({ side, type: 'refill', params: { platoon: pl.id } });
-    res.manpower -= Math.min(missing, Math.floor(res.manpower / per)) * per;
-  }
-  // Raise a new platoon when there is plenty to spare.
-  const rc = cc.costs.recruit;
-  if (mine.length < cc.maxPlatoons && Object.entries(rc).every(([k, v]) => res[k] >= v + (k === 'materiel' ? cc.costs.fortify.materiel : 0))) {
-    cmds.push({ side, type: 'recruit', params: { template: mine.length, group: mine.length % 2 ? 'south' : 'north' } });
-    for (const [k, v] of Object.entries(rc)) res[k] -= v;
-  }
-
-  // Sector values: enemy sites there are worth taking.
-  const valueOf = (sector) => state.sites.filter((s) => s.sector === sector && s.owner !== side).reduce((a, s) => a + cc.siteValue[s.kind], 0);
-  const enemyCells = (sector) => { let n = 0; for (let i = 0; i < state.sector.length; i++) if (state.sector[i] === sector && state.owner[i] !== side) n++; return n; };
-  const defenders = (sector) => state.platoons.filter((p) => p.side !== side && p.sector === sector).reduce((a, p) => a + strengthOf(p), 0);
-  const committed = new Map();
-  const frontSectors = state.sectors.filter((s) => sectorOwner(state, s.id) === side && s.neighbours.some((nb) => enemyCells(nb) > 0 || sectorOwner(state, nb) !== side)).map((s) => s.id);
-
-  // A garrison: where one of our sites faces enemy platoons next door, the
-  // weakest fit platoon there stays to hold it.
-  const staying = new Set();
-  for (const site of state.sites.filter((x) => x.owner === side)) {
-    const threat = state.sectors[site.sector].neighbours.some((nb) => state.platoons.some((p) => p.side !== side && p.sector === nb));
-    if (!threat) continue;
-    const here = mine.filter((p) => p.sector === site.sector).sort((a, b) => strengthOf(a) - strengthOf(b));
-    if (here.length) staying.add(here[0].id);
-  }
-
-  for (const pl of mine) {
-    if (staying.has(pl.id) || strengthOf(pl) < Math.max(cc.minStrength, 0.4)) continue; // holding, or too weak: wait for a refill
-    const targets = attackable(state, pl);
-    if (targets.length) {
-      let best = null, bestScore = -Infinity;
-      for (const t of targets) {
-        const have = committed.get(t) || 0;
-        if (have >= cc.maxPerSide) continue;
-        // Enemy-held sectors (real gains) and their sites first; slivers of
-        // our own contested sectors only if the enemy stands in them.
-        const theirs = sectorOwner(state, t) !== side;
-        const foes = defenders(t);
-        if (!theirs && foes === 0) continue;
-        const score = (theirs ? 6 : 1) + valueOf(t) * 2 - foes * 4 + have * 3 - t * 0.001;
-        if (score > bestScore) { bestScore = score; best = t; }
-      }
-      // Only attack where the odds look fair: our strength there against theirs.
-      if (best !== null && (committed.get(best) || 0) + strengthOf(pl) >= defenders(best) * 0.8) {
-        committed.set(best, (committed.get(best) || 0) + strengthOf(pl));
-        cmds.push({ side, type: 'attack', params: { platoon: pl.id, sector: best } });
-        continue;
-      }
+  // Spend supply: refill the most worn army first, keeping enough back to
+  // raise a platoon when there is no army at the capital.
+  const atCap = cap.owner === side ? armyAt(state, cap.id) : null;
+  if (cap.owner === side && supply >= cc.costs.recruit) {
+    const armies = mine.length;
+    if (armies < cc.maxArmies || (atCap && atCap.side === side && atCap.platoons.length < cc.maxPlatoons)) {
+      return { side, type: 'recruit', params: {} };
     }
-    // No good attack from here: move up to the front.
-    const reach = reachable(state, pl);
-    let go = null, gd = Infinity;
-    for (const [s, d] of reach) if (frontSectors.includes(s) && d < gd) { gd = d; go = s; }
-    if (go === null) for (const [s, d] of reach) if (d < gd) { gd = d; go = s; }
-    if (go !== null && !frontSectors.includes(pl.sector)) cmds.push({ side, type: 'move', params: { platoon: pl.id, sector: go } });
+  }
+  const worn = mine.filter((a) => con.has(a.at) && soldiers(a) < fullStrength(a)).sort((a, b) => soldiers(a) / fullStrength(a) - soldiers(b) / fullStrength(b) || (a.id < b.id ? -1 : 1));
+  if (worn.length && supply >= Math.min(5, fullStrength(worn[0]) - soldiers(worn[0])) * cc.costs.refillPerSoldier) {
+    return { side, type: 'refill', params: { army: worn[0].id } };
   }
 
-  // Dig in where valuable ground of ours faces enemy platoons.
-  const threatened = frontSectors
-    .map((s) => ({ s, v: state.sites.filter((x) => x.sector === s && x.owner === side).reduce((a, x) => a + cc.siteValue[x.kind], 0) + state.sectors[s].neighbours.filter((nb) => state.platoons.some((p) => p.side !== side && p.sector === nb)).length }))
-    .filter((t) => t.v > 0 && state.platoons.some((p) => p.side === side && p.sector === t.s))
-    .sort((a, b) => b.v - a.v || a.s - b.s);
-  for (const t of threatened) {
-    if (res.materiel < cc.costs.fortify.materiel) break;
-    cmds.push({ side, type: 'fortify', params: { sector: t.s } });
-    res.materiel -= cc.costs.fortify.materiel;
+  // Guard the capital: while an enemy army is within two provinces of it,
+  // one army stays there (raised on the spot if need be, else called back).
+  const capDist = distances(state, cap.id);
+  const capThreat = cap.owner === side && state.armies.some((a) => a.side !== side && (capDist.get(a.at) ?? 99) <= 2);
+  const guard = atCap && atCap.side === side ? atCap : null;
+  if (capThreat && !guard) {
+    const back = mine.filter((a) => !a.moved).map((a) => ({ a, o: ordersFor(state, a).find((o) => o.kind === 'march' && (capDist.get(o.to) ?? 99) < (capDist.get(a.at) ?? 99)) }))
+      .filter((x) => x.o).sort((x, y) => (capDist.get(x.a.at) ?? 99) - (capDist.get(y.a.at) ?? 99) || (x.a.id < y.a.id ? -1 : 1));
+    if (back.length) return { side, type: 'march', params: { army: back[0].a.id, to: back[0].o.to } };
   }
-  void extrasFor;
-  cmds.push({ side, type: 'endPlanning', params: {} });
-  return cmds;
+
+  // Each army that has not moved: take, attack, dig in, or move up.
+  const push = side !== state.playerSide && pushIn(state) === 0;
+  const need = push ? cc.aiPushOdds : cc.aiAttackOdds;
+  const enemyGround = state.provinces.filter((p) => p.owner !== side).map((p) => p.id);
+  const toFront = multiDistances(state, enemyGround);
+  for (const army of mine) {
+    if (army.moved) continue;
+    const orders = ordersFor(state, army);
+    // Value: supply, sites, the enemy capital above all.
+    const value = (id) => {
+      const p = state.provinces[id];
+      return p.supply + (p.site === 'capital' ? 20 : 0) + (p.home === side ? 2 : 0);
+    };
+    const takes = orders.filter((o) => o.kind === 'take').sort((a, b) => value(b.to) - value(a.to) || tie(side, a.to, b.to));
+    const here = state.provinces[army.at];
+    const threatened = here.neighbours.some((n) => { const e = armyAt(state, n); return e && e.side !== side; });
+    // The capital's guard stays put while the enemy is near.
+    const holdCapital = army === guard && capThreat;
+    if (holdCapital) {
+      if (!army.dug && threatened && supply >= cc.costs.dig) return { side, type: 'dig', params: { army: army.id } };
+      continue;
+    }
+    if (takes.length) return { side, type: 'attack', params: { army: army.id, to: takes[0].to } };
+    const fights = orders.filter((o) => o.kind === 'fight' && o.odds >= need).sort((a, b) => b.odds * value(b.to) - a.odds * value(a.to) || tie(side, a.to, b.to));
+    if (fights.length) return { side, type: 'attack', params: { army: army.id, to: fights[0].to } };
+    if (threatened) {
+      if (!army.dug && supply >= cc.costs.dig) return { side, type: 'dig', params: { army: army.id } };
+      continue; // hold the line
+    }
+    // Move up towards the front, through our own ground.
+    const marches = orders.filter((o) => o.kind === 'march' && (toFront.get(o.to) ?? 99) < (toFront.get(army.at) ?? 99))
+      .sort((a, b) => (toFront.get(a.to) ?? 99) - (toFront.get(b.to) ?? 99) || value(b.to) - value(a.to) || tie(side, a.to, b.to));
+    if (marches.length) return { side, type: 'march', params: { army: army.id, to: marches[0].to } };
+  }
+  return end;
 }
+
+// Ties broken in mirror order for the two sides, so mirrored boards play
+// out the same way for either.
+const tie = (side, a, b) => (side === 0 ? a - b : b - a);
+
+function multiDistances(state, from) {
+  const d = new Map(from.map((id) => [id, 0]));
+  const q = [...from];
+  while (q.length) {
+    const s = q.shift();
+    for (const n of state.provinces[s].neighbours) if (!d.has(n)) { d.set(n, d.get(s) + 1); q.push(n); }
+  }
+  return d;
+}
+
+export { distances };
