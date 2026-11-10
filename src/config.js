@@ -284,6 +284,33 @@ export const ABILITY_HELP = {
   vanish: 'Infiltrators go fully hidden for eight seconds, even up close, and shake off being pinned: slip away or set up the next ambush.',
 };
 
+// Turn-based battles (src/tactics): the same battlefield, armies and live
+// visuals, but the two sides take turns, every platoon and the tank get two
+// actions, and these rules (not the live fight) decide every loss.
+export const TACTICS = {
+  tile: 120, // world units per grid tile (a platoon stands on one tile)
+  turns: 10, // rounds; then the side with the most objective points wins
+  ap: 2, // actions per unit per turn
+  move: 3, // tiles per move action (a dash spends both actions for twice as far)
+  tankMove: 4,
+  range: 5, // tiles a platoon can fire at
+  tankRange: 6,
+  sight: 7, // tiles a unit can see (with a clear line)
+  base: 65, // hit chance before modifiers (percent)
+  tankBase: 75,
+  falloff: 4, // percent lost per tile beyond 2
+  cover: { full: 40, half: 20 }, // percent off the hit chance (flanking ignores it)
+  height: 10, // firing down from higher ground
+  pinned: 15, // a pinned unit shoots worse and has one action
+  overwatch: 10, // overwatch shots are snap shots
+  kills: { base: 1, perStrength: 2, heavy: 1, tank: 3 }, // soldiers killed by a hit: 1 + 2 x strength (+1 with heavies), the tank gun 3
+  vsTank: { platoon: 1, heavy: 2, tank: 4, of: 12 }, // a hit on a tank takes this many twelfths of its armour
+  grenade: { range: 2, kills: 2, cooldown: 3 }, // always lands, ignores cover, pins; rifle squads only
+  breakAt: 0.3, // a platoon below this share of its soldiers breaks and runs
+  objectivePoints: 10, // per objective held at the end of each round
+  ai: { fireAt: 50, fireAfterMove: 35 }, // the AI shoots at these odds or better
+};
+
 // The war map campaign (src/campaign). Every strategic number lives here.
 // Roma Invicta style: a board of named provinces, armies of up to three
 // platoons, one move each per turn, attacks fought (or auto-resolved) on

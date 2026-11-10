@@ -69,6 +69,11 @@
         <button data-act="artillery" class="sup art" aria-label="Artillery"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><small>3 pts</small></button>
       </div>
 
+      <!-- Turn-based battles: the turn, the selected unit, End turn. -->
+      <div id="tb-bar" class="glass"><span id="tb-turn"></span><span id="tb-phase"></span></div>
+      <section id="tb-panel" class="glass"><div id="tb-body"></div><div id="tb-btns"></div></section>
+      <button id="tb-end" class="hud-btn wide go">END TURN</button>
+
       <div id="toast" hidden></div>
       <div id="rotate-hint" hidden>Turn your phone sideways for the best view of the battlefield.<br><button id="rotate-ok">Play upright anyway</button></div>
     </main>
@@ -110,7 +115,8 @@
         <button class="primary" id="st-continue" hidden>Continue the war</button>
         <button id="st-new-short">New war (short: 12 turns)</button>
         <button id="st-new">New war (full: 18 turns)</button>
-        <button id="st-quick">Quick battle</button>
+        <button id="st-quick">Quick battle (real time)</button>
+        <button id="st-quick-tb">Quick battle (turn-based)</button>
         <button id="st-import">Load a campaign from a code</button>
         <button id="st-help">How the war works</button>
       </div>
@@ -171,6 +177,7 @@
     <div class="sheet">
       <h2>How to play</h2>
       <ul>
+        <li><b>Two ways to fight</b> (menu, Battle mode): <b>real time</b> as below, or <b>turn-based</b>: the same battle on a grid of tiles. Each platoon and the tank get two actions a turn: move (blue tiles), dash (amber), fire (the hit chance and its reasons are shown, then rolled), overwatch (fires at the first enemy to move in sight) or grenades. A hit kills soldiers, a miss pins (one action next turn). Cover counts unless you flank from the side. Then press <b>End turn</b> and the Helghast move. Objectives score each round; most points after 10 turns wins. The soldiers keep fighting on screen, but only the turn rules decide losses.</li>
         <li>You command the <b class="isa-text">ISA</b> on the left. The <b class="hgh-text">Helghast</b> hold the right.</li>
         <li>Your units are the chips bottom left (three platoons and the tank). Tap one (or its soldiers on the map) and its orders pop up; then tap the map. Tap an objective or a capturable post to <b>take</b> it, or open ground to <b>move</b> there.</li>
         <li><b>Squad orders:</b> a platoon order is the shared goal for all three squads. When you need one squad somewhere else, pick it in the tray (or tap one of its soldiers), then tap the map (1 point). <b>Rejoin</b> sends it back; the platoon's next order brings everyone back too.</li>
@@ -210,6 +217,12 @@
           <option value="industrial">Industrial site</option>
           <option value="city">Ruined city</option>
           <option value="random">Random</option>
+        </select>
+      </div>
+      <div class="row"><span>Battle mode (next battle)</span>
+        <select id="mode-select" aria-label="Battle mode">
+          <option value="rt">Real time</option>
+          <option value="tb">Turn-based</option>
         </select>
       </div>
       <div class="row"><span>Battle length</span>
