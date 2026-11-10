@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createCampaignMatch, issueCampaign, aiRound, replayCampaign } from '../src/campaign/match.js';
 import { armyAt, connected, incomeOf, oddsOf, ordersFor, capitalOf, soldiers } from '../src/campaign/state.js';
 
-const quick = { config: { battle: { durationSec: 40 } } };
+const quick = { config: { battle: { durationSec: 40 }, ceasefire: 0 } };
 const cmd = (cm, side, type, params = {}) => issueCampaign(cm, { side, type, params });
 // A battle result handed in directly, so rule tests do not run battles.
 const fake = (rec, winner, survivors = 4) => ({ winner, margin: 'clear', reason: 'time', durationSec: 40, scores: [0, 0], casualties: [0, 0], platoons: rec.forces.flatMap((f) => f.platoons.map((p) => ({ ref: p.ref, broken: false, survivors: p.alive.map(() => survivors) }))), log: [] });
@@ -101,6 +101,15 @@ test('the same seed and orders give the same war (replay from the log)', () => {
   for (let i = 0; i < 3 && cm.state.phase !== 'over'; i++) aiRound(cm);
   const again = replayCampaign('determinism', { turns: 3, ...quick }, cm.log);
   assert.equal(JSON.stringify(again.state), JSON.stringify(cm.state));
+});
+
+test('no attacks during the opening ceasefire', () => {
+  const cm = createCampaignMatch('ceasefire', { config: { battle: { durationSec: 40 } } });
+  const s = cm.state;
+  const a = s.armies.find((x) => x.side === 0);
+  assert.ok(ordersFor(s, a).every((o) => o.kind === 'march'));
+  const enemy = s.provinces[a.at].neighbours.find((n) => s.provinces[n].owner === 1);
+  assert.match(cmd(cm, 0, 'attack', { army: a.id, to: enemy }).reason, /Ceasefire/);
 });
 
 test('an AI against AI war reaches a winner', () => {

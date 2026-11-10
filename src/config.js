@@ -310,6 +310,10 @@ export const CAMPAIGN = {
   maxPlatoons: 3, // per army (and so per side in one battle)
   attrition: 2, // soldiers an army cut off from its capital loses each turn
   homeBonus: 0.25, // defending your own home half: the AI counts it, and the defenders fight from trenches
+  occupiedSupply: 1, // an enemy home province you hold pays only this (its people will not work for you)
+  catchUp: 2, // supply a turn for each province a side holds fewer than the other (the war economy)
+  ceasefire: 1, // no attacks until this turn is over (both sides set up first)
+  surrenderAt: 2, // a side holding this many provinces or fewer at the end of a turn gives up
   turns: 18, // the war ends after this many turns (most provinces wins)
   pushEvery: 3, // every few turns the Helghast make a big push (attack at worse odds, and extra supply)
   pushSupply: 8,

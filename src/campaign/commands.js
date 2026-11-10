@@ -53,6 +53,7 @@ export function applyCampaignCommand(state, cmd) {
       const to = state.provinces[p.to];
       if (!to || !state.provinces[army.at].neighbours.includes(to.id)) return fail('Attack a neighbouring province');
       if (to.owner === side) return fail('That province is already yours');
+      if (state.turn <= (cc.ceasefire || 0)) return fail('Ceasefire: no attacks until the next turn. March up and dig in.');
       army.moved = true;
       army.dug = false;
       const there = armyAt(state, to.id);
@@ -96,6 +97,14 @@ export function applyCampaignCommand(state, cmd) {
       const cap = capitalOf(state, side);
       if (cap.owner !== side) return fail('Your capital has fallen');
       if (state.supply[side] < cc.costs.recruit) return fail(`A new platoon costs ${cc.costs.recruit} supply`);
+      // A platoon for an army anywhere supply can reach.
+      if (army) {
+        if (army.platoons.length >= cc.maxPlatoons) return fail(`An army holds at most ${cc.maxPlatoons} platoons`);
+        if (!connected(state, side).has(army.at)) return fail('Cut off from your capital: no recruits can reach it');
+        state.supply[side] -= cc.costs.recruit;
+        addPlatoon(state, army);
+        return ok();
+      }
       const here = armyAt(state, cap.id);
       if (here && here.side === side && here.platoons.length < cc.maxPlatoons) {
         state.supply[side] -= cc.costs.recruit;
@@ -245,6 +254,10 @@ function upkeep(state) {
   for (const a of state.armies) a.moved = false;
   state.turn++;
   state.active = state.first;
+  // A side down to its last few provinces gives up.
+  for (const side of [0, 1]) {
+    if (held(state, side) <= (cc.surrenderAt || 0)) return endWar(state, 1 - side, `${SIDE_NAMES[side]} surrendered with only ${held(state, side)} province${held(state, side) === 1 ? '' : 's'} left`);
+  }
   if (state.turn > state.finalTurn) {
     const h = [held(state, 0), held(state, 1)];
     const w = h[0] !== h[1] ? (h[0] > h[1] ? 0 : 1) : incomeOf(state, 0) >= incomeOf(state, 1) ? 0 : 1;

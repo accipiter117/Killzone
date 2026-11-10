@@ -18,14 +18,16 @@ export function nextCommand(state, side) {
   const cap = capitalOf(state, side);
   const con = connected(state, side);
 
-  // Spend supply: refill the most worn army first, keeping enough back to
-  // raise a platoon when there is no army at the capital.
+  // Spend supply: a platoon for the army at the front that needs one most,
+  // else a new army; then refill the most worn army.
   const atCap = cap.owner === side ? armyAt(state, cap.id) : null;
   if (cap.owner === side && supply >= cc.costs.recruit) {
-    const armies = mine.length;
-    if (armies < cc.maxArmies || (atCap && atCap.side === side && atCap.platoons.length < cc.maxPlatoons)) {
-      return { side, type: 'recruit', params: {} };
-    }
+    const enemyNear = (a) => state.provinces[a.at].neighbours.some((n) => state.provinces[n].owner !== side);
+    const short = mine.filter((a) => a.platoons.length < cc.maxPlatoons && con.has(a.at))
+      .sort((a, b) => (enemyNear(b) ? 1 : 0) - (enemyNear(a) ? 1 : 0) || a.platoons.length - b.platoons.length || (a.id < b.id ? -1 : 1));
+    if (short.length) return { side, type: 'recruit', params: { army: short[0].id } };
+    const roomForArmy = mine.length < cc.maxArmies && (!atCap || state.provinces.some((p) => con.has(p.id) && !armyAt(state, p.id)));
+    if (roomForArmy) return { side, type: 'recruit', params: {} };
   }
   const worn = mine.filter((a) => con.has(a.at) && soldiers(a) < fullStrength(a)).sort((a, b) => soldiers(a) / fullStrength(a) - soldiers(b) / fullStrength(b) || (a.id < b.id ? -1 : 1));
   if (worn.length && supply >= Math.min(5, fullStrength(worn[0]) - soldiers(worn[0])) * cc.costs.refillPerSoldier) {

@@ -90,8 +90,12 @@ export function connected(state, side) {
 
 export function incomeOf(state, side) {
   const con = connected(state, side);
+  const cc = state.cc;
   let n = 0;
-  for (const id of con) n += state.provinces[id].supply;
+  for (const id of con) { const p = state.provinces[id]; n += p.home === side ? p.supply : Math.min(p.supply, cc.occupiedSupply ?? p.supply); }
+  // The war economy: a side that has lost ground digs deeper.
+  const behind = held(state, 1 - side) - held(state, side);
+  if (behind > 0) n += behind * (cc.catchUp || 0);
   return n;
 }
 
@@ -127,11 +131,13 @@ export function oddsOf(state, army, provId) {
 // take (enemy ground nobody holds) or fight (enemy ground with an army).
 export function ordersFor(state, army) {
   if (army.moved || state.phase !== 'turn' || state.active !== army.side) return [];
+  const truce = state.turn <= (state.cc.ceasefire || 0);
   const out = [];
   for (const n of state.provinces[army.at].neighbours) {
     const p = state.provinces[n];
     const there = armyAt(state, n);
     if (p.owner === army.side) { if (!there) out.push({ to: n, kind: 'march' }); }
+    else if (truce) continue;
     else if (!there) out.push({ to: n, kind: 'take' });
     else if (there.side !== army.side) out.push({ to: n, kind: 'fight', odds: oddsOf(state, army, n) });
   }

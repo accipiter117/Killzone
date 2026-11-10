@@ -18,7 +18,8 @@ Modelled on Roma Invicta: a war table of named provinces, armies you move one at
 - **Supply** comes in each turn from provinces joined to your capital (cities and factories pay most). Spend it in the army panel: **Refill** soldiers, **Dig in** (fight from trenches when attacked; uses the army's turn), **Raise** a platoon at your capital (or a new army there). Armies cut off from the capital lose soldiers each turn.
 - **Sites** add to every battle while held and joined to the capital: tank works (your tank), power plant (artillery), comms hub (+1 order point), airfield (jetpacks).
 - **Pressure:** defending your own home ground helps, and every few turns the Helghast make a big push (with extra supply). An **objective** (gold dashed outline) pays extra supply if taken in time.
-- **Victory:** take the Helghast capital, or hold the most provinces when the last turn ends (12 turns for a short war, 18 for a full one).
+- **Comebacks:** enemy home ground you hold pays only 1 supply (its people will not work for you), and a side that has lost ground gets 2 extra supply a turn for each province it is behind. The war opens with a ceasefire turn (no attacks), so neither side gets a free grab.
+- **Victory:** take the Helghast capital, hold the most provinces when the last turn ends (12 turns for a short war, 18 for a full one), or push them down to two provinces, when they surrender.
 - **Saving:** the war saves itself after every order. Menu, "Save as a code" gives a text code to carry it to another device. (Wars from the old sector map cannot be continued.)
 
 
@@ -37,6 +38,7 @@ All in `CAMPAIGN` in [`src/config.js`](src/config.js).
 | Objectives | `objective` (every 4 turns, +8 supply) | | How much the briefings pay |
 | War length | `turns` (18) | | Also picked on the start menu (12 or 18) |
 | Cut off | `attrition` (2 soldiers a turn) | | How dangerous deep raids are |
+| Comebacks | `occupiedSupply` (1), `catchUp` (2), `surrenderAt` (2) | | How hard it is to come back from losing ground, and when a beaten side gives up |
 | Battle length | `battle.durationSec` (360) | 300 | Shorter battles, quicker turns |
 
 `node tools/campaign-balance.mjs 6 18 360` plays six AI against AI wars (push and objectives off, so both sides play by the same rules) and reports win rates, how wars end and how many battles are fought.

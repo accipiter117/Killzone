@@ -330,6 +330,7 @@ export function createCampaignUI({ fightBattle, watchReplay, toMenu, toggleSound
     else if (ui.busy) hint = 'The Helghast are moving...';
     else if (sel && sel.moved) hint = 'This army has acted this turn. Pick another, or end the turn.';
     else if (sel) hint = 'Pale: march. Gold: take empty ground. Red: attack (the odds are shown).';
+    else if (s.turn <= (s.cc.ceasefire || 0)) hint = 'Ceasefire this turn: march into position, dig in and spend supply. Attacks open next turn.';
     else if (idle) hint = `${idle} arm${idle === 1 ? 'y has' : 'ies have'} not acted. Tap a standard (or a chip below) to give orders.`;
     else hint = 'Every army has acted. Spend supply in the army panel, then end the turn.';
     $('cp-hint').innerHTML = hint ? `<span>${esc(hint)}</span>` : '';
@@ -362,8 +363,7 @@ export function createCampaignUI({ fightBattle, watchReplay, toMenu, toggleSound
         const missing = fullStrength(sel) - soldiers(sel);
         button('Refill', missing ? `${Math.min(missing, s.supply[P()])} supply` : 'full', () => { if (issue('refill', { army: sel.id })) toastMsg('Refilled', `${armyName(sel)} is back to ${soldiers(sel)} soldiers.`); }, !missing || !supplied || !s.supply[P()]);
         button('Dig in', sel.dug ? 'dug in' : `${cc.costs.dig} supply, uses its turn`, () => { if (issue('dig', { army: sel.id })) toastMsg('Digging in', 'Attackers will face trenches here.'); }, sel.moved || sel.dug);
-        const cap = capitalOf(s, P());
-        if (sel.at === cap.id) button('Raise a platoon', `${cc.costs.recruit} supply`, () => { if (issue('recruit', {})) toastMsg('Platoon raised', `${armyName(sel)} now has ${sel.platoons.length} platoons.`); }, sel.platoons.length >= cc.maxPlatoons || s.supply[P()] < cc.costs.recruit);
+        if (sel.platoons.length < cc.maxPlatoons) button('Raise a platoon', `${cc.costs.recruit} supply`, () => { if (issue('recruit', { army: sel.id })) toastMsg('Platoon raised', `${armyName(sel)} now has ${sel.platoons.length} platoons.`); }, !supplied || s.supply[P()] < cc.costs.recruit);
       }
     } else if (ui.province !== null && ui.province >= 0) {
       const prov = s.provinces[ui.province];
