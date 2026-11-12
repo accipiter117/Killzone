@@ -38,8 +38,25 @@ export function resetSquadPlan(state, sq) {
 export const orderOf = (pl, sq) => sq.order || pl.order;
 
 function goalOf(state, o) {
+  if (o.via && o.via.length) return { x: o.via[0].x, y: o.via[0].y }; // the next stop on the route first
   if (o.type === 'take') return state.sites.find((s) => s.id === o.siteId);
   return { x: o.x, y: o.y };
+}
+
+// Routes with stops: when most of a platoon reaches its next stop, on to
+// the one after (and finally the order's own point).
+export function updateRoutes(state) {
+  for (const pl of state.platoons) {
+    const via = pl.order && pl.order.via;
+    if (!via || !via.length || pl.broken) continue;
+    const sqs = pl.squads.map((id) => state.squads[id]).filter((q) => q.mode !== 'dead' && !q.order);
+    if (!sqs.length) continue;
+    const near = sqs.filter((q) => Math.hypot(q.cx - via[0].x, q.cy - via[0].y) < 90).length;
+    if (near * 2 >= sqs.length) {
+      via.shift();
+      resetPlans(state, pl);
+    }
+  }
 }
 
 function slotFor(state, pl, sq, goal) {
@@ -337,6 +354,7 @@ export function thinkSquad(state, sq) {
   // Any squad that can still move gets out from under a marked barrage.
   const art = cfg.artillery;
   for (const st of state.strikes) {
+    if (st.side !== sq.side && st.warnAt !== undefined && state.tick < st.warnAt) continue; // a timed barrage they cannot know about yet
     const d = dist(c, st);
     if (d > art.radius + 25) continue;
     const ux = d > 1 ? (c.x - st.x) / d : -dir, uy = d > 1 ? (c.y - st.y) / d : 0;
@@ -377,7 +395,7 @@ export function thinkSquad(state, sq) {
 function pinnedCrawl(state, sq, c, order) {
   const sc = state.cfg.squad;
   const st = state.cfg.stances[state.platoons[sq.platoon].stance];
-  if (order.type === 'take') {
+  if (order.type === 'take' && !(order.via && order.via.length)) {
     const site = goalOf(state, order);
     if (site && site.owner !== sq.side) {
       const d = dist(c, site);
@@ -446,7 +464,7 @@ function advance(state, sq, pl, list, c, firing, order) {
   const st = cfg.stances[pl.stance];
   const dir = sideDir(sq.side);
   const goalSite = goalOf(state, order);
-  const label = order.type === 'take' ? siteLabel(goalSite) : null;
+  const label = order.type === 'take' && !(order.via && order.via.length) ? siteLabel(goalSite) : null;
   let goal = slotFor(state, pl, sq, goalSite);
   // A platoon mate pinned down: move up to fire at whoever is pinning it,
   // rather than hanging back or waiting for it.

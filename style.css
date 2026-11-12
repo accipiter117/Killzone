@@ -224,6 +224,7 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 .end-tbl th:first-child, .end-tbl td:first-child, #end-table th:first-child, #end-table td:first-child { text-align: left; color: var(--muted); font-weight: 400; }
 
 @keyframes pulse { from { opacity: 1; } to { opacity: 0.45; } }
+@keyframes go-pulse { from { box-shadow: 0 0 0 0 rgba(232, 192, 74, 0.7); } to { box-shadow: 0 0 0 10px rgba(232, 192, 74, 0); } }
 @keyframes shake { 0%, 100% { transform: none; } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
 
 /* Portrait: a gentle nudge to turn the phone sideways. */
@@ -370,3 +371,12 @@ body.tb-mode #timer, body.tb-mode #op, body.tb-mode #support, body.tb-mode #tray
   body.tb-mode #tb-end { width: 150px; }
   body.tb-mode #tb-bar { top: calc(var(--hud-t) + 52px); }
 }
+
+/* Planning and timing: the GO signal and the barrage delay. */
+#btn-go { position: absolute; right: var(--hud-r); bottom: calc(var(--hud-b) + 66px); z-index: 5; min-width: 120px; height: 52px; border-radius: 26px; border: 2px solid #ffe08a; background: #e8c04a; color: #1d1a15 !important; font: 800 20px/1 system-ui, sans-serif; letter-spacing: 0.08em; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; animation: go-pulse 1s infinite; }
+#btn-go[hidden] { display: none; }
+#btn-go small { font: 600 10px system-ui, sans-serif; letter-spacing: 0; }
+#art-delay { position: absolute; right: var(--hud-r); bottom: calc(var(--hud-b) + 126px); z-index: 4; display: flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 14px; background: rgba(18, 17, 14, 0.85); border: 1px solid rgba(255, 106, 70, 0.5); font-size: 12px; color: #ece6d6; }
+#art-delay[hidden] { display: none; }
+#art-delay button { min-width: 44px; min-height: 36px; border-radius: 10px; border: 1px solid rgba(236, 230, 214, 0.2); background: transparent; font-size: 12px; font-weight: 700; }
+#art-delay button.on { background: #c4321f; border-color: #ffb3a8; color: #fff; }

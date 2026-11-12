@@ -56,6 +56,8 @@
             <button data-act="fallback">Fall back<small>1 pt</small></button>
             <button data-act="stance">Stance<small id="stance-label">Balanced</small></button>
             <button data-act="holdfire">Hold fire<small id="holdfire-label">off</small></button>
+            <button data-act="route">Route<small id="route-label">add stops</small></button>
+            <button data-act="signal">On signal<small id="signal-label">off</small></button>
             <button data-act="reinforce">Reinforce<small>2 pts</small></button>
             <button id="tray-rejoin" hidden>Rejoin<small>free</small></button>
           </div>
@@ -69,6 +71,10 @@
         <button data-act="smoke" class="sup" aria-label="Smoke"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="8" cy="14" r="4"/><circle cx="15" cy="11" r="5"/><circle cx="17" cy="17" r="3"/></svg><small>2 pts</small></button>
         <button data-act="artillery" class="sup art" aria-label="Artillery"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><small>3 pts</small></button>
       </div>
+
+      <!-- Planning and timing: release every order held for the signal; delay a barrage. -->
+      <button id="btn-go" hidden>GO<small id="go-count"></small></button>
+      <div id="art-delay" hidden><span>Land in</span><button data-delay="0" class="on">now</button><button data-delay="10">10s</button><button data-delay="20">20s</button></div>
 
       <!-- Turn-based battles: the turn, the selected unit, End turn. -->
       <div id="tb-bar" class="glass"><span id="tb-turn"></span><span id="tb-phase"></span></div>
@@ -181,6 +187,7 @@
         <li><b>Two ways to fight</b> (menu, Battle mode): <b>real time</b> as below, or <b>turn-based</b>: the same battle on a grid of tiles. Each platoon and the tank get two actions a turn: move (blue tiles), dash (amber), fire (the hit chance and its reasons are shown, then rolled), overwatch (fires at the first enemy to move in sight) or grenades. A hit kills soldiers, a miss pins (one action next turn). Cover counts unless you flank from the side. Then press <b>End turn</b> and the Helghast move. Objectives score each round; most points after 10 turns wins. The soldiers keep fighting on screen, but only the turn rules decide losses.</li>
         <li>You command the <b class="isa-text">ISA</b> on the left. The <b class="hgh-text">Helghast</b> hold the right.</li>
         <li>Your units are the chips bottom left (three platoons and the tank). Tap one (or its soldiers on the map) and its orders pop up; then tap the map. Tap an objective or a capturable post to <b>take</b> it, or open ground to <b>move</b> there.</li>
+        <li><b>Planning and timing:</b> before the battle starts, pick a platoon and tap your shaded zone to set it up there. <b>Route</b> (order tray) lets you tap stops, then press Route again to send them. <b>On signal</b> holds your orders until you press <b>GO</b>, so several platoons move at once. After tapping Artillery you can make the barrage land in 10 or 20 seconds, timed with your attack.</li>
         <li><b>Routes</b> (trenches map): a chain of craters along the bottom is a covered way from your wire to the Helghast objective C; theirs runs along the top to your A. The ground in front of B is bare and swept by MG nests. The AI keeps a reserve and uses its covered route.</li>
         <li><b>Fog of war:</b> you only see what your troops see (the rest is dimmed); orange question marks show where enemies were last seen. Troops lying still in cover are hard to spot until they move or fire, and shots from hiding hit harder. <b>Hold fire</b> (order tray) sets an ambush: the platoon lies low until the enemy is close or it is shot at, then opens up all at once.</li>
         <li><b>Flanking:</b> squads face their threat and their cover only works that way (the shaded arc in front of enemy squads while you give orders). Hit them from the side or behind for much more damage and pinning. Pinned squads cannot turn. Pin with heavies, flank with assault or jetpacks.</li>

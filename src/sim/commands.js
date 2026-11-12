@@ -3,7 +3,7 @@
 // AI's decisions both arrive here, so they follow exactly the same rules.
 
 import { clamp, isActive } from './util.js';
-import { T, cellIndex } from './map.js';
+import { T, cellIndex, terrainAt } from './map.js';
 import { resetPlans, resetSquadPlan, thinkSquad } from './squads.js';
 import { callArtillery, dropSmoke } from './features.js';
 import { useAbility } from './abilities.js';
@@ -56,7 +56,7 @@ function reinforce(state, pl) {
   return { ok: true };
 }
 
-export const COMMAND_TYPES = ['move', 'take', 'hold', 'fallback', 'stance', 'artillery', 'smoke', 'ability', 'reinforce', 'vmove', 'vability', 'focus', 'squad', 'holdfire'];
+export const COMMAND_TYPES = ['move', 'take', 'hold', 'fallback', 'stance', 'artillery', 'smoke', 'ability', 'reinforce', 'vmove', 'vability', 'focus', 'squad', 'holdfire', 'go', 'deploy'];
 
 const fail = (reason) => ({ ok: false, reason });
 
@@ -85,7 +85,7 @@ function applyInner(state, cmd) {
   if (!sd) return fail('Unknown side');
 
   let pl = null;
-  if (['move', 'take', 'hold', 'fallback', 'stance', 'ability', 'reinforce', 'focus', 'squad', 'holdfire'].includes(type)) {
+  if (['move', 'take', 'hold', 'fallback', 'stance', 'ability', 'reinforce', 'focus', 'squad', 'holdfire', 'deploy'].includes(type)) {
     pl = state.platoons[p.platoon];
     if (!pl || pl.side !== side) return fail('Not your platoon');
     // A platoon regrouping after breaking can still be reinforced.
@@ -115,27 +115,61 @@ function applyInner(state, cmd) {
   if (sd.op + 1e-9 < cost) return fail('Not enough order points');
   const W = state.map.width, H = state.map.height;
   const point = () => (Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: clamp(Math.round(p.x), 0, W), y: clamp(Math.round(p.y), 0, H) } : null);
+  // Stops on the way (waypoints), walked in order before the order's own point.
+  const route = () => {
+    const via = Array.isArray(p.via) ? p.via.filter((q) => Number.isFinite(q.x) && Number.isFinite(q.y)).slice(0, cfg.orders.maxWaypoints).map((q) => ({ x: clamp(Math.round(q.x), 0, W), y: clamp(Math.round(q.y), 0, H) })) : [];
+    return via.length ? { via } : {};
+  };
 
   switch (type) {
     case 'move': {
       const pt = point();
       if (!pt) return fail('Bad position');
       if (!amending) pl.paidTick = state.tick;
-      setOrder(state, pl, { type: 'move', ...pt });
+      issueOrWait(state, pl, { type: 'move', ...pt, ...route() }, p.wait);
       break;
     }
     case 'take': {
       const site = state.sites.find((s) => s.id === p.site);
       if (!site) return fail('Unknown objective');
       if (!amending) pl.paidTick = state.tick;
-      setOrder(state, pl, { type: 'take', siteId: site.id, x: site.x, y: site.y });
+      issueOrWait(state, pl, { type: 'take', siteId: site.id, x: site.x, y: site.y, ...route() }, p.wait);
       break;
     }
     case 'hold':
     case 'fallback':
       if (!amending) pl.paidTick = state.tick;
-      setOrder(state, pl, { type });
+      issueOrWait(state, pl, { type }, p.wait);
       break;
+    case 'go': {
+      // The signal: every order held back for it goes at once.
+      let n = 0;
+      for (const o of state.platoons) if (o.side === side && o.pending && !o.broken) { setOrder(state, o, o.pending); o.pending = null; n++; }
+      if (!n) return fail('No orders are waiting for the signal');
+      state.events.push({ type: 'go', side });
+      break;
+    }
+    case 'deploy': {
+      // Before the battle starts: set the platoon up anywhere in your own deployment zone.
+      if (state.tick > 0) return fail('Platoons can only be set up before the battle starts');
+      const pt = point();
+      if (!pt) return fail('Bad position');
+      const W = state.map.width, H = state.map.height, zone = cfg.deploy.zone;
+      if ((side === 0 ? pt.x : W - pt.x) > zone || pt.y < 40 || pt.y > H - 40) return fail('Set up inside your deployment zone');
+      const g = terrainAt(state.map, pt.x, pt.y);
+      if (g === T.wall || g === T.building) return fail('Not inside a building or wall');
+      const list = pl.squads.flatMap((id) => state.squads[id].soldiers.map((sid) => state.soldiers[sid])).filter((x) => x.alive && !x.fled);
+      if (!list.length) return fail('Nobody to set up');
+      const cx = list.reduce((a, x) => a + x.x, 0) / list.length, cy = list.reduce((a, x) => a + x.y, 0) / list.length;
+      for (const x of list) {
+        let nx = Math.max(20, Math.min(W - 20, x.x + pt.x - cx)), ny = Math.max(20, Math.min(H - 20, x.y + pt.y - cy));
+        const gg = terrainAt(state.map, nx, ny);
+        if (gg === T.wall || gg === T.building) { nx = pt.x; ny = pt.y; }
+        x.x = x.tx = nx; x.y = x.ty = ny;
+      }
+      for (const id of pl.squads) { const q = state.squads[id]; q.cx = pt.x; q.cy = pt.y; q.path = null; }
+      break;
+    }
     case 'stance':
       if (!cfg.stances[p.stance]) return fail('Unknown stance');
       pl.stance = p.stance;
@@ -148,7 +182,8 @@ function applyInner(state, cmd) {
       if (!pt) return fail('Bad position');
       if (sd.noArtillery) return fail('No artillery in this battle (it needs a power plant on the war map)');
       if (state.tick < sd.artReadyTick) return fail('Artillery is reloading');
-      callArtillery(state, side, pt.x, pt.y);
+      // A timed barrage lands after a delay (up to maxDelaySec): time it with an assault.
+      callArtillery(state, side, pt.x, pt.y, Math.max(0, Math.min(cfg.orders.maxDelaySec, Number(p.delay) || 0)));
       sd.artReadyTick = state.tick + Math.round(cfg.artillery.cooldownSec * cfg.tickRate);
       break;
     }
@@ -261,6 +296,13 @@ export function followUpWindow(state, pl) {
 // while its platoon's order is fresh.
 export function squadFreeWindow(state, sq) {
   return Math.max(amendWindow(state, sq), followUpWindow(state, state.platoons[sq.platoon]));
+}
+
+// An order now, or (wait) held back until the side gives the signal.
+function issueOrWait(state, pl, order, wait) {
+  if (wait) { pl.pending = order; return; }
+  pl.pending = null;
+  setOrder(state, pl, order);
 }
 
 function setOrder(state, pl, order) {

@@ -168,16 +168,31 @@ export function explodeTank(state, tank) {
   }
 }
 
-export function callArtillery(state, side, x, y) {
+export function callArtillery(state, side, x, y, delaySec = 0) {
   const a = state.cfg.artillery;
-  const start = state.tick + Math.round(a.warningSec * state.cfg.tickRate);
-  state.strikes.push({ side, x, y, start, shellsLeft: a.shells, nextTick: start });
-  state.events.push({ type: 'strike', side, x, y });
-  const near = nearObjective(state, { x, y }, 400);
-  feed(state, `${sideName(side)} artillery incoming${near ? ' near ' + near.id : ''}`, side, { x, y });
+  const warn = Math.round(a.warningSec * state.cfg.tickRate);
+  const start = state.tick + Math.round(delaySec * state.cfg.tickRate) + warn;
+  // A timed barrage is a secret until its warning begins (the shells are
+  // heard coming): only then does the other side see it and can it scatter.
+  const st = { side, x, y, start, warnAt: start - warn, announced: false, shellsLeft: a.shells, nextTick: start };
+  state.strikes.push(st);
+  if (delaySec > 0) feed(state, `${sideName(side)} artillery: timed barrage in ${Math.round(delaySec)}s`, side, { x, y });
+  announceStrikes(state);
+}
+
+// Strikes whose warning has begun: the shells are heard coming.
+export function announceStrikes(state) {
+  for (const st of state.strikes) {
+    if (st.announced || state.tick < st.warnAt) continue;
+    st.announced = true;
+    state.events.push({ type: 'strike', side: st.side, x: st.x, y: st.y });
+    const near = nearObjective(state, st, 400);
+    feed(state, `${sideName(st.side)} artillery incoming${near ? ' near ' + near.id : ''}`, st.side, st);
+  }
 }
 
 export function updateStrikes(state) {
+  announceStrikes(state);
   const a = state.cfg.artillery;
   const gap = Math.max(1, Math.round((a.spreadSec * state.cfg.tickRate) / a.shells));
   for (const st of state.strikes) {

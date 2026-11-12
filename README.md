@@ -136,6 +136,14 @@ Every squad faces its threat, and its cover only works that way. While you give 
 - **The AI** keeps a platoon in reserve at its home objective until you threaten something of theirs, and sends platoons heading for your home objective up its covered route rather than straight across.
 - Numbers in `map.lanes` in `src/config.js`.
 
+### Planning and timing
+
+- **Set up before the battle:** while the battle is paused at the start, pick a platoon and tap anywhere in your shaded deployment zone to set it up there (free).
+- **Routes:** press **Route** in the order tray, tap up to five stops on the map, then press Route again to send the platoon along them (or tap an objective to finish the route there). One order point.
+- **On signal:** switch **On signal** on, then give orders: they are held (a dotted gold line marked GO?) instead of carried out. The **GO** button sends every waiting platoon at once, for a coordinated attack instead of a trickle.
+- **Timed barrages:** after tapping Artillery, choose **now, 10s or 20s** before tapping the target, so the shells land as your assault goes in. The enemy cannot see a timed barrage coming until its usual warning starts.
+- Numbers in `orders.maxWaypoints`, `orders.maxDelaySec` and `deploy.zone` in `src/config.js`.
+
 ### What the squads do by themselves
 
 When a squad is pinned it is not frozen for good: if it is at the edge of the post it was sent to take, it crawls onto it so the capture keeps going; if it is pinned out in the open, it crawls to the nearest cover (a little back rather than forward). Meanwhile the rest of its platoon moves up to within range of whoever is pinning it and fires back, instead of hanging back or waiting for it.
