@@ -241,6 +241,7 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 .end-tbl, #end-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-variant-numeric: tabular-nums; }
 .end-tbl th, .end-tbl td, #end-table th, #end-table td { padding: 5px 4px; border-bottom: 1px solid var(--line); text-align: right; }
 .end-tbl th:first-child, .end-tbl td:first-child, #end-table th:first-child, #end-table td:first-child { text-align: left; color: var(--muted); font-weight: 400; }
+#end-causes tr.total td { font-weight: 700; color: var(--text, inherit); border-top: 1px solid var(--line); }
 
 @keyframes pulse { from { opacity: 1; } to { opacity: 0.45; } }
 @keyframes go-pulse { from { box-shadow: 0 0 0 0 rgba(232, 192, 74, 0.7); } to { box-shadow: 0 0 0 10px rgba(232, 192, 74, 0); } }

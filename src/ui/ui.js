@@ -328,8 +328,9 @@ export function showEnd(ui, state, playerSide, replayCheck) {
   $('#end-margin').textContent = `${how} ${MARGIN_TEXT[r.margin]}`;
   const rows = [
     ['', 'ISA', 'Helghast'],
-    ['Score', r.scores[0], r.scores[1]],
-    ['Killed', r.casualties[0], r.casualties[1]],
+    // Score is objective time only; a side that breaks loses whatever its score.
+    ['Objective points', r.scores[0], r.scores[1]],
+    ['Soldiers lost', r.casualties[0], r.casualties[1]],
     ['Ran off the field', r.fled[0], r.fled[1]],
     ['Objectives held', r.held[0].join(' ') || 'none', r.held[1].join(' ') || 'none'],
     ['Objectives and posts taken', r.captures[0], r.captures[1]],
@@ -356,16 +357,27 @@ export function showEnd(ui, state, playerSide, replayCheck) {
   causes.innerHTML = '';
   const lb = r.lossBy || [{}, {}];
   const keys = [...new Set([...Object.keys(lb[0]), ...Object.keys(lb[1])])]
-    .sort((a, b) => ((lb[0][b] || 0) + (lb[1][b] || 0)) - ((lb[0][a] || 0) + (lb[1][a] || 0))).slice(0, 6);
+    .filter((k) => (lb[0][k] || 0) + (lb[1][k] || 0) > 0)
+    .sort((a, b) => ((lb[0][b] || 0) + (lb[1][b] || 0)) - ((lb[0][a] || 0) + (lb[1][a] || 0)));
+  // The six biggest causes by name, the rest folded into "Other", then a total that
+  // matches "Soldiers lost" so the two tables always agree.
+  const sum = (side, ks) => ks.reduce((t, k) => t + (lb[side][k] || 0), 0);
+  const shown = keys.slice(0, 6), rest = keys.slice(6);
   const head = document.createElement('tr');
   for (const t of ['Killed by', 'ISA lost', 'Helghast lost']) head.appendChild(document.createElement('th')).textContent = t;
   causes.appendChild(head);
-  for (const k of keys) {
+  const line = (cells, cls) => {
     const tr = document.createElement('tr');
-    const label = state.cfg.causes[k] || k;
-    for (const t of [label[0].toUpperCase() + label.slice(1), lb[0][k] || 0, lb[1][k] || 0]) tr.appendChild(document.createElement('td')).textContent = t;
+    if (cls) tr.className = cls;
+    for (const t of cells) tr.appendChild(document.createElement('td')).textContent = t;
     causes.appendChild(tr);
+  };
+  for (const k of shown) {
+    const label = state.cfg.causes[k] || k;
+    line([label[0].toUpperCase() + label.slice(1), lb[0][k] || 0, lb[1][k] || 0]);
   }
+  if (rest.length) line(['Other', sum(0, rest), sum(1, rest)]);
+  line(['Total', sum(0, keys), sum(1, keys)], 'total');
   $('#end-replay-check').textContent = replayCheck || '';
   openOverlay('overlay-end');
   drawEndChart($('#end-chart'), r.history || [], state);
