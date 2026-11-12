@@ -41,7 +41,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), battleMode: store.get('battleMode', 'rt'), labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), mapChoice: store.get('mapType', 'trenches'), mapType: 'trenches', lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), battleMode: store.get('battleMode', 'rt'), route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), mapChoice: store.get('mapType', 'trenches'), mapType: 'trenches', lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, scope: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -262,8 +262,26 @@ function action(act) {
     if (order('squad', { platoon: pl.id, role: sq.role, what: 'hold' })) releaseAfterOrder('squad', sq.id);
     return;
   }
-  if (act === 'hold' || act === 'fallback') order(act, { platoon: pl.id });
+  if (act === 'hold' || act === 'fallback') order(act, { platoon: pl.id, wait: game.signal });
   if (act === 'reinforce' && order('reinforce', { platoon: pl.id })) toast(ui, 'Reinforcements', `Fresh soldiers are on their way to ${pl.name}'s weakest squad.`);
+  if (act === 'route') {
+    // First tap: start adding stops (each tap on the map adds one). Second
+    // tap: send the platoon along them to the last stop.
+    if (!game.route) { game.route = []; toast(ui, `${pl.name}: route`, 'Tap the map to add stops (up to five), then press Route again to send them. Tap an objective to finish the route there.'); return; }
+    if (!game.route.length) { game.route = null; return; }
+    const last = game.route[game.route.length - 1];
+    if (order('move', { platoon: pl.id, x: last.x, y: last.y, via: game.route.slice(0, -1), wait: game.signal })) {
+      toast(ui, `${pl.name}: ${game.signal ? 'route ready, waiting for GO' : 'on the move'}`, `${game.route.length} stop${game.route.length === 1 ? '' : 's'}.`);
+      releaseAfterOrder('platoon', pl.id);
+    }
+    game.route = null;
+    return;
+  }
+  if (act === 'signal') {
+    game.signal = !game.signal;
+    toast(ui, game.signal ? 'Orders wait for the signal' : 'Orders go at once', game.signal ? 'Give your platoons their orders; they hold them until you press GO, then all move together.' : 'New orders are carried out straight away.');
+    return;
+  }
   if (act === 'holdfire') {
     if (order('holdfire', { platoon: pl.id, on: !pl.holdFire })) {
       toast(ui, pl.holdFire ? `${pl.name}: holding fire` : `${pl.name}: fire at will`, pl.holdFire ? 'Lying low and unseen. They open up together when an enemy comes close or they are shot at, and the first shots from hiding hit hard.' : 'Shooting at any enemy in range again.');
@@ -286,6 +304,7 @@ function lookAt(x, y) {
 }
 
 function deselect() {
+  game.route = null;
   game.selected = null;
   game.scope = null;
   game.vehicle = false;
@@ -375,7 +394,7 @@ function onTap(sx, sy) {
     if (game.armed) {
       const type = game.armed;
       game.armed = null;
-      if (order(type, { x: w.x, y: w.y })) game.marker = { x: w.x, y: w.y, t0: performance.now() / 1000, colour: type === 'artillery' ? '#ff4a3a' : '#e0e0e0' };
+      if (order(type, { x: w.x, y: w.y, delay: type === 'artillery' ? game.artDelay : 0 })) game.marker = { x: w.x, y: w.y, t0: performance.now() / 1000, colour: type === 'artillery' ? '#ff4a3a' : '#e0e0e0' };
       return;
     }
     const badge = game.renderer.badges.find((b) => b.side === PLAYER && Math.hypot(b.x - sx, b.y - sy) < 20);
@@ -414,6 +433,22 @@ function onTap(sx, sy) {
         return;
       }
       const site = siteAt(st, w);
+      // Before the battle starts: set the platoon up anywhere in your zone.
+      if (game.planning && st.tick === 0 && !site && game.scope === null && !game.route) {
+        const inZone = w.x <= st.cfg.deploy.zone;
+        if (inZone) { if (order('deploy', { platoon: pl.id, x: w.x, y: w.y })) toast(ui, `${pl.name} set up here`, 'Tap elsewhere in the shaded zone to move it, or give it orders.'); return; }
+      }
+      // Drawing a route: each tap adds a stop; an objective finishes it.
+      if (game.route && game.scope === null) {
+        if (site) {
+          if (order('take', { platoon: pl.id, site: site.id, via: game.route, wait: game.signal })) { toast(ui, `${pl.name}: route to ${site.id === 'A' || site.id === 'B' || site.id === 'C' ? site.id : 'the post'}`, `${game.route.length} stop${game.route.length === 1 ? '' : 's'} on the way.`); releaseAfterOrder('platoon', pl.id); }
+          game.route = null;
+          return;
+        }
+        if (game.route.length >= st.cfg.orders.maxWaypoints + 1) { toast(ui, 'That is enough stops', 'Press Route to send them.'); return; }
+        game.route.push({ x: Math.round(w.x), y: Math.round(w.y) });
+        return;
+      }
       // Move orders snap to the centre of a grid tile (Bad North style), so
       // where the platoon will stand is clear and taps land cleanly.
       const t = CONFIG.ui.tile;
@@ -424,7 +459,7 @@ function onTap(sx, sy) {
         ok = site ? order('squad', { platoon: pl.id, role: scoped.role, what: 'take', site: site.id }) : order('squad', { platoon: pl.id, role: scoped.role, what: 'move', x: snap.x, y: snap.y });
         if (ok) releaseAfterOrder('squad', scoped.id);
       } else {
-        ok = site ? order('take', { platoon: pl.id, site: site.id }) : order('move', { platoon: pl.id, x: snap.x, y: snap.y });
+        ok = site ? order('take', { platoon: pl.id, site: site.id, wait: game.signal }) : order('move', { platoon: pl.id, x: snap.x, y: snap.y, wait: game.signal });
         if (ok) releaseAfterOrder('platoon', pl.id);
       }
       if (ok && !site) { game.marker = { x: snap.x, y: snap.y, t0: performance.now() / 1000, colour: '#aaffaa' }; return; }
@@ -647,6 +682,16 @@ document.getElementById('st-new').addEventListener('click', () => startCampaign(
 document.getElementById('st-new-short').addEventListener('click', () => startCampaign(12));
 document.getElementById('st-quick').addEventListener('click', () => { closeOverlay('overlay-start'); setBattleMode('rt'); startBattle(newSeed()); });
 document.getElementById('st-quick-tb').addEventListener('click', () => { closeOverlay('overlay-start'); setBattleMode('tb'); startBattle(newSeed()); });
+document.getElementById('btn-go').addEventListener('click', () => {
+  if (order('go', {})) { toast(ui, 'GO!', 'Every waiting platoon moves now.'); game.signal = false; }
+});
+for (const b of document.querySelectorAll('#art-delay button')) {
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    game.artDelay = Number(b.dataset.delay);
+    for (const o of document.querySelectorAll('#art-delay button')) o.classList.toggle('on', o === b);
+  });
+}
 function setBattleMode(m) {
   game.battleMode = m;
   store.set('battleMode', m);
@@ -718,7 +763,9 @@ document.addEventListener('pointerdown', () => { if (game.match && !game.match.s
 
 function hintText() {
   if (game.replay || game.watch) return '';
-  if (game.planning && game.selected === null && !game.vehicle && !game.armed) return 'Planning: tap a unit, then the map. Press \u25B6 to start.';
+  if (game.planning && game.selected === null && !game.vehicle && !game.armed) return 'Planning: pick a platoon to set it up in your zone, plan routes, hold orders for GO. Press \u25B6 to start.';
+  if (game.route) return game.route.length ? `Route: ${game.route.length} stop${game.route.length === 1 ? '' : 's'}. Tap for more, an objective to finish, or Route to send.` : 'Route: tap the map to add stops.';
+  if (game.planning && game.selected !== null && game.match.state.tick === 0) return 'Tap inside the shaded zone to set this platoon up there, or beyond it to give an order.';
   if (game.armed === 'artillery') return 'Tap where the shells should land. They hit everyone, yours too.';
   if (game.armed === 'smoke') return 'Tap where to drop smoke. It blocks sight for a while.';
   if (game.selected !== null) return `${game.match.state.platoons[game.selected].name}: tap an objective to take it, or ground to move (slowed while you decide)`;
@@ -783,9 +830,19 @@ function frame(t) {
   prune(game.fxs, now);
   const shake = shakeOffset(game.fxs, dt);
   const reveal = game.watch || game.replay;
-  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, scope: game.scope, vehicleSelected: game.vehicle, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, tilt: game.tilt, facing: !st.tb && !game.watch && !game.replay && (game.selected !== null || game.vehicle), grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null) };
+  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, scope: game.scope, vehicleSelected: game.vehicle, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, tilt: game.tilt, routeDraft: game.route, deploying: game.planning && st.tick === 0 && !st.tb && game.selected !== null, facing: !st.tb && !game.watch && !game.replay && (game.selected !== null || game.vehicle), grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null) };
   drawFrame(g, game.renderer, st, game.cam, view);
   if (st.tb) tacticsUI.draw(g, game.cam, game.dpr, now);
+  // Planning and timing controls.
+  const waiting = st.platoons.filter((p) => p.side === PLAYER && p.pending && !p.broken).length;
+  const goBtn = document.getElementById('btn-go');
+  goBtn.hidden = !!st.tb || game.replay || game.watch || !waiting;
+  if (!goBtn.hidden) document.getElementById('go-count').textContent = `${waiting} waiting`;
+  document.getElementById('art-delay').hidden = game.armed !== 'artillery';
+  const rl = document.getElementById('route-label'), sl = document.getElementById('signal-label');
+  if (rl) rl.textContent = game.route ? (game.route.length ? `send ${game.route.length}` : 'tap stops') : 'add stops';
+  if (sl) sl.textContent = game.signal ? 'ON: wait' : 'off';
+  for (const [id, on] of [['route', !!game.route], ['signal', game.signal]]) { const b = document.querySelector(`#stage button[data-act="${id}"]`); if (b) { b.classList.add('ab'); b.classList.toggle('ready', on); } }
   if (game.minimap && miniCanvas.width > 0) drawMinimap(mg, game.renderer, st, game.cam, view);
   // Turn-based: the chips light up for the unit picked on the grid.
   const tbSel = st.tb && tacticsUI.selected ? st.tb.units.find((u) => u.id === tacticsUI.selected) : null;

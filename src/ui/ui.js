@@ -95,7 +95,7 @@ export function updateUI(ui, state, view) {
   for (const [act, btn] of Object.entries(e.actions)) {
     btn.classList.toggle('armed', view.armed === act);
     const sel = view.selected !== null ? state.platoons[view.selected] : null;
-    const needsPlatoon = act === 'hold' || act === 'fallback' || act === 'stance' || act === 'reinforce' || act === 'holdfire';
+    const needsPlatoon = act === 'hold' || act === 'fallback' || act === 'stance' || act === 'reinforce' || act === 'holdfire' || act === 'route' || act === 'signal';
     const cost = state.cfg.orders.cost[act];
     btn.disabled = view.replay || view.watch || (needsPlatoon && (!sel || sel.broken)) || op + 1e-9 < cost || (act === 'artillery' && state.tick < me.artReadyTick) || (act === 'reinforce' && sel && state.tick < (sel.reinforceReadyTick || 0));
   }
@@ -215,7 +215,7 @@ export function updateUI(ui, state, view) {
     }
   }
   // With one squad picked, only its orders and ability show.
-  for (const act of ['fallback', 'stance', 'reinforce', 'holdfire']) e.actions[act].hidden = !!scoped;
+  for (const act of ['fallback', 'stance', 'reinforce', 'holdfire', 'route', 'signal']) e.actions[act].hidden = !!scoped;
   e.trayRejoin.hidden = !(scoped && scoped.order);
   e.trayRejoin.disabled = !live;
   for (const r of ui.rows || []) if (r.sq) r.btn.hidden = !!scoped && r.sq !== scoped;

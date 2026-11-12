@@ -87,7 +87,8 @@ export function drawFrame(g, r, state, cam, opts) {
   drawSoldiers(g, r, state, opts, px);
   drawSmoke(g, fxs, state.smokes, now, state.tick, state.cfg.tickRate);
   drawEffects(g, fxs, now, px);
-  drawStrikes(g, state, now, px);
+  drawStrikes(g, state, now, px, opts);
+  drawDeployZone(g, state, opts, px);
   drawMarker(g, opts, now, px);
 
   // Screen space: icons, badges and text stay the same size at any zoom.
@@ -607,19 +608,58 @@ function drawGrid(g, state, cam, opts, px) {
   }
 }
 
+// Before the battle: your deployment zone, where platoons can be set up.
+function drawDeployZone(g, state, opts, px) {
+  if (!opts.deploying) return;
+  const W = state.map.width, H = state.map.height, z = state.cfg.deploy.zone;
+  const x0 = opts.playerSide === 0 ? 0 : W - z;
+  g.fillStyle = 'rgba(127,182,255,0.08)';
+  g.fillRect(x0, 0, z, H);
+  g.strokeStyle = 'rgba(127,182,255,0.6)';
+  g.lineWidth = 2 * px;
+  g.setLineDash([14 * px, 10 * px]);
+  g.beginPath();
+  const xe = opts.playerSide === 0 ? z : W - z;
+  g.moveTo(xe, 0); g.lineTo(xe, H);
+  g.stroke();
+  g.setLineDash([]);
+}
+
 function drawOrderLine(g, state, opts, px) {
+  // A route being drawn: its stops so far.
+  if (opts.routeDraft && opts.routeDraft.length && opts.selected !== null && opts.selected !== undefined) {
+    const pl0 = state.platoons[opts.selected];
+    const ms = pl0 ? pl0.squads.flatMap((id) => members(state, state.squads[id])) : [];
+    if (ms.length) {
+      const c = centroid(ms);
+      g.strokeStyle = 'rgba(232,192,74,0.9)';
+      g.lineWidth = 2.5 * px;
+      g.setLineDash([8 * px, 6 * px]);
+      g.beginPath(); g.moveTo(c.x, LY(c.x, c.y));
+      for (const p of opts.routeDraft) g.lineTo(p.x, LY(p.x, p.y));
+      g.stroke(); g.setLineDash([]);
+      opts.routeDraft.forEach((p, i) => {
+        g.fillStyle = 'rgba(232,192,74,0.95)';
+        g.beginPath(); g.arc(p.x, LY(p.x, p.y), 9 * px, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#1d1a15'; g.font = `700 ${11 * px}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(String(i + 1), p.x, LY(p.x, p.y) + 0.5 * px);
+      });
+    }
+  }
   if (opts.selected === null || opts.selected === undefined) return;
   const pl = state.platoons[opts.selected];
   if (!pl) return;
-  const line = (from, o, faint) => {
-    if (!from || (o.type !== 'move' && o.type !== 'take')) return;
-    g.strokeStyle = o.type === 'take' ? `rgba(255,224,120,${faint ? 0.45 : 0.8})` : `rgba(170,255,170,${faint ? 0.45 : 0.8})`;
+  const line = (from, o, faint, waiting = false) => {
+    if (!from || !o || (o.type !== 'move' && o.type !== 'take')) return;
+    g.strokeStyle = waiting ? 'rgba(232,192,74,0.85)' : o.type === 'take' ? `rgba(255,224,120,${faint ? 0.45 : 0.8})` : `rgba(170,255,170,${faint ? 0.45 : 0.8})`;
     g.lineWidth = (faint ? 1.5 : 2) * px;
-    g.setLineDash([10 * px, 8 * px]);
+    g.setLineDash(waiting ? [4 * px, 6 * px] : [10 * px, 8 * px]);
     g.beginPath();
     g.moveTo(from.x, LY(from.x, from.y));
+    for (const p of o.via || []) g.lineTo(p.x, LY(p.x, p.y));
     g.lineTo(o.x, LY(o.x, o.y));
     g.stroke();
+    if (waiting) { g.fillStyle = 'rgba(232,192,74,0.95)'; g.font = `800 ${12 * px}px system-ui, sans-serif`; g.textAlign = 'center'; g.fillText('GO?', o.x, LY(o.x, o.y) - 12 * px); }
     g.setLineDash([]);
     g.beginPath();
     g.arc(o.x, LY(o.x, o.y), 6 * px, 0, Math.PI * 2);
@@ -629,6 +669,7 @@ function drawOrderLine(g, state, opts, px) {
   // line of its own for each squad sent somewhere else.
   const withPlatoon = pl.squads.map((id) => state.squads[id]).filter((q) => !q.order).flatMap((q) => members(state, q));
   line(withPlatoon.length ? centroid(withPlatoon) : null, pl.order, opts.scope !== null && opts.scope !== undefined);
+  if (pl.pending) line(withPlatoon.length ? centroid(withPlatoon) : null, pl.pending, false, true);
   for (const id of pl.squads) {
     const q = state.squads[id];
     if (!q.order) continue;
@@ -953,9 +994,11 @@ function drawBodies(g, r, state, fxs, now, px, view) {
   g.globalAlpha = 1;
 }
 
-function drawStrikes(g, state, now, px) {
+function drawStrikes(g, state, now, px, opts = {}) {
   const a = state.cfg.artillery;
   for (const st0 of state.strikes) {
+    // The enemy's timed barrage is unknown until its shells are heard coming.
+    if (!opts.reveal && st0.side !== opts.playerSide && st0.warnAt !== undefined && state.tick < st0.warnAt) continue;
     const st = lifted(st0);
     const incoming = state.tick < st.start;
     const pulse = 0.5 + 0.5 * Math.sin(now * 12);

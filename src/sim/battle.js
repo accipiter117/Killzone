@@ -5,7 +5,7 @@ import { seedFrom, range } from './rng.js';
 import { generateMap, forCells, T } from './map.js';
 import { updateVision, updateFiring, updateSuppression } from './combat.js';
 import { updateSites, updateEmplacements, updateStrikes, updateSmokes } from './features.js';
-import { thinkSquad, moveSoldiers, resetPlans, updateMedics } from './squads.js';
+import { thinkSquad, moveSoldiers, resetPlans, updateMedics, updateRoutes } from './squads.js';
 import { updateThrows, updateDives } from './abilities.js';
 import { platoonAlive, feed, sideName } from './util.js';
 import { createVehicles, updateVehicles, updateCharges, updateVehicleVision } from './vehicles.js';
@@ -50,7 +50,7 @@ export function createBattle(seed, options = {}) {
     list.forEach(({ roles, name, alive, ref }, pi) => {
       const pl = {
         id: state.platoons.length, side, index: pi, name: name || PLATOON_NAMES[pi] || `Platoon ${pi + 1}`, ref: ref ?? null,
-        squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, reinforceReadyTick: 0, holdFire: false, breakBase: 0, paidTick: -1, brokeTick: 0, focus: -1, focusUntil: 0, size: roles.length * cfg.soldiersPerSquad,
+        squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, reinforceReadyTick: 0, holdFire: false, pending: null, breakBase: 0, paidTick: -1, brokeTick: 0, focus: -1, focusUntil: 0, size: roles.length * cfg.soldiersPerSquad,
       };
       state.platoons.push(pl);
       const baseY = H * spread[pi];
@@ -151,6 +151,7 @@ export function step(state) {
   // Mirrored squads on both sides think on the same tick.
   for (const sq of state.squads) if ((state.tick + (sq.id % perSide)) % thinkEvery === 0) thinkSquad(state, sq);
 
+  updateRoutes(state);
   updateMedics(state);
   moveSoldiers(state, dt);
   updateVehicles(state, dt);

@@ -55,7 +55,7 @@ export const CONFIG = {
   // how much slower climbing a ramp is.
   height: { rangePerLevel: 0.15, hitPerLevel: 0.15, rampSpeed: 0.7 },
 
-  deploy: { x: 190, spreadY: [0.22, 0.5, 0.78] },
+  deploy: { x: 190, spreadY: [0.22, 0.5, 0.78], zone: 560 }, // zone: how far out you may set a platoon up before the battle
 
   orders: {
     start: 3,
@@ -64,7 +64,9 @@ export const CONFIG = {
     amendSec: 5, // a movement order can be changed free for this long after giving it
     squadFollowUpSec: 10, // after a paid platoon order, its squads can be placed one by one free for this long (part of the same order)
     commsRegenMult: 1.75, // owning the comms post speeds refill by this much
-    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0, focus: 1, squad: 1, holdfire: 0 },
+    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0, focus: 1, squad: 1, holdfire: 0, go: 0, deploy: 0 },
+    maxWaypoints: 4, // stops on a route before its last point
+    maxDelaySec: 30, // longest delay for a timed barrage
   },
 
   // Squad roles. range/sight in world units, fireInterval in seconds,
