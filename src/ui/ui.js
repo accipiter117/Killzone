@@ -204,6 +204,8 @@ export function updateUI(ui, state, view) {
     };
     if (sel) for (const id of sel.squads) { const sq = state.squads[id]; add('', () => ui.handlers.ability(sel.id, sq.role), { sq }); }
     else if (open) add('', () => ui.handlers.tankAbility(), { tank });
+    // A new selection starts the row at its left edge, where the abilities are.
+    e.squads.parentElement.scrollLeft = 0;
   }
   const scoped = sel && view.scope !== null && view.scope !== undefined ? state.squads[view.scope] : null;
   for (const p of ui.pills || []) {
@@ -268,6 +270,9 @@ export function updateUI(ui, state, view) {
     r.btn.title = sq.status;
     r.btn.disabled = dead || wait > 0 || !live || sq.mode === 'rout';
     r.btn.classList.toggle('ready', !r.btn.disabled && abilityHasTarget(state, sq));
+    // Ready abilities slide to the front, recharging ones behind, wiped out squads last.
+    // CSS order rather than moving the buttons, so a tap never lands on a shuffled one.
+    r.btn.style.order = r.btn.classList.contains('ready') ? 0 : !r.btn.disabled ? 1 : dead ? 3 : 2;
   }
 
   // Event feed: newest three, fading after a few seconds.
