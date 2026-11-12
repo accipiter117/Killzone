@@ -95,11 +95,40 @@ export function drawFrame(g, r, state, cam, opts) {
   drawSiteIcons(g, state, cam);
   r.badges = drawBadges(g, state, cam, opts);
   drawSquadLabels(g, state, cam, opts);
+  drawFacing(g, state, cam, opts);
   drawMarks(g, state, cam, opts);
   drawMedical(g, state, cam, opts);
   drawFocus(g, state, cam, opts);
   drawIncoming(g, state, cam, opts);
   r.edges = drawEdgeAlerts(g, state, cam, opts);
+}
+
+// Which way squads face (where their cover works): while you give orders,
+// a shaded arc in front of every enemy squad you can see, and of your own
+// selected platoon's squads. Get round the arc to flank them.
+function drawFacing(g, state, cam, opts) {
+  if (!opts.facing) return;
+  const f = state.cfg.combat.flank;
+  const arc = (f.frontArc * Math.PI) / 180;
+  for (const sq of state.squads) {
+    if (sq.mode === 'dead' || sq.mode === 'rout' || !sq.face) continue;
+    const mine = sq.side === opts.playerSide;
+    if (mine && state.squads[sq.id].platoon !== opts.selected) continue;
+    const list = members(state, sq).filter((s) => mine || opts.reveal || visible(state, s, opts));
+    if (!list.length) continue;
+    const c = centroid(list);
+    const p = toScreen(cam, c.x, LY(c.x, c.y) - 8);
+    const q = toScreen(cam, c.x + sq.face.x * 50, LY(c.x, c.y) - 8 + sq.face.y * 50);
+    const a = Math.atan2(q.y - p.y, q.x - p.x);
+    const r = 34;
+    const col = mine ? '127,182,255' : '255,138,82';
+    g.fillStyle = `rgba(${col},0.13)`;
+    g.beginPath(); g.moveTo(p.x, p.y); g.arc(p.x, p.y, r, a - arc, a + arc); g.closePath(); g.fill();
+    g.strokeStyle = `rgba(${col},0.75)`;
+    g.lineWidth = 2;
+    g.beginPath(); g.arc(p.x, p.y, r, a - arc, a + arc); g.stroke();
+    if (sq.pinned) { g.setLineDash([3, 3]); g.beginPath(); g.arc(p.x, p.y, r + 4, a - arc, a + arc); g.stroke(); g.setLineDash([]); }
+  }
 }
 
 // Where the fire is coming from: a red arc on the side of each of your

@@ -109,6 +109,16 @@ Pick **Battle mode: Turn-based** in the battle menu (or **Quick battle (turn-bas
 - **Press and hold** anything (ground, wire, a post, an enemy squad) to see its one rule or what that squad is doing.
 - Drag to pan, pinch to zoom, tap or drag the minimap to jump. In a desktop browser, the space bar pauses and resumes and the arrow keys move the view (on the war map too).
 
+### Fire and manoeuvre
+
+Every squad faces its threat, and its cover only works that way. While you give orders, a shaded arc shows which way each enemy squad you can see is facing (and your selected platoon's squads). Fire from outside the arc gets round the cover:
+
+- **From the side:** cover counts for less than half; hits do 25% more and pin 60% faster.
+- **From behind:** no cover at all; hits do 60% more and pin more than twice as fast.
+- Squads turn towards the nearest enemy over a few seconds, so a flanker gets a head start. **Pinned squads cannot turn at all**, and barely fire back (40% accuracy, slower fire).
+- The play: pin a squad with heavies from the front, then send assault, jetpacks or infiltrators round its side. The feed calls out "flanked!" and "hit from behind!". The AI does the same: when one of its squads is pinned, its fast squads go round the side of whoever pinned it.
+- Numbers in `combat.flank` in `src/config.js`.
+
 ### What the squads do by themselves
 
 When a squad is pinned it is not frozen for good: if it is at the edge of the post it was sent to take, it crawls onto it so the capture keeps going; if it is pinned out in the open, it crawls to the nearest cover (a little back rather than forward). Meanwhile the rest of its platoon moves up to within range of whoever is pinning it and fires back, instead of hanging back or waiting for it.

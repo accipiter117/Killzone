@@ -131,11 +131,24 @@ export function coverOf(state, t) {
   return coverAt(state, t.x, t.y);
 }
 
+// Where a shot comes from, as the target squad sees it: 0 front, 1 side, 2 rear.
+export function aspectOf(state, shooter, target) {
+  if (!shooter || !target.role) return 0;
+  const sq = state.squads[target.squad];
+  if (!sq || !sq.face) return 0;
+  const dx = shooter.x - target.x, dy = shooter.y - target.y, L = Math.hypot(dx, dy) || 1;
+  const ang = (Math.acos(Math.max(-1, Math.min(1, (dx * sq.face.x + dy * sq.face.y) / L))) * 180) / Math.PI;
+  const f = state.cfg.combat.flank;
+  return ang <= f.frontArc ? 0 : ang <= f.rearArc ? 1 : 2;
+}
+
 export function hitChance(state, accuracy, d, range, target, shooterPinned, shooter = null) {
   const c = state.cfg.combat;
   const cover = target.role ? coverOf(state, target) : coverAt(state, target.x, target.y);
   let p = accuracy * (1 - c.rangeFalloff * Math.min(1, d / range));
-  p *= 1 - cover.hit;
+  // Cover faces the squad's threat: from the side it only half helps, from behind not at all.
+  const aspect = aspectOf(state, shooter, target);
+  p *= 1 - cover.hit * (aspect === 0 ? 1 : aspect === 1 ? c.flank.sideCover : 0);
   if (shooterPinned) p *= c.pinnedAccuracy;
   if (target.markUntil > state.tick) p *= state.cfg.abilities.mark.hitMult;
   if (shooter) {
@@ -223,8 +236,17 @@ export function fireShot(state, from, t, w, range, shooterPinned, source) {
   const p = hitChance(state, w.accuracy, d, range, t, shooterPinned, from);
   const hit = next(state) < p;
   let ix = t.x, iy = t.y;
+  const f = state.cfg.combat.flank;
+  const aspect = aspectOf(state, from, t);
+  const tsq = state.squads[t.squad];
+  if (aspect && state.tick - tsq.flankedTick > f.feedEverySec * state.cfg.tickRate) {
+    tsq.flankedTick = state.tick;
+    const pl = state.platoons[tsq.platoon];
+    feed(state, `${sideName(t.side)} ${state.cfg.roles[tsq.role].label} squad (${pl.name}) ${aspect === 2 ? 'hit from behind' : 'flanked'}!`, t.side, t);
+    state.events.push({ type: 'flanked', side: t.side, squad: tsq.id, x: t.x, y: t.y, rear: aspect === 2 });
+  }
   if (hit) {
-    const dmg = (w.closeRange && d < w.closeRange ? w.damage * w.closeMult : w.damage) * state.cfg.combat.damageMult;
+    const dmg = (w.closeRange && d < w.closeRange ? w.damage * w.closeMult : w.damage) * state.cfg.combat.damageMult * (aspect === 2 ? f.rearDamage : aspect === 1 ? f.sideDamage : 1);
     damageSoldier(state, t, dmg, source === 'fire' ? from.role || 'rifle' : source);
   } else {
     // Stray rounds land near the target and might find a petrusite tank.
@@ -233,7 +255,8 @@ export function fireShot(state, from, t, w, range, shooterPinned, source) {
     strayImpact(state, ix, iy);
   }
   const cover = coverOf(state, t);
-  suppress(state, state.squads[t.squad], w.suppress * cover.supp * (hit ? state.cfg.suppression.hitMult : 1), source, from);
+  const coverSupp = aspect === 0 ? cover.supp : aspect === 1 ? 1 - (1 - cover.supp) * f.sideCover : 1;
+  suppress(state, tsq, w.suppress * coverSupp * (hit ? state.cfg.suppression.hitMult : 1) * (aspect === 2 ? f.rearSupp : aspect === 1 ? f.sideSupp : 1), source, from);
   state.events.push({ type: 'shot', id: from.id === undefined ? -1 : from.id, side: from.side, x1: from.x, y1: from.y, x2: ix, y2: iy, hit, src: source });
 }
 

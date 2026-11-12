@@ -89,8 +89,13 @@ export const CONFIG = {
   combat: {
     damageMult: 0.8, // scales every bullet's damage: lower = longer battles where objectives matter more
     rangeFalloff: 0.65, // hit chance drops by this share at maximum range
-    pinnedAccuracy: 0.6,
-    pinnedFireSlow: 1.8,
+    pinnedAccuracy: 0.4, // pinned squads barely fire back...
+    pinnedFireSlow: 2.5, // ...and slowly
+    // Fire and manoeuvre: a squad faces its threat and its cover only works
+    // that way. Fire from the side (beyond frontArc degrees of its facing)
+    // or the rear (beyond rearArc) gets round the cover, hits harder and
+    // pins faster. Squads turn slowly (turnRate a think), pinned ones not at all.
+    flank: { frontArc: 60, rearArc: 125, sideCover: 0.4, sideDamage: 1.25, sideSupp: 1.6, rearDamage: 1.6, rearSupp: 2.4, turnRate: 0.15, feedEverySec: 12 },
     strayRadius: 34, // misses land up to this far from the target
     retargetSec: 0.5,
     visionEveryTicks: 6,
