@@ -59,7 +59,7 @@ export function createRenderer(map) {
   const wireCells = [];
   for (let i = 0; i < map.wire.length; i++) if (map.wire[i] > 0) wireCells.push(i);
   // facing, last drawn position and distance walked per soldier drive the animation.
-  return { wireCells, facing: [], lastX: [], lastY: [], stride: [], badges: [], edges: [], thumb: null, thumbAt: -1, vdist: [0, 0], vlast: [] };
+  return { wireCells, facing: [], lastX: [], lastY: [], stride: [], badges: [], edges: [], thumb: null, thumbAt: -1, vdist: [0, 0], vlast: [], fog: null, lastSeen: new Map() };
 }
 
 const visible = (state, s, opts) => s.side === opts.playerSide || opts.reveal || state.sides[opts.playerSide].spotted[s.id];
@@ -91,7 +91,9 @@ export function drawFrame(g, r, state, cam, opts) {
   drawMarker(g, opts, now, px);
 
   // Screen space: icons, badges and text stay the same size at any zoom.
+  drawFog(g, r, state, cam, opts);
   g.setTransform(dpr, 0, 0, dpr, sh.x * dpr, sh.y * dpr);
+  drawLastSeen(g, r, state, cam, opts, now);
   drawSiteIcons(g, state, cam);
   r.badges = drawBadges(g, state, cam, opts);
   drawSquadLabels(g, state, cam, opts);
@@ -101,6 +103,70 @@ export function drawFrame(g, r, state, cam, opts) {
   drawFocus(g, state, cam, opts);
   drawIncoming(g, state, cam, opts);
   r.edges = drawEdgeAlerts(g, state, cam, opts);
+}
+
+// Fog of war: everywhere your troops cannot see is dimmed. Drawn small and
+// scaled up (soft edges come free), from each squad's and tank's sight.
+function drawFog(g, r, state, cam, opts) {
+  if (opts.reveal || opts.fog === false) return;
+  const W = Math.ceil(g.canvas.width / 4), H = Math.ceil(g.canvas.height / 4);
+  if (!r.fog || r.fog.width !== W || r.fog.height !== H) { r.fog = document.createElement('canvas'); r.fog.width = W; r.fog.height = H; }
+  const f = r.fog.getContext('2d');
+  f.globalCompositeOperation = 'source-over';
+  f.clearRect(0, 0, W, H);
+  f.fillStyle = 'rgba(6,8,14,0.4)';
+  f.fillRect(0, 0, W, H);
+  f.globalCompositeOperation = 'destination-out';
+  const k = opts.dpr / 4;
+  const clear = (x, y, sight) => {
+    const p = toScreen(cam, x, LY(x, y));
+    const rad = sight * cam.z * k, px = p.x * k, py = p.y * k;
+    if (px < -rad || py < -rad || px > W + rad || py > H + rad) return;
+    const grad = f.createRadialGradient(px, py, rad * 0.7, px, py, rad);
+    grad.addColorStop(0, 'rgba(0,0,0,1)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    f.fillStyle = grad;
+    f.beginPath(); f.arc(px, py, rad, 0, Math.PI * 2); f.fill();
+  };
+  for (const sq of state.squads) {
+    if (sq.side !== opts.playerSide || sq.mode === 'dead') continue;
+    const list = members(state, sq);
+    if (!list.length) continue;
+    const c = centroid(list);
+    clear(c.x, c.y, state.cfg.roles[sq.role].sight);
+  }
+  for (const v of state.vehicles || []) if (v.side === opts.playerSide && v.alive && !v.absent) clear(v.x, v.y, state.cfg.tank.sight);
+  g.save();
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.imageSmoothingEnabled = true;
+  g.drawImage(r.fog, 0, 0, g.canvas.width, g.canvas.height);
+  g.restore();
+}
+
+// Where enemy squads were last seen: a fading dashed ring with a question
+// mark, until they are spotted again (or 25 seconds pass).
+function drawLastSeen(g, r, state, cam, opts, now) {
+  if (opts.reveal) return;
+  for (const sq of state.squads) {
+    if (sq.side === opts.playerSide) continue;
+    const seen = members(state, sq).filter((s) => state.sides[opts.playerSide].spotted[s.id]);
+    if (seen.length) { const c = centroid(seen); r.lastSeen.set(sq.id, { x: c.x, y: c.y, t: now }); continue; }
+    const m = r.lastSeen.get(sq.id);
+    if (!m) continue;
+    const age = now - m.t;
+    if (age > 25 || sq.mode === 'dead' || sq.mode === 'rout') { r.lastSeen.delete(sq.id); continue; }
+    const p = toScreen(cam, m.x, LY(m.x, m.y));
+    const a = 0.85 * (1 - age / 25);
+    g.strokeStyle = `rgba(255,138,82,${a})`;
+    g.lineWidth = 1.6;
+    g.setLineDash([4, 4]);
+    g.beginPath(); g.arc(p.x, p.y, 15, 0, Math.PI * 2); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = `rgba(255,190,150,${a})`;
+    g.font = '700 13px system-ui, sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('?', p.x, p.y + 0.5);
+  }
 }
 
 // Which way squads face (where their cover works): while you give orders,

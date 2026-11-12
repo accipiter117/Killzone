@@ -50,7 +50,7 @@ export function createBattle(seed, options = {}) {
     list.forEach(({ roles, name, alive, ref }, pi) => {
       const pl = {
         id: state.platoons.length, side, index: pi, name: name || PLATOON_NAMES[pi] || `Platoon ${pi + 1}`, ref: ref ?? null,
-        squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, reinforceReadyTick: 0, breakBase: 0, paidTick: -1, brokeTick: 0, focus: -1, focusUntil: 0, size: roles.length * cfg.soldiersPerSquad,
+        squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, reinforceReadyTick: 0, holdFire: false, breakBase: 0, paidTick: -1, brokeTick: 0, focus: -1, focusUntil: 0, size: roles.length * cfg.soldiersPerSquad,
       };
       state.platoons.push(pl);
       const baseY = H * spread[pi];

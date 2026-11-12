@@ -119,6 +119,15 @@ Every squad faces its threat, and its cover only works that way. While you give 
 - The play: pin a squad with heavies from the front, then send assault, jetpacks or infiltrators round its side. The feed calls out "flanked!" and "hit from behind!". The AI does the same: when one of its squads is pinned, its fast squads go round the side of whoever pinned it.
 - Numbers in `combat.flank` in `src/config.js`.
 
+### Fog of war and ambushes
+
+- You only see what your troops can see; everywhere else is dimmed. Where an enemy squad drops out of sight, a fading orange ring with a question mark marks where it was last seen (for 25 seconds).
+- **Concealment:** troops lying still in cover (not moving for 2 seconds, not firing for 3) are much harder to spot: enemies see them at under half their usual range in full cover (trenches, ruins, sandbags), 70% in half cover. Moving or firing gives them away.
+- **Ambush bonus:** shots from troops the enemy has not spotted do 50% more damage.
+- **Hold fire** (order tray, free): the platoon lies low and does not shoot until an enemy comes within 140, it is shot at, or one of its squads opens up; then all of it opens up at once ("ambush!"). Pair it with Hold in a trench across the enemy's path.
+- The AI sets ambushes too: a platoon holding an objective with no enemy in sight nearby holds fire until they come close.
+- Numbers in `combat.conceal` and `combat.ambushRange` in `src/config.js`.
+
 ### What the squads do by themselves
 
 When a squad is pinned it is not frozen for good: if it is at the edge of the post it was sent to take, it crawls onto it so the capture keeps going; if it is pinned out in the open, it crawls to the nearest cover (a little back rather than forward). Meanwhile the rest of its platoon moves up to within range of whoever is pinning it and fires back, instead of hanging back or waiting for it.

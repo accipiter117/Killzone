@@ -69,6 +69,18 @@ function decide(state, side, prof, memory) {
     if (pl.stance !== want) spend({ type: 'stance', params: { platoon: pl.id, stance: want } }, cost.stance);
   }
 
+  // Lie low on objectives already held: hold fire for an ambush while no
+  // enemy is in sight nearby (it springs by itself when one comes close).
+  for (const pl of mine) {
+    if (pl.holdFire || pl.order.type !== 'take') continue;
+    const site = state.sites.find((x) => x.id === pl.order.siteId);
+    if (!site || site.owner !== side) continue;
+    const c = centres.get(pl.id);
+    if (!c || Math.hypot(c.x - site.x, c.y - site.y) > 120) continue;
+    if (seenFoes.some((e) => Math.hypot(e.x - c.x, e.y - c.y) < 450)) continue;
+    spend({ type: 'holdfire', params: { platoon: pl.id, on: true } }, cost.holdfire || 0);
+  }
+
   // Pull back platoons that are both weak and taking a beating.
   for (const pl of mine) {
     if (pl.order.type === 'fallback') continue;

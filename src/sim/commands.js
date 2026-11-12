@@ -56,7 +56,7 @@ function reinforce(state, pl) {
   return { ok: true };
 }
 
-export const COMMAND_TYPES = ['move', 'take', 'hold', 'fallback', 'stance', 'artillery', 'smoke', 'ability', 'reinforce', 'vmove', 'vability', 'focus', 'squad'];
+export const COMMAND_TYPES = ['move', 'take', 'hold', 'fallback', 'stance', 'artillery', 'smoke', 'ability', 'reinforce', 'vmove', 'vability', 'focus', 'squad', 'holdfire'];
 
 const fail = (reason) => ({ ok: false, reason });
 
@@ -85,7 +85,7 @@ function applyInner(state, cmd) {
   if (!sd) return fail('Unknown side');
 
   let pl = null;
-  if (['move', 'take', 'hold', 'fallback', 'stance', 'ability', 'reinforce', 'focus', 'squad'].includes(type)) {
+  if (['move', 'take', 'hold', 'fallback', 'stance', 'ability', 'reinforce', 'focus', 'squad', 'holdfire'].includes(type)) {
     pl = state.platoons[p.platoon];
     if (!pl || pl.side !== side) return fail('Not your platoon');
     // A platoon regrouping after breaking can still be reinforced.
@@ -139,6 +139,9 @@ function applyInner(state, cmd) {
     case 'stance':
       if (!cfg.stances[p.stance]) return fail('Unknown stance');
       pl.stance = p.stance;
+      break;
+    case 'holdfire':
+      pl.holdFire = !!p.on;
       break;
     case 'artillery': {
       const pt = point();
