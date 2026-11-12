@@ -128,6 +128,14 @@ Every squad faces its threat, and its cover only works that way. While you give 
 - The AI sets ambushes too: a platoon holding an objective with no enemy in sight nearby holds fire until they come close.
 - Numbers in `combat.conceal` and `combat.ambushRange` in `src/config.js`.
 
+### Routes (trenches map)
+
+- **The covered route:** a chain of craters and rubble runs along the bottom of the map from your wire (through its own gap) to the Helghast's home objective C. Slow-ish and full of cover, and with concealment it is the way to get a platoon onto C's flank unseen. The Helghast have the same route along the top to your A, so watch it.
+- **The killing ground:** the ground in front of the hill at B is swept bare: quickest way in, nowhere to hide, and the MG nests cover it.
+- **The wire** is otherwise the chokepoint: only a few gaps.
+- **The AI** keeps a platoon in reserve at its home objective until you threaten something of theirs, and sends platoons heading for your home objective up its covered route rather than straight across.
+- Numbers in `map.lanes` in `src/config.js`.
+
 ### What the squads do by themselves
 
 When a squad is pinned it is not frozen for good: if it is at the edge of the post it was sent to take, it crawls onto it so the capture keeps going; if it is pinned out in the open, it crawls to the nearest cover (a little back rather than forward). Meanwhile the rest of its platoon moves up to within range of whoever is pinning it and fires back, instead of hanging back or waiting for it.

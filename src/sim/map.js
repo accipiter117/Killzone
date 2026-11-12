@@ -53,6 +53,9 @@ function trenchMap(seedInt, cfg) {
     const len = range(g, m.wireGapLength[0], m.wireGapLength[1]);
     gaps.push([centre - len / 2, centre + len / 2]);
   }
+  // The covered route crosses the wire through its own gap.
+  const L = m.lanes, laneY = H * L.coverY;
+  gaps.push([laneY - 50, laneY + 50]);
   map.wires.push({ pts: wire, gaps }, { pts: wire.map(mir), gaps: gaps.map(([a, b]) => [H - b, H - a]) });
 
   // Objectives: A in the ISA half, C its mirror, B dead centre.
@@ -89,8 +92,25 @@ function trenchMap(seedInt, cfg) {
   const nCr = int(g, m.craters[0], m.craters[1]);
   for (let k = 0; k < nCr; k++) {
     const c = { x: range(g, baseX + wireOff + 40, W / 2 - 20), y: range(g, 20, H - 20), r: range(g, m.craterRadius[0], m.craterRadius[1]) };
+    // The killing ground in front of the B hill stays bare.
+    if (Math.abs(c.y - H / 2) < H * L.openBand && c.x > baseX + wireOff + 220) continue;
     map.craters.push(c, { ...mir(c), r: c.r });
   }
+  // The covered routes: on this half, the ISA's own start (from their wire
+  // gap to the middle, low on the map) and the far end of the Helghast's
+  // route (from the middle to just short of A, high on the map). Mirrored,
+  // each side gets a covered way to the other's home objective.
+  const laneCraters = (x0, x1, y) => {
+    for (let x = x0; x < x1; x += L.spacing) {
+      const c = { x: x + range(g, -8, 8), y: y + Math.sin(x / 140) * 26 + range(g, -10, 10), r: range(g, L.craterR[0], L.craterR[1]) };
+      map.craters.push(c, { ...mir(c), r: c.r });
+    }
+  };
+  laneCraters(baseX + wireOff + 50, W / 2 - 10, laneY);
+  laneCraters(A.x + 90, W / 2 - 10, H - laneY);
+  // Where each side's route runs (for the AI): a point on the route, past
+  // the middle, before turning in on the enemy's home objective.
+  map.lanes = [{ side: 0, via: { x: W / 2 + 160, y: laneY }, to: 'C' }, { side: 1, via: mir({ x: W / 2 + 160, y: laneY }), to: 'A' }];
 
   // Petrusite tanks out in the open where stray fire will find them.
   for (let k = 0; k < m.tanksPerHalf; k++) {

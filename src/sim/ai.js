@@ -129,7 +129,18 @@ function decide(state, side, prof, memory) {
     if (pl.order.type === 'fallback') return state.tick - (memory.fallbackTick[pl.id] || 0) > 25 * cfg.tickRate;
     return true;
   }).sort((a, b) => platoonAlive(state, b) - platoonAlive(state, a) || a.id - b.id);
+  // A reserve: while not ahead, the weakest platoon waits at our home
+  // objective until the enemy threatens something of ours, so a push can be
+  // answered instead of everyone being committed at once.
+  const homeObj = state.sites.filter((s) => s.kind === 'objective').sort((a, b) => (side === 0 ? a.x - b.x : b.x - a.x))[0];
+  const threatened = state.sites.some((s) => s.owner === side && near.get(s.id) > 0) || (homeObj && homeObj.owner !== side && homeObj.owner !== null);
+  const reserve = !ahead && !threatened && free.length >= 3 && homeObj ? free[free.length - 1] : null;
+  if (reserve) {
+    if (!(reserve.order.type === 'take' && reserve.order.siteId === homeObj.id) && can(cost.take)) spend({ type: 'take', params: { platoon: reserve.id, site: homeObj.id } }, cost.take);
+  }
+  const lane = (state.map.lanes || []).find((l) => l.side === side);
   for (const pl of free) {
+    if (pl === reserve) continue;
     const c = centres.get(pl.id);
     if (!c) continue;
     const alive = platoonAlive(state, pl);
@@ -163,6 +174,17 @@ function decide(state, side, prof, memory) {
       }
       continue;
     }
+    // Going for the enemy's home objective from our own half: take the
+    // covered route round the flank first, then turn in.
+    const onOwnHalf = side === 0 ? c.x < state.map.width / 2 : c.x > state.map.width / 2;
+    memory.lane = memory.lane || {};
+    if (lane && best.id === lane.to && onOwnHalf && !memory.lane[pl.id]) {
+      if (dist(c, lane.via) > 150) {
+        if (!(pl.order.type === 'move' && Math.hypot(pl.order.x - lane.via.x, pl.order.y - lane.via.y) < 10) && can(cost.move)) spend({ type: 'move', params: { platoon: pl.id, x: Math.round(lane.via.x), y: Math.round(lane.via.y) } }, cost.move);
+        continue;
+      }
+    }
+    if (lane && dist(c, lane.via) <= 150) memory.lane[pl.id] = true;
     if (can(cost.take)) spend({ type: 'take', params: { platoon: pl.id, site: best.id } }, cost.take);
   }
 
