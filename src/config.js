@@ -36,6 +36,11 @@ export const CONFIG = {
     objectiveRadius: 90,
     featureRadius: 45,
     ruinsPerObjective: [3, 5],
+    // Routes: a covered approach along each side's right flank (seen from
+    // its own lines) to the enemy's home objective, a chain of craters and
+    // rubble at this height (share of the map, ISA side); the ground in front
+    // of the B hill swept bare (this share either side of the middle).
+    lanes: { coverY: 0.84, spacing: 44, craterR: [17, 25], openBand: 0.13 },
     hills: {
       centre: [150, 125], // the raised ground round B (radii, mirrored so the hill is wider)
       centreOffset: 60,
