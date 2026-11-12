@@ -160,11 +160,15 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 #tray-hint { margin-left: auto; color: #aaffaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
 #tray-row { display: flex; gap: 5px; overflow-x: auto; scrollbar-width: none; }
 #tray-row::-webkit-scrollbar { display: none; }
-#tray-cmds, #squads { display: flex; gap: 5px; }
+#tray-cmds { display: flex; gap: 5px; }
+/* The ability buttons join the row directly so each can be ordered on its own. */
+#squads { display: contents; }
 #tray-cmds[hidden], #tray-row button[hidden] { display: none; }
-/* Abilities lead the row (no swiping to reach them); orders follow after a divider. */
-#squads { order: -1; padding-right: 6px; border-right: 1px solid rgba(236, 230, 214, 0.18); }
-#tray-cmds[hidden] + #squads { padding-right: 0; border-right: 0; }
+/* Orders first, then a divider, then the abilities. An ability that lights up
+   (ready, with a target) jumps to the very front until it is used. */
+#tray-cmds { order: 0; padding-right: 6px; border-right: 1px solid rgba(236, 230, 214, 0.18); }
+#squads > button { order: 1; }
+#squads > button.ready { order: -1; }
 #tray-row button { height: 44px; min-width: 58px; padding: 0 8px; border-radius: 10px; border: 1px solid rgba(236, 230, 214, 0.18); background: rgba(236, 230, 214, 0.06); font-size: 12px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1.1; white-space: nowrap; flex: none; }
 #tray-row button small { font-size: 10px; font-weight: 500; color: #a39b88; }
 #tray-row button.ab.ready { border-color: rgba(232, 192, 74, 0.8); background: rgba(232, 192, 74, 0.16); }
@@ -206,7 +210,7 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
   #tray-scope button { height: 28px; min-height: 28px; padding: 0 9px; font-size: 11px; }
   #tray-close { width: 30px; height: 30px; min-width: 30px; min-height: 30px; }
   #tray-row { flex-wrap: nowrap; overflow-x: auto; -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); padding-right: 24px; }
-  #tray-cmds, #squads { flex-wrap: nowrap; }
+  #tray-cmds { flex-wrap: nowrap; }
   #tray-row button { height: 40px; min-width: 50px; padding: 0 7px; font-size: 11px; }
   #tray-row button small { font-size: 9px; }
   #tray-foot { display: none; }
