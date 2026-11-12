@@ -59,7 +59,7 @@ export const CONFIG = {
     amendSec: 5, // a movement order can be changed free for this long after giving it
     squadFollowUpSec: 10, // after a paid platoon order, its squads can be placed one by one free for this long (part of the same order)
     commsRegenMult: 1.75, // owning the comms post speeds refill by this much
-    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0, focus: 1, squad: 1 },
+    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0, focus: 1, squad: 1, holdfire: 0 },
   },
 
   // Squad roles. range/sight in world units, fireInterval in seconds,
@@ -95,6 +95,13 @@ export const CONFIG = {
     // that way. Fire from the side (beyond frontArc degrees of its facing)
     // or the rear (beyond rearArc) gets round the cover, hits harder and
     // pins faster. Squads turn slowly (turnRate a think), pinned ones not at all.
+    // Fog of war: troops lying still in cover are hard to spot (spotters'
+    // sight is cut to this share) until they fire or move; shots from troops
+    // the enemy has not spotted hit harder (an ambush).
+    conceal: { full: 0.45, half: 0.7, revealSec: 3, stillSec: 2, ambushDamage: 1.5 },
+    // Hold fire: a platoon waits, concealed, until an enemy comes this close,
+    // it is shot at, or another squad of it opens up; then they all open up.
+    ambushRange: 140,
     flank: { frontArc: 60, rearArc: 125, sideCover: 0.4, sideDamage: 1.25, sideSupp: 1.6, rearDamage: 1.6, rearSupp: 2.4, turnRate: 0.15, feedEverySec: 12 },
     strayRadius: 34, // misses land up to this far from the target
     retargetSec: 0.5,

@@ -264,6 +264,12 @@ function action(act) {
   }
   if (act === 'hold' || act === 'fallback') order(act, { platoon: pl.id });
   if (act === 'reinforce' && order('reinforce', { platoon: pl.id })) toast(ui, 'Reinforcements', `Fresh soldiers are on their way to ${pl.name}'s weakest squad.`);
+  if (act === 'holdfire') {
+    if (order('holdfire', { platoon: pl.id, on: !pl.holdFire })) {
+      toast(ui, pl.holdFire ? `${pl.name}: holding fire` : `${pl.name}: fire at will`, pl.holdFire ? 'Lying low and unseen. They open up together when an enemy comes close or they are shot at, and the first shots from hiding hit hard.' : 'Shooting at any enemy in range again.');
+    }
+    return;
+  }
   if (act === 'stance') {
     const nextStance = STANCES[(STANCES.indexOf(pl.stance) + 1) % STANCES.length];
     if (order('stance', { platoon: pl.id, stance: nextStance })) {

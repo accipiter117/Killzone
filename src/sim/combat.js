@@ -80,9 +80,14 @@ export function updateVision(state) {
         }
         continue;
       }
+      // Lying still in cover, not firing: much harder to spot.
+      const cc = state.cfg.combat.conceal;
+      const still = state.tick - (e.lastMoveTick ?? -9999) > cc.stillSec * state.cfg.tickRate && state.tick - e.lastShotTick > cc.revealSec * state.cfg.tickRate;
+      const cov = still ? coverAt(state, e.x, e.y).hit : 0;
+      const hide = cov >= 0.5 ? cc.full : cov >= 0.3 ? cc.half : 1;
       for (const s of sol) {
         if (s.side !== side || !isActive(s)) continue;
-        const sight = sightOf(state, s);
+        const sight = sightOf(state, s) * hide;
         const dx = e.x - s.x, dy = e.y - s.y;
         if (dx * dx + dy * dy > sight * sight) continue;
         if (!losClear(state, s.x, s.y, e.x, e.y)) continue;
@@ -173,6 +178,9 @@ export function updateFiring(state, dt) {
     if (sq.mode === 'rout') continue;
     s.cd -= dt;
     if (s.cd > 0) continue;
+    // Holding fire for an ambush: wait for the moment.
+    const pl = state.platoons[sq.platoon];
+    if (pl.holdFire && !springAmbush(state, pl, s)) { s.cd = 0.2; continue; }
     s.retarget -= dt;
     let t = s.target >= 0 ? state.soldiers[s.target] : null;
     const range = weaponRange(state, s);
@@ -202,6 +210,8 @@ export function updateFiring(state, dt) {
     if (!t) { s.cd = 0.2; continue; }
     // An infiltrator firing from hiding: the first shots hit much harder.
     if (base.hidden && state.tick - s.lastShotTick > base.revealSec * cfg.tickRate) base = { ...base, damage: base.damage * base.ambushMult };
+    // Anyone firing from where the enemy has not spotted them: an ambush.
+    else if (!state.sides[t.side].spotted[s.id]) base = { ...base, damage: base.damage * cfg.combat.conceal.ambushDamage };
     s.lastShotTick = state.tick;
     const b = cfg.abilities.barrage;
     const role = barrage ? { ...base, suppress: base.suppress * b.suppressMult } : base;
@@ -227,6 +237,20 @@ function fireAtNest(state, s, w, range, pinned) {
   best.supp = Math.min(100, (best.supp || 0) + w.suppress * m.perShot * (pinned ? state.cfg.combat.pinnedAccuracy : 1));
   const a = next(state) * Math.PI * 2;
   state.events.push({ type: 'shot', id: s.id, side: s.side, x1: s.x, y1: s.y, x2: best.x + Math.cos(a) * 10, y2: best.y + Math.sin(a) * 10, hit: false, src: 'fire' });
+  return true;
+}
+
+// A platoon holding fire opens up when an enemy comes close to any of its
+// soldiers, when it is shot at, or (already sprung) at once.
+function springAmbush(state, pl, s) {
+  const r = state.cfg.combat.ambushRange;
+  let go = false;
+  for (const id of pl.squads) if (state.tick - state.squads[id].lastHitTick < state.cfg.tickRate) go = true;
+  if (!go) for (const e of state.soldiers) if (e.side !== s.side && isActive(e) && (e.x - s.x) ** 2 + (e.y - s.y) ** 2 < r * r) { go = true; break; }
+  if (!go) return false;
+  pl.holdFire = false;
+  feed(state, `${pl.side === 0 ? '' : 'Helghast '}${pl.name}: ambush! Opening fire`, pl.side, s);
+  state.events.push({ type: 'ambush', side: pl.side, x: s.x, y: s.y });
   return true;
 }
 

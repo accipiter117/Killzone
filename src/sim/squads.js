@@ -772,6 +772,7 @@ export function moveSoldiers(state, dt) {
     if (flies || canStep(state.map, from, cellIndex(state.map, nx, ny))) { s.x = nx; s.y = ny; }
     else if (canStep(state.map, from, cellIndex(state.map, nx, s.y))) s.x = nx;
     else if (canStep(state.map, from, cellIndex(state.map, s.x, ny))) s.y = ny;
+    if (step > 0.3) s.lastMoveTick = state.tick; // moving gives a soldier away
     if (sq.mode === 'rout' && pl.rallied && (s.x < 35 || s.x > W - 35)) {
       s.fled = true;
       state.sides[s.side].fled++;
