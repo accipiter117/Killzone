@@ -57,7 +57,7 @@ export function createBattle(seed, options = {}) {
       roles.forEach((role, k) => {
         const sq = {
           id: state.squads.length, platoon: pl.id, side, role, soldiers: [],
-          supp: 0, pinned: false, lastHitTick: -9999, lastFiredTick: -9999, tally: {}, lossBy: {}, hitFrom: null,
+          face: { x: side === 0 ? 1 : -1, y: 0 }, flankedTick: -9999, supp: 0, pinned: false, lastHitTick: -9999, lastFiredTick: -9999, tally: {}, lossBy: {}, hitFrom: null,
           mode: 'idle', status: 'Awaiting orders', bound: null, pauseUntil: 0, holdSpot: null, flankDone: false, waitSince: -1, cx: 0, cy: 0,
           bestD: Infinity, bestTick: 0, pushUntil: 0, path: null, pathTo: null, pathTick: 0,
           order: null, paidTick: -1, abilityReady: 0, barrageUntil: 0, chargeUntil: 0, chargeTarget: -1, diveUntil: 0, diveTarget: null, vanishUntil: 0, breachUntil: 0, breachVehicle: -1, repairUntil: 0, repairVehicle: -1, repairDoneTick: 0,

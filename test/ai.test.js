@@ -32,12 +32,13 @@ test('the AI holds its own against an all-in rush on B', () => {
 });
 
 test('both AI controllers decide from the same moment (no second mover edge)', () => {
-  // Mirrored AIs on a mirrored map: over a handful of seeds neither side
-  // should win everything.
+  // Mirrored AIs on a mirrored map: over a dozen seeds neither side should
+  // win (nearly) everything. (Six seeds proved too few: chance alone gave
+  // one side all six once.)
   const wins = [0, 0];
-  for (const seed of [1, 2, 3, 4, 5, 6]) {
+  for (let seed = 1; seed <= 12; seed++) {
     const r = runToEnd(createMatch({ seed, controllers: [createAI(0), createAI(1)] }));
     if (r.winner !== null) wins[r.winner]++;
   }
-  assert.ok(wins[0] >= 1 && wins[1] >= 1, `wins ${wins}`);
+  assert.ok(wins[0] >= 2 && wins[1] >= 2, `wins ${wins}`);
 });

@@ -55,6 +55,20 @@ function slotFor(state, pl, sq, goal) {
   return { x: clamp(goal.x, 15, W - 15), y: clamp(goal.y + k * state.cfg.squad.slotSpacing, 15, H - 15) };
 }
 
+// Which way the squad faces (its cover's front): towards the nearest enemy
+// it can see, turning a little each think so a flanker gets a few seconds'
+// head start. Pinned squads cannot turn at all.
+function turnToThreat(state, sq, c) {
+  if (sq.pinned) return;
+  const e = nearestVisibleEnemy(state, sq.side, c);
+  const want = e ? { x: e.e.x - c.x, y: e.e.y - c.y } : { x: sideDir(sq.side), y: 0 };
+  const L = Math.hypot(want.x, want.y) || 1;
+  const k = state.cfg.combat.flank.turnRate;
+  const fx = sq.face.x * (1 - k) + (want.x / L) * k, fy = sq.face.y * (1 - k) + (want.y / L) * k;
+  const F = Math.hypot(fx, fy) || 1;
+  sq.face = { x: fx / F, y: fy / F };
+}
+
 function nearestVisibleEnemy(state, side, p) {
   const seen = state.sides[side].spotted;
   let best = null, bd = Infinity;
@@ -203,6 +217,7 @@ export function thinkSquad(state, sq) {
     c = { x: lead.x, y: lead.y };
   }
   sq.cx = c.x; sq.cy = c.y;
+  turnToThreat(state, sq, c);
   const dir = sideDir(sq.side);
   const H = state.map.height;
 
@@ -394,10 +409,35 @@ function supportSpot(state, sq, pl, c, list) {
   const threat = mate.hitFrom;
   const range = weaponRange(state, list[0]) * cfg.stances[pl.stance].support;
   const d = dist(c, threat);
+  // Fast close-range squads go round the side of whoever is pinning their
+  // mates (outside its facing) rather than straight at it.
+  if (['assault', 'jump', 'infiltrator'].includes(sq.role)) {
+    const foe = enemySquadNear(state, sq.side, threat);
+    if (foe && foe.face) {
+      const sign = sq.side === 0 ? 1 : -1; // mirror-image flanks for the two sides
+      const ang = Math.atan2(foe.face.y, foe.face.x) + sign * (Math.PI * 0.6);
+      const r = Math.min(range, 160);
+      const spot = { x: clamp(foe.cx + Math.cos(ang) * r, 20, state.map.width - 20), y: clamp(foe.cy + Math.sin(ang) * r, 20, state.map.height - 20) };
+      if (dist(c, spot) < 40) return { mate, to: c, inRange: true };
+      const cv = findCover(state.map, spot.x, spot.y, 50, (x, y) => -Math.hypot(x - spot.x, y - spot.y), sq.side === 1);
+      return { mate, to: cv || spot, inRange: false, flank: true };
+    }
+  }
   if (d <= range) return { mate, to: c, inRange: true };
   const spot = { x: threat.x + ((c.x - threat.x) / d) * range, y: threat.y + ((c.y - threat.y) / d) * range };
   const cv = findCover(state.map, spot.x, spot.y, 50, (x, y) => -Math.hypot(x - spot.x, y - spot.y), sq.side === 1);
   return { mate, to: cv || spot, inRange: false };
+}
+
+// The enemy squad nearest a point (by its centre).
+function enemySquadNear(state, side, p) {
+  let best = null, bd = 140;
+  for (const q of state.squads) {
+    if (q.side === side || q.mode === 'dead' || q.mode === 'rout') continue;
+    const d = Math.hypot(q.cx - p.x, q.cy - p.y);
+    if (d < bd) { bd = d; best = q; }
+  }
+  return best;
 }
 
 function advance(state, sq, pl, list, c, firing, order) {
@@ -421,7 +461,7 @@ function advance(state, sq, pl, list, c, firing, order) {
       formUp(state, sq, list, cv || c, true);
     } else {
       sq.mode = 'move';
-      sq.status = `Moving up to help ${who}`;
+      sq.status = help.flank ? `Flanking to help ${who}` : `Moving up to help ${who}`;
       formUp(state, sq, list, nextStep(state, sq, c, help.to), false);
     }
     return;
