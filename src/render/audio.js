@@ -6,23 +6,28 @@
 import { fx } from './fx-random.js';
 
 export function createAudio() {
-  const a = { ctx: null, master: null, noise: null, enabled: true, budget: 0, lastWhistle: 0, played: 0 };
+  // mix: play alongside the player's own music (Spotify and so on) instead
+  // of taking over the phone's audio.
+  const a = { ctx: null, master: null, noise: null, enabled: true, mix: true, budget: 0, lastWhistle: 0, played: 0 };
   return a;
 }
 
 // Browsers only allow sound after the player has touched the page.
 // Called on every touch, tap and key press until sound is running.
-// iPhones need three things: the audio started from a real tap (touchend or
-// click count, pointerdown alone may not), a silent sound played straight
-// away, and the page's audio treated as media playback so the silent switch
-// does not mute it (done with a looping silent <audio> element, plus the
-// newer audioSession setting where the browser has it).
+// iPhones need the audio started from a real tap (touchend or click count,
+// pointerdown alone may not) and a silent sound played straight away.
+// Two ways to share the phone's audio:
+// - mix (the default): the page's sound is 'ambient', so it plays over the
+//   player's own music without stopping it (the silent switch mutes it).
+// - not mix: the page's sound is media 'playback' (a looping silent <audio>
+//   element plus the audioSession setting), so the silent switch does not
+//   mute it, but music from other apps stops.
 export function unlockAudio(a) {
   try {
     if (!a.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
-      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+      applySession(a);
       a.ctx = new AC();
       a.master = a.ctx.createGain();
       a.master.gain.value = 0.8;
@@ -41,7 +46,7 @@ export function unlockAudio(a) {
       src.start(0);
       a.primed = true;
     }
-    if (!a.mediaEl) {
+    if (!a.mediaEl && !a.mix) {
       a.mediaEl = document.createElement('audio');
       a.mediaEl.setAttribute('playsinline', '');
       a.mediaEl.loop = true;
@@ -51,6 +56,18 @@ export function unlockAudio(a) {
       if (p && p.catch) p.catch(() => { a.mediaEl = null; });
     }
   } catch { /* sound is a nicety; never break the game over it */ }
+}
+
+function applySession(a) {
+  try { if (navigator.audioSession) navigator.audioSession.type = a.mix ? 'ambient' : 'playback'; } catch { /* older browsers */ }
+}
+
+// Switch between playing over the player's music and taking over the audio.
+export function setMix(a, on) {
+  a.mix = on;
+  applySession(a);
+  if (on && a.mediaEl) { try { a.mediaEl.pause(); } catch { /* fine */ } a.mediaEl = null; }
+  if (!on && a.ctx) unlockAudio(a);
 }
 
 // A tiny silent WAV file built in code (no audio files are shipped).

@@ -16,7 +16,7 @@ import { buildTiltTerrain, liftAt, LIFT } from './render/terrain-tilt.js';
 import { createRenderer, drawFrame, drawMinimap } from './render/renderer.js';
 import { loadUnitSprites } from './render/unit-sprites.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
-import { createAudio, unlockAudio, newFrame, playEvents, uiClick } from './render/audio.js';
+import { createAudio, unlockAudio, newFrame, playEvents, uiClick, setMix } from './render/audio.js';
 import { attachMapInput, attachMinimapInput } from './ui/input.js';
 import { createUI, updateUI, toast, flashOrderPoints, openOverlay, closeOverlay, showEnd, resetFeed } from './ui/ui.js';
 import { createCampaignUI } from './ui/campaign.js';
@@ -48,6 +48,7 @@ const game = {
 window.__kz = game; // handy for debugging and browser tests
 const audio = createAudio();
 audio.enabled = store.get('sound', true);
+audio.mix = store.get('mixMusic', true); // play over the player's own music by default
 game.audio = audio; // for browser tests
 // Sound can only start after a touch; buttons click.
 for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(ev, () => unlockAudio(audio), { passive: true });
@@ -539,6 +540,7 @@ function openMenu() {
   document.getElementById('tilt-toggle').checked = game.tilt;
   document.getElementById('slowmo-toggle').checked = game.slowMo;
   document.getElementById('sound-toggle').checked = audio.enabled;
+  document.getElementById('mix-toggle').checked = audio.mix;
   document.getElementById('grid-toggle').checked = game.grid;
   openOverlay('overlay-menu');
 }
@@ -562,6 +564,11 @@ document.getElementById('watch-toggle').addEventListener('change', (e) => {
 document.getElementById('grid-toggle').addEventListener('change', (e) => {
   game.grid = e.target.checked;
   store.set('grid', game.grid);
+});
+document.getElementById('mix-toggle').addEventListener('change', (e) => {
+  setMix(audio, e.target.checked);
+  store.set('mixMusic', audio.mix);
+  toast(ui, audio.mix ? 'Playing over your music' : 'Game sound takes over', audio.mix ? 'Your Spotify (or any music) keeps playing under the game sounds. On iPhone the silent switch mutes game sounds.' : 'Other music stops while the game makes sound; the silent switch no longer mutes it.');
 });
 document.getElementById('sound-toggle').addEventListener('change', (e) => {
   audio.enabled = e.target.checked;
