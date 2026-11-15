@@ -117,19 +117,26 @@
   </section>
 
   <div id="overlay-start" class="overlay" hidden>
-    <div class="sheet">
-      <h2>Front Line</h2>
-      <p class="small">ISA against Helghast. Fight a single battle, or command a whole war on the war map.</p>
-      <div class="buttons">
-        <button class="primary" id="st-continue" hidden>Continue the war</button>
+    <div class="sheet start-sheet">
+      <canvas id="helghan-globe" width="720" height="780" aria-label="Turning survey scan of the planet Helghan"></canvas>
+      <div class="start-menu">
+        <h2>Front Line</h2>
+        <p class="small">ISA against Helghast. Pick your side and fight.</p>
+        <div class="buttons">
+          <button class="primary" id="st-quick-hgh">Quick battle as Helghast</button>
+          <button id="st-quick">Quick battle as ISA</button>
+        </div>
+        <p class="small">Fan-made, non-commercial prototype. Not affiliated with Guerrilla Games or Sony.</p>
+      </div>
+      <!-- The war map (campaign) is shelved for now: its code stays, and these
+           hidden buttons keep its wiring intact for when it comes back. -->
+      <div hidden>
+        <button id="st-continue" hidden>Continue the war</button>
         <button id="st-new-short">New war (short: 12 turns)</button>
         <button id="st-new">New war (full: 18 turns)</button>
-        <button id="st-quick" class="side-isa">Quick battle as ISA</button>
-        <button id="st-quick-hgh" class="side-hgh">Quick battle as Helghast</button>
         <button id="st-import">Load a campaign from a code</button>
         <button id="st-help">How the war works</button>
       </div>
-      <p class="small">Fan-made, non-commercial prototype. Not affiliated with Guerrilla Games or Sony.</p>
     </div>
   </div>
 

@@ -4,7 +4,7 @@ A fan-made, non-commercial battle prototype set in the Killzone universe: the IS
 
 Two layers, played solo against an AI: real-time **battles**, and a **campaign** on a war map above them where the battles decide where the front line runs. Multiplayer comes later; both layers are built so it can slot in (every battle and every campaign order is a command that can be replayed exactly).
 
-Play it: **https://accipiter117.github.io/Killzone/**. The start menu offers a campaign (new, continue or load from a code) or a quick battle as either side (ISA or Helghast; also under **Your side** in the battle menu). As the Helghast the map is turned round so you still start on the left. War map battles are always ISA. Add `?seed=anything` to the address to jump straight into a quick battle on a particular map.
+Play it: **https://accipiter117.github.io/Killzone/**. The start screen shows a turning survey hologram of Helghan (src/ui/helghan-globe.js, maps in assets/helghan/; it only draws while the start screen is open) and offers a quick battle as the Helghast (the default) or the ISA; the side can also be changed under **Your side** in the battle menu. As the Helghast the map is turned round so you still start on the left. The war map (campaign) is shelved for now: its code and tests stay, but the start screen no longer offers it. Add `?seed=anything` to the address to jump straight into a quick battle on a particular map.
 
 ## The war (campaign)
 
