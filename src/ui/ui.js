@@ -95,14 +95,15 @@ export function updateUI(ui, state, view) {
   for (const [act, btn] of Object.entries(e.actions)) {
     btn.classList.toggle('armed', view.armed === act);
     const sel = view.selected !== null ? state.platoons[view.selected] : null;
-    const needsPlatoon = act === 'hold' || act === 'fallback' || act === 'stance' || act === 'reinforce' || act === 'holdfire' || act === 'route' || act === 'signal';
+    const tankOn = !sel && view.vehicle && state.vehicles.some((v) => v.side === view.playerSide && v.alive);
+    const needsPlatoon = act === 'hold' || act === 'fallback' || act === 'stance' || act === 'reinforce' || act === 'holdfire' || ((act === 'route' || act === 'signal') && !tankOn);
     const cost = state.cfg.orders.cost[act];
     btn.disabled = view.replay || view.watch || (needsPlatoon && (!sel || sel.broken)) || op + 1e-9 < cost || (act === 'artillery' && state.tick < me.artReadyTick) || (act === 'reinforce' && sel && state.tick < (sel.reinforceReadyTick || 0));
   }
 
   // Selecting or letting go of a unit redraws straight away (the tray must
   // pop up on the tap, not a moment later).
-  const selKey = `${view.selected}|${view.vehicle}|${view.scope}`;
+  const selKey = `${view.selected}|${view.vehicle}|${view.scope}|${view.escortPick}`;
   if (ui.selKey !== selKey) { ui.selKey = selKey; ui.lastText = -1; }
   if (view.now - ui.lastText < 0.2) return;
   ui.lastText = view.now;
@@ -181,7 +182,7 @@ export function updateUI(ui, state, view) {
     e.trayScope.innerHTML = '';
     ui.rows = [];
     ui.pills = [];
-    e.trayCmds.hidden = !sel;
+    e.trayCmds.hidden = !open;
     // Who the orders are for: the whole platoon, or one of its squads.
     if (sel) {
       const pill = (label, id) => {
@@ -203,7 +204,10 @@ export function updateUI(ui, state, view) {
       ui.rows.push({ btn, name: btn.firstChild, sub: btn.lastChild, ...extra });
     };
     if (sel) for (const id of sel.squads) { const sq = state.squads[id]; add('', () => ui.handlers.ability(sel.id, sq.role), { sq }); }
-    else if (open) add('', () => ui.handlers.tankAbility(), { tank });
+    else if (open) {
+      add('', () => ui.handlers.tankAbility('overwatch'), { tank });
+      add('', () => ui.handlers.tankAbility('smoke'), { tank, smoke: true });
+    }
     ui.readyCount = 0;
   }
   const scoped = sel && view.scope !== null && view.scope !== undefined ? state.squads[view.scope] : null;
@@ -216,7 +220,23 @@ export function updateUI(ui, state, view) {
     }
   }
   // With one squad picked, only its orders and ability show.
-  for (const act of ['fallback', 'stance', 'reinforce', 'holdfire', 'route', 'signal']) e.actions[act].hidden = !!scoped;
+  // The tank shares Route and On signal with the platoons, and has its own
+  // Escort and Hull down; the platoon-only orders hide while it is chosen.
+  const tankOpen = !sel && open;
+  for (const act of ['fallback', 'stance', 'reinforce', 'holdfire']) e.actions[act].hidden = !!scoped || tankOpen;
+  e.actions.hold.hidden = tankOpen;
+  for (const act of ['route', 'signal']) e.actions[act].hidden = !!scoped;
+  for (const act of ['escort', 'hulldown']) e.actions[act].hidden = !tankOpen;
+  if (tankOpen) {
+    const hd = document.getElementById('hulldown-label');
+    if (hd) hd.textContent = tank.hullDown ? 'ON: dug in' : 'off';
+    e.actions.hulldown.classList.add('ab');
+    e.actions.hulldown.classList.toggle('ready', !!tank.hullDown);
+    const es = document.getElementById('escort-label');
+    if (es) es.textContent = view.escortPick ? 'tap a platoon' : tank.order.type === 'escort' ? state.platoons[tank.order.platoon].name : 'pick platoon';
+    e.actions.escort.classList.add('ab');
+    e.actions.escort.classList.toggle('ready', !!view.escortPick || tank.order.type === 'escort');
+  }
   e.trayRejoin.hidden = !(scoped && scoped.order);
   e.trayRejoin.disabled = !live;
   for (const r of ui.rows || []) if (r.sq) r.btn.hidden = !!scoped && r.sq !== scoped;
@@ -240,7 +260,7 @@ export function updateUI(ui, state, view) {
     e.traySub.textContent = `${Math.ceil((100 * tank.hp) / tank.maxHp)}% \u00b7 ${tank.alive ? tank.status : 'Knocked out'}`;
     e.traySub.classList.remove('pinned');
     const free = Math.ceil(amendWindow(state, tank) / state.cfg.tickRate);
-    e.trayHint.textContent = free > 0 ? `Tap again to change, free (${free}s)` : 'Tap ground to drive there';
+    e.trayHint.textContent = view.escortPick ? 'Tap a platoon (or its chip) to escort' : free > 0 ? `Tap again to change, free (${free}s)` : 'Tap ground to drive there';
   }
   e.stanceLabel.textContent = sel ? state.cfg.stances[sel.stance].label : '-';
   const hf = document.getElementById('holdfire-label');
@@ -248,6 +268,16 @@ export function updateUI(ui, state, view) {
   e.actions.holdfire.classList.toggle('ab', true);
   e.actions.holdfire.classList.toggle('ready', !!(sel && sel.holdFire));
   for (const r of ui.rows || []) {
+    if (r.tank && r.smoke) {
+      // Smoke launchers: lit when the enemy can see the tank.
+      const v = r.tank, o = state.cfg.tank.smoke;
+      const wait = Math.ceil((v.smokeReady - state.tick) / state.cfg.tickRate);
+      r.name.textContent = o.label;
+      r.sub.textContent = wait > 0 ? `${wait}s` : 'Screen';
+      r.btn.disabled = !v.alive || wait > 0 || !live;
+      r.btn.classList.toggle('ready', !r.btn.disabled && !!v.spotted[1 - v.side]);
+      continue;
+    }
     if (r.tank) {
       const v = r.tank, o = state.cfg.tank.overwatch;
       const wait = Math.ceil((v.abilityReady - state.tick) / state.cfg.tickRate);

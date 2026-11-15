@@ -626,12 +626,14 @@ function drawDeployZone(g, state, opts, px) {
 }
 
 function drawOrderLine(g, state, opts, px) {
-  // A route being drawn: its stops so far.
-  if (opts.routeDraft && opts.routeDraft.length && opts.selected !== null && opts.selected !== undefined) {
-    const pl0 = state.platoons[opts.selected];
+  const tank = opts.vehicleSelected ? state.vehicles.find((v) => v.side === opts.playerSide && v.alive) : null;
+  if (tank) drawTankOrder(g, state, tank, px);
+  // A route being drawn: its stops so far (from the platoon or the tank).
+  if (opts.routeDraft && opts.routeDraft.length && ((opts.selected !== null && opts.selected !== undefined) || tank)) {
+    const pl0 = tank ? null : state.platoons[opts.selected];
     const ms = pl0 ? pl0.squads.flatMap((id) => members(state, state.squads[id])) : [];
-    if (ms.length) {
-      const c = centroid(ms);
+    if (ms.length || tank) {
+      const c = tank ? { x: tank.x, y: tank.y } : centroid(ms);
       g.strokeStyle = 'rgba(232,192,74,0.9)';
       g.lineWidth = 2.5 * px;
       g.setLineDash([8 * px, 6 * px]);
@@ -675,6 +677,37 @@ function drawOrderLine(g, state, opts, px) {
     if (!q.order) continue;
     const ms = members(state, q);
     line(ms.length ? centroid(ms) : null, q.order, opts.scope !== null && opts.scope !== undefined && opts.scope !== q.id);
+  }
+}
+
+// The chosen tank's orders: its route (or the one waiting for GO), or a
+// line to the platoon it is escorting.
+function drawTankOrder(g, state, v, px) {
+  const path = (o, waiting) => {
+    if (!o || o.type !== 'move') return;
+    g.strokeStyle = waiting ? 'rgba(232,192,74,0.85)' : 'rgba(170,255,170,0.8)';
+    g.lineWidth = 2 * px;
+    g.setLineDash(waiting ? [4 * px, 6 * px] : [10 * px, 8 * px]);
+    g.beginPath(); g.moveTo(v.x, LY(v.x, v.y));
+    for (const p of o.via || []) g.lineTo(p.x, LY(p.x, p.y));
+    g.lineTo(o.x, LY(o.x, o.y));
+    g.stroke(); g.setLineDash([]);
+    for (const p of o.via || []) { g.beginPath(); g.arc(p.x, LY(p.x, p.y), 4 * px, 0, Math.PI * 2); g.stroke(); }
+    g.beginPath(); g.arc(o.x, LY(o.x, o.y), 6 * px, 0, Math.PI * 2); g.stroke();
+    if (waiting) { g.fillStyle = 'rgba(232,192,74,0.95)'; g.font = `800 ${12 * px}px system-ui, sans-serif`; g.textAlign = 'center'; g.fillText('GO?', o.x, LY(o.x, o.y) - 12 * px); }
+  };
+  if (Math.hypot(v.order.x - v.x, v.order.y - v.y) > 14 || (v.order.via && v.order.via.length)) path(v.order, false);
+  path(v.pending, true);
+  if (v.order.type === 'escort') {
+    const pl = state.platoons[v.order.platoon];
+    const ms = pl ? pl.squads.flatMap((id) => members(state, state.squads[id])) : [];
+    if (ms.length) {
+      const c = centroid(ms);
+      g.strokeStyle = 'rgba(127,182,255,0.75)';
+      g.lineWidth = 2 * px;
+      g.setLineDash([3 * px, 5 * px]);
+      g.beginPath(); g.moveTo(v.x, LY(v.x, v.y)); g.lineTo(c.x, LY(c.x, c.y)); g.stroke(); g.setLineDash([]);
+    }
   }
 }
 

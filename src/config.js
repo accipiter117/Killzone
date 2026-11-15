@@ -64,7 +64,7 @@ export const CONFIG = {
     amendSec: 5, // a movement order can be changed free for this long after giving it
     squadFollowUpSec: 10, // after a paid platoon order, its squads can be placed one by one free for this long (part of the same order)
     commsRegenMult: 1.75, // owning the comms post speeds refill by this much
-    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0, focus: 1, squad: 1, holdfire: 0, go: 0, deploy: 0 },
+    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0, vescort: 1, focus: 1, squad: 1, holdfire: 0, go: 0, deploy: 0 },
     maxWaypoints: 4, // stops on a route before its last point
     maxDelaySec: 30, // longest delay for a timed barrage
   },
@@ -205,6 +205,17 @@ export const CONFIG = {
     mg: { range: 280, fireInterval: 0.25, damage: 7, accuracy: 0.28, suppress: 7 },
     damageFrom: { rifle: 0.04, heavy: 0.35, other: 0.06, blast: 1.6, arc: 1.2 },
     overwatch: { label: 'Overwatch', cooldownSec: 20, vsTank: 280, blastDamage: 80 },
+    // Smoke launchers: a screen round the tank that blocks sight (cover for
+    // a retreat or an infantry push). A long recharge so it is a big call.
+    smoke: { label: 'Smoke', cooldownSec: 50, radius: 100, durationSec: 16 },
+    // Hull down: the tank stops and digs in. Hits from in front of it do much
+    // less damage; blasts from above (artillery) and charges are unchanged.
+    // Any new move or escort order brings it out.
+    hullDown: { label: 'Hull down', front: 0.4 },
+    // Escort: the tank follows a platoon, this far behind it (towards home),
+    // so the infantry ahead get covering fire and the tank is screened.
+    escort: { behind: 90, reorderDist: 30 },
+    routeReach: 30, // a route stop counts as reached this close
     coverRadius: 55, // infantry this close to their own tank, with it between them and the shooter, are covered
     coverHit: 0.5,
     crushRadius: 36, // wire this close under the tank is flattened (a lane a squad can walk through)
@@ -298,6 +309,8 @@ export const ABILITY_HELP = {
   repair: 'Engineers run to your damaged tank and patch it up: after a few seconds of work it gets back about a third of its armour.',
   breach: 'Engineers run up to the enemy tank and plant a breaching charge: it goes off after a few seconds for heavy damage.',
   overwatch: 'The tank fires an aimed heavy shell at the best target in range (the enemy tank first).',
+  tanksmoke: 'The tank fires smoke grenades all round itself: a screen nobody can see through for a while. Cover for pulling back, or for infantry pushing up beside it. Lit when the enemy can see your tank.',
+  hulldown: 'The tank stops and digs in: hits from in front of it do less than half their damage. Artillery and charges still hurt in full. It stays put until you give it a move or escort order.',
   mark: 'Recon marks an enemy group for ten seconds: everyone can see them and hits them more often.',
   dive: 'Jetpack squad leaps onto the nearest enemy group and lands with a stomp that hurts and pins them.',
   vanish: 'Infiltrators go fully hidden for eight seconds, even up close, and shake off being pinned: slip away or set up the next ambush.',

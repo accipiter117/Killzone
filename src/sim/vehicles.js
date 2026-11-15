@@ -18,7 +18,7 @@ export function createVehicles(state) {
     hp: t.hp, maxHp: t.hp, alive: true, radius: t.radius,
     order: { type: 'idle' }, paidTick: -1, path: null, pathTo: null, pathTick: 0,
     facing: side === 0 ? 1 : -1, gunReady: Math.round(2 * state.cfg.tickRate), mgCd: 0, lastFireTick: -9999,
-    abilityReady: 0, moved: 0, status: 'Awaiting orders', spotted: [0, 0],
+    abilityReady: 0, smokeReady: 0, hullDown: false, pending: null, moved: 0, status: 'Awaiting orders', spotted: [0, 0],
   }));
 }
 
@@ -75,8 +75,31 @@ function driveToward(state, v, here, t, maxStep) {
 
 function goalOf(state, v) {
   const o = v.order;
-  if (o.type === 'move') return { x: o.x, y: o.y };
+  if (o.type === 'move') return o.via && o.via.length ? o.via[0] : { x: o.x, y: o.y };
+  if (o.type === 'escort') return escortSpot(state, v, o.platoon);
   return null;
+}
+
+// Where an escorting tank wants to be: just behind the platoon (towards its
+// own side), or null once the platoon is gone.
+export function escortSpot(state, v, id) {
+  const pl = state.platoons[id];
+  if (!pl || pl.broken) return null;
+  const ms = pl.squads.flatMap((q) => state.squads[q].soldiers).map((sid) => state.soldiers[sid]).filter(isActive);
+  if (!ms.length) return null;
+  let x = 0, y = 0;
+  for (const s of ms) { x += s.x; y += s.y; }
+  x /= ms.length; y /= ms.length;
+  const back = v.side === 0 ? -1 : 1;
+  const W = state.map.width;
+  return { x: Math.max(40, Math.min(W - 40, Math.round(x + back * state.cfg.tank.escort.behind))), y: Math.round(y) };
+}
+
+// Route stops: drop each one as the tank reaches it.
+function updateRoute(state, v) {
+  const via = v.order.via;
+  if (!via || !via.length) return;
+  if (Math.hypot(via[0].x - v.x, via[0].y - v.y) < state.cfg.tank.routeReach) { via.shift(); v.path = null; }
 }
 
 export function updateVehicles(state, dt) {
@@ -86,9 +109,15 @@ export function updateVehicles(state, dt) {
   for (const v of order) {
     if (!v.alive) continue;
     v.moved = 0;
-    // Drive.
-    const goal = goalOf(state, v);
-    if (goal && Math.hypot(goal.x - v.x, goal.y - v.y) > 12) {
+    if (v.order.type === 'move') updateRoute(state, v);
+    if (v.order.type === 'escort' && !escortSpot(state, v, v.order.platoon)) {
+      v.order = { type: 'idle' };
+      v.status = 'Escort over';
+    }
+    // Drive (never while hull down).
+    const goal = v.hullDown ? null : goalOf(state, v);
+    const near = v.order.type === 'escort' ? state.cfg.tank.escort.reorderDist : 12;
+    if (goal && Math.hypot(goal.x - v.x, goal.y - v.y) > near) {
       const wp = nextWaypoint(state, v, goal);
       let speed = cfg.speed;
       const here = cellIndex(state.map, v.x, v.y);
@@ -106,8 +135,11 @@ export function updateVehicles(state, dt) {
       }
       if (!v.moved) v.path = null;
       crushWire(state, v);
-      v.status = 'Advancing';
-    } else if (v.order.type === 'move') v.status = 'In position';
+      v.status = v.order.type === 'escort' ? `Escorting ${state.platoons[v.order.platoon].name}` : v.order.via && v.order.via.length ? `On route (${v.order.via.length + 1} stops left)` : 'Advancing';
+    } else if (v.hullDown) v.status = 'Hull down';
+    else if (v.order.type === 'escort') v.status = `Escorting ${state.platoons[v.order.platoon].name}`;
+    else if (v.order.type === 'move') v.status = 'In position';
+    else if (v.pending) v.status = 'Waiting for GO';
     // Fight.
     fireMainGun(state, v, dt);
     fireMachineGun(state, v, dt);
@@ -165,7 +197,7 @@ export function shell(state, v, t, { vsTank, blastDamage, accuracy }) {
   v.lastFireTick = state.tick;
   let x = t.x, y = t.y;
   if (t.tank) {
-    if (next(state) < accuracy) damageVehicle(state, t.tank, vsTank, 'shell');
+    if (next(state) < accuracy) damageVehicle(state, t.tank, vsTank, 'shell', v);
     else { const a = next(state) * Math.PI * 2; x += Math.cos(a) * 30; y += Math.sin(a) * 30; }
   } else {
     const a = next(state) * Math.PI * 2, r = next(state) * 14;
@@ -199,8 +231,10 @@ function fireMachineGun(state, v, dt) {
   v.mgCd = m.fireInterval;
 }
 
-export function damageVehicle(state, v, amount, source) {
+export function damageVehicle(state, v, amount, source, from = null) {
   if (!v.alive) return;
+  // Dug in: hits from in front of the tank are mostly absorbed.
+  if (v.hullDown && from && (from.x - v.x) * v.facing > 0) amount *= state.cfg.tank.hullDown.front;
   if (state.tb && !state.tb.applying) { state.events.push({ type: 'vehicleHit', id: v.id, x: v.x, y: v.y }); return; }
   v.hp -= amount;
   state.events.push({ type: 'vehicleHit', id: v.id, x: v.x, y: v.y });
@@ -234,7 +268,7 @@ export function infantryVsTank(state, s, role, range, pinned) {
   const f = state.cfg.tank.damageFrom;
   const p = role.accuracy * (1 - state.cfg.combat.rangeFalloff * Math.min(1, dist(s, v) / range)) * (pinned ? state.cfg.combat.pinnedAccuracy : 1) * 1.5;
   const hit = next(state) < p;
-  if (hit) damageVehicle(state, v, role.damage * (f[s.role] ?? f.other), 'fire');
+  if (hit) damageVehicle(state, v, role.damage * (f[s.role] ?? f.other), 'fire', s);
   state.events.push({ type: 'shot', id: s.id, side: s.side, x1: s.x, y1: s.y, x2: v.x, y2: v.y - 14, hit });
   return true;
 }

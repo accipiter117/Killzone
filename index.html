@@ -59,6 +59,8 @@
             <button data-act="route">Route<small id="route-label">add stops</small></button>
             <button data-act="signal">On signal<small id="signal-label">off</small></button>
             <button data-act="reinforce">Reinforce<small>2 pts</small></button>
+            <button data-act="escort" hidden>Escort<small id="escort-label">pick platoon</small></button>
+            <button data-act="hulldown" hidden>Hull down<small id="hulldown-label">off</small></button>
             <button id="tray-rejoin" hidden>Rejoin<small>free</small></button>
           </div>
           <div id="squads"></div>
@@ -174,7 +176,7 @@
         <li><b>Sites</b> add to every battle while held and joined to your capital: the tank works gives you a tank, the power plant artillery, the comms hub an order point, the airfield jetpacks.</li>
         <li>Defending your own home ground helps, and every few turns the Helghast make a big <b>push</b>. An <b>objective</b> (gold dashed outline) pays extra supply if you take it in time.</li>
         <li><b>Victory:</b> take the Helghast capital, or hold the most provinces when the last turn ends. Lose Fort Corvane and the war is lost.</li>
-        <li>Drag (or use WASD or the arrow keys) to pan, pinch to zoom, twist to turn the table (with a mouse: right-drag or Shift + drag, or hold Q and E). Every battle can be replayed from its result.</li>
+        <li>Drag (or use WASD or the arrow keys) to pan, pinch to zoom, twist to turn the table (with a mouse: right-drag or Shift + drag, or hold Q and E). Keys: <b>1</b> to <b>3</b> pick platoons, <b>4</b> the tank, <b>Esc</b> lets go, <b>Space</b> pauses. Every battle can be replayed from its result.</li>
       </ul>
       <button class="primary" data-close>Got it</button>
     </div>
@@ -200,6 +202,7 @@
         <li>Each squad has an <b>ability</b> (grenade, barrage, charge, sandbags, mark) with its own button under the platoon cards. They are free but need time to recharge.</li>
         <li><b>Jetpack</b> troopers fly straight over cliffs, wire and trenches (but get no cover in the air). <b>Infiltrators</b> stay hidden until they fire or an enemy gets close; their first shots hit hardest. A recon Mark exposes them.</li>
         <li>Each side has one <b>tank</b> (its own card). Tap the card, then the ground to drive there (1 point). Its main gun shells groups of infantry and the enemy tank; its machine gun sprays anyone close. <b>Overwatch</b> fires an aimed heavy shell. Infantry close behind their tank are covered, and it flattens wire.</li>
+        <li><b>Tank orders</b> (in its tray): <b>Route</b> to drive through up to five stops, <b>On signal</b> to hold its order for GO with your platoons, <b>Escort</b> then tap a platoon to have the tank follow just behind it, and <b>Hull down</b> to stop and dig in (hits from in front do less than half damage). <b>Smoke</b> screens the tank and anyone beside it.</li>
         <li>Rifles barely scratch a tank. Hurt it with <b>heavies</b>, grenades, artillery, the arc tower, jetpack dives, your own tank, and <b>engineers</b>: with an enemy tank close, their ability becomes a <b>breaching charge</b>. A knocked out tank stays as a wreck you can hide behind.</li>
         <li><b>Maps</b> (menu): Trenches, an Industrial site or a Ruined city. On the built-up maps <b>walls</b> block movement and sight and shelter anyone beside them; artillery, grenades and tank shells blow holes in them.</li>
         <li><b>High ground</b> gives range and accuracy. Cliffs can only be climbed at ramps, so hills make chokepoints.</li>

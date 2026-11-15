@@ -107,7 +107,7 @@ Shelved for now: the code is still here (src/tactics, src/ui/tactics-ui.js) but 
 - **Sound** is synthesised in code: gunfire, explosions, the artillery whistle, a chime when an objective changes hands and a horn when a platoon breaks or rallies. It starts on your first tap and can be switched off in the menu. Your own music (Spotify and so on) keeps playing underneath by default; switch off "Keep my music playing" in the menu if you would rather the game take over the sound (then the iPhone silent switch no longer mutes it).
 - **Reading the battle:** a platoon's badge turns red with a "!" when one of its squads is pinned; soldiers flash when hit; enemies marked by recon get red brackets.
 - **Press and hold** anything (ground, wire, a post, an enemy squad) to see its one rule or what that squad is doing.
-- Drag to pan, pinch to zoom, tap or drag the minimap to jump. In a desktop browser, the space bar pauses and resumes WASD or the arrow keys move the view, Q and E turn it, and right-drag (or Shift + drag) spins it (on the war map too).
+- Drag to pan, pinch to zoom, tap or drag the minimap to jump. In a desktop browser, the space bar pauses and resumes 1 to 3 pick platoons and 4 the tank, Esc lets go, WASD or the arrow keys move the view, Q and E turn it, and right-drag (or Shift + drag) spins it (on the war map too).
 
 ### Fire and manoeuvre
 
@@ -171,10 +171,13 @@ When a squad is pinned it is not frozen for good: if it is at the edge of the po
 | Repair | Engineer | Replaces Sandbags while your own tank is damaged and close (and no enemy tank is): the squad runs to it and after four seconds' work it gets back about a third of its armour. |
 | Breach | Engineer | Replaces Sandbags while an enemy tank is within reach: the squad sprints to the tank and plants a charge that goes off a few seconds later for heavy damage. |
 | Overwatch | Tank | An aimed heavy shell at the best target in range (the enemy tank first). |
+| Smoke | Tank | A smoke screen round the tank that blocks sight (50 s recharge). |
 
 ### Tanks
 
 Each side has one tank from the start, with the same numbers for both (only the look differs: the ISA tank is low and angular, the Helghast tank tall, riveted and lit by orange vents). It has its own chip: tap it, then tap the ground to drive there (1 order point, free to change for 5 seconds). It cannot enter ruins and slows on ramps. Its main gun reloads slowly and bursts on groups of infantry or hits the enemy tank; its machine gun sprays anyone close. Infantry close behind their own tank are covered from fire coming the other way, and it crushes wire as it goes. It cannot take objectives.
+
+Tank orders in its tray: **Route** (tap up to five stops, then Route again), **On signal** (hold the order for GO with your platoons), **Escort** (tap a platoon or its chip: the tank follows 90 units behind it until given a move order; the line to the platoon shows while the tank is chosen) and **Hull down** (stops and digs in: hits from in front do 40% damage, artillery and charges full; any move or escort order climbs out). Abilities: **Overwatch** and **Smoke** (a 100-unit screen round the tank, 50 s recharge, lit when the enemy can see it; the AI pops it when pulling a badly hurt tank back).
 
 Counters: rifles barely scratch it. Heavies turn their fire on it first and hurt it properly, blasts (grenades, artillery, petrusite, jetpack landings) and the arc tower hurt it more, engineers can breach it, and the other tank duels it. A knocked out tank stays on the field as a burnt wreck that infantry use as cover. The AI drives its tank behind its strongest platoon, pulls it back when badly damaged, and breaches yours with its engineers. Numbers live in `tank` and `breach` in `src/config.js`.
 

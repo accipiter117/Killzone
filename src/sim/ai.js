@@ -237,7 +237,11 @@ function decide(state, side, prof, memory) {
     const W = state.map.width;
     const back = side === 0 ? -1 : 1;
     let goal = null;
-    if (tank.hp < tank.maxHp * ai.tankRetreatHp) goal = { x: side === 0 ? ai.tankRetreatX : W - ai.tankRetreatX, y: tank.y };
+    if (tank.hp < tank.maxHp * ai.tankRetreatHp) {
+      goal = { x: side === 0 ? ai.tankRetreatX : W - ai.tankRetreatX, y: tank.y };
+      // Badly hurt and still seen by the enemy: pop smoke to cover the retreat.
+      if (state.tick >= tank.smokeReady && tank.spotted[1 - side]) cmds.push({ side, type: 'vability', params: { kind: 'smoke' } });
+    }
     else {
       const lead = mine.filter((pl) => pl.order.type === 'take' || pl.order.type === 'move' || pl.order.type === 'hold')
         .sort((a, b) => platoonAlive(state, b) - platoonAlive(state, a) || a.id - b.id)[0];
