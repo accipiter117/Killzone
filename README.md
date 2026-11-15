@@ -4,7 +4,7 @@ A fan-made, non-commercial battle prototype set in the Killzone universe: the IS
 
 Two layers, played solo against an AI: real-time **battles**, and a **campaign** on a war map above them where the battles decide where the front line runs. Multiplayer comes later; both layers are built so it can slot in (every battle and every campaign order is a command that can be replayed exactly).
 
-Play it: **https://accipiter117.github.io/Killzone/**. The start menu offers a campaign (new, continue or load from a code) or a quick battle. Add `?seed=anything` to the address to jump straight into a quick battle on a particular map.
+Play it: **https://accipiter117.github.io/Killzone/**. The start menu offers a campaign (new, continue or load from a code) or a quick battle as either side (ISA or Helghast; also under **Your side** in the battle menu). As the Helghast the map is turned round so you still start on the left. War map battles are always ISA. Add `?seed=anything` to the address to jump straight into a quick battle on a particular map.
 
 ## The war (campaign)
 
@@ -45,7 +45,7 @@ All in `CAMPAIGN` in [`src/config.js`](src/config.js).
 
 ## Turn-based battles
 
-Pick **Battle mode: Turn-based** in the battle menu (or **Quick battle (turn-based)** on the start menu); it applies to war map battles too. Real time stays as it was.
+Shelved for now: the code is still here (src/tactics, src/ui/tactics-ui.js) but nothing in the menus starts a turn-based battle. To bring it back, restore a menu entry that sets `game.battleMode = 'tb'` in src/main.js.
 
 - The same maps, platoons, tanks and look, on a grid of tiles (one platoon or tank a tile). The soldiers keep moving and firing on screen the whole time, but only the turn rules decide who is lost.
 - **Whole-side turns, XCOM style:** you act with every platoon and the tank, then press **End turn** and the Helghast act. Each unit has **two actions**: move (blue tiles, one action), dash (amber, both), fire, overwatch or grenades.

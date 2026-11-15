@@ -28,8 +28,9 @@ const setCentre = (cam, cx, cy) => { cam.x = cx - cam.vw / cam.z / 2; cam.y = cy
 
 export function clampCamera(cam) {
   cam.z = Math.max(cam.minZ, Math.min(cam.maxZ, cam.z));
-  if (!cam.rot) {
-    // Not turned: keep the view inside the map, as it always was.
+  if (!cam.rot || cam.rot === Math.PI) {
+    // Not turned, or turned right round (playing as the Helghast): the view
+    // covers the same box of the world either way, so keep it inside the map.
     const viewW = cam.vw / cam.z, viewH = cam.vh / cam.z;
     cam.x = viewW >= cam.W ? (cam.W - viewW) / 2 : Math.max(0, Math.min(cam.W - viewW, cam.x));
     cam.y = viewH >= cam.H ? (cam.H - viewH) / 2 : Math.max(0, Math.min(cam.H - viewH, cam.y));
