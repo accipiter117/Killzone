@@ -738,9 +738,11 @@ document.addEventListener('keydown', (e) => {
 // Arrow keys pan the view (battle and war map) while held. Screen
 // directions, so they still make sense when the map is turned.
 const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+// Q and E turn the view (anticlockwise, clockwise) while held.
+const TURNS = { KeyQ: -1, KeyE: 1 };
 const held = new Set();
 document.addEventListener('keydown', (e) => {
-  if (!ARROWS[e.code] || e.ctrlKey || e.metaKey || e.altKey) return;
+  if ((!ARROWS[e.code] && !TURNS[e.code]) || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
   if ([...document.querySelectorAll('.overlay')].some((o) => !o.hidden)) return;
   e.preventDefault();
@@ -751,7 +753,14 @@ window.addEventListener('blur', () => held.clear());
 function keyPan(cam, dt) {
   if (!cam || !held.size) return;
   let dx = 0, dy = 0;
-  for (const k of held) { dx += ARROWS[k][0]; dy += ARROWS[k][1]; }
+  let turn = 0;
+  for (const k of held) { if (TURNS[k]) { turn += TURNS[k]; continue; } dx += ARROWS[k][0]; dy += ARROWS[k][1]; }
+  if (turn && cam.canRotate) {
+    // Keep a running angle so the snap to square cannot hold the turn back.
+    cam.keyRot = (cam.keyRot ?? cam.rot) + turn * 1.6 * dt;
+    if (Math.abs(cam.keyRot - cam.rot) > 0.5) cam.keyRot = cam.rot + turn * 1.6 * dt;
+    rotateAt(cam, cam.vw / 2, cam.vh / 2, cam.keyRot);
+  } else cam.keyRot = undefined;
   const speed = 700 * dt; // screen pixels per second
   if (dx || dy) panBy(cam, -dx * speed, -dy * speed);
 }
