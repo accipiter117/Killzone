@@ -1,5 +1,6 @@
 // Touch and mouse on the battlefield: one finger drags to pan, two fingers
-// pinch to zoom and twist to turn the view, a short touch is a tap (allowing ~12px of finger drift), and
+// pinch to zoom and twist to turn the view. With a mouse, right-drag (or
+// Shift + drag, or middle-drag) turns the view like spinning a map on a table, a short touch is a tap (allowing ~12px of finger drift), and
 // a long press inspects whatever is under the finger.
 
 import { zoomAt, panBy, rotateAt, centreOn } from '../render/camera.js';
@@ -20,8 +21,20 @@ export function attachMapInput(el, cam, { onTap, onLongPress }) {
   };
   const cancelLong = () => { clearTimeout(longTimer); longTimer = 0; };
 
+  // Mouse turning: the angle of the pointer round the middle of the view.
+  const angleOf = (p) => Math.atan2(p.y - el.clientHeight / 2, p.x - el.clientWidth / 2);
+  let spin = null;
+
   el.addEventListener('pointerdown', (e) => {
     try { el.setPointerCapture(e.pointerId); } catch { /* not every pointer can be captured */ }
+    if (e.pointerType === 'mouse' && (e.button === 2 || e.button === 1 || (e.button === 0 && e.shiftKey))) {
+      cancelLong();
+      pts.set(e.pointerId, local(e));
+      mode = cam.canRotate ? 'spin' : 'done';
+      spin = { ang: angleOf(local(e)), rot: cam.rot };
+      e.preventDefault();
+      return;
+    }
     pts.set(e.pointerId, local(e));
     if (pts.size === 1) {
       mode = 'pending';
@@ -47,7 +60,17 @@ export function attachMapInput(el, cam, { onTap, onLongPress }) {
       mode = 'pan';
       cancelLong();
     }
-    if (mode === 'pan') {
+    if (mode === 'spin') {
+      // Near the middle the angle jumps about, so ignore the pointer there.
+      if (Math.hypot(p.x - el.clientWidth / 2, p.y - el.clientHeight / 2) < 30) return;
+      const a = angleOf(p);
+      let turn = a - spin.ang;
+      if (turn > Math.PI) turn -= Math.PI * 2;
+      if (turn < -Math.PI) turn += Math.PI * 2;
+      spin.ang = a;
+      spin.rot += turn;
+      rotateAt(cam, el.clientWidth / 2, el.clientHeight / 2, spin.rot);
+    } else if (mode === 'pan') {
       panBy(cam, p.x - last.x, p.y - last.y);
       last = p;
     } else if (mode === 'pinch' && pts.size >= 2) {
