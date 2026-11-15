@@ -14,7 +14,7 @@ import { createCamera, setViewport, toWorld, toScreen, centreOn, clampCamera, ro
 import { buildTerrain } from './render/terrain.js';
 import { buildTiltTerrain, liftAt, LIFT } from './render/terrain-tilt.js';
 import { createRenderer, drawFrame, drawMinimap } from './render/renderer.js';
-import { loadUnitSprites } from './render/unit-sprites.js';
+import { loadUnitSprites, loadFlags } from './render/unit-sprites.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
 import { createAudio, unlockAudio, newFrame, playEvents, uiClick, setMix } from './render/audio.js';
 import { attachMapInput, attachMinimapInput } from './ui/input.js';
@@ -967,6 +967,7 @@ showRotateHint();
 // The infantry sprite sheets load in the background; the code-drawn
 // troopers stand in until they are ready.
 loadUnitSprites();
+loadFlags();
 const params = new URLSearchParams(location.search);
 const urlSeed = params.get('seed');
 // A link with a seed opens that battle straight away; otherwise the start

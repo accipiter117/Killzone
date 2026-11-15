@@ -10,7 +10,7 @@ import { getSprite25, W25, H25, ANCHOR_X, ANCHOR_Y } from './sprites25d.js';
 import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './pixel-troopers.js';
 import { getTank, TANK_W, TANK_H, TANK_FOOT } from './tanks.js';
 import { liftAt } from './terrain-tilt.js';
-import { SPRITES, drawUnit, dirFromAngle, tankScale } from './unit-sprites.js';
+import { SPRITES, FLAGS, drawUnit, dirFromAngle, tankScale } from './unit-sprites.js';
 import { fx } from './fx-random.js';
 
 // In the tilted view, anything standing on raised ground is drawn higher up
@@ -95,7 +95,7 @@ export function drawFrame(g, r, state, cam, opts) {
   drawFog(g, r, state, cam, opts);
   g.setTransform(dpr, 0, 0, dpr, sh.x * dpr, sh.y * dpr);
   drawLastSeen(g, r, state, cam, opts, now);
-  drawSiteIcons(g, state, cam);
+  drawSiteIcons(g, state, cam, now);
   r.badges = drawBadges(g, state, cam, opts);
   drawSquadLabels(g, state, cam, opts);
   drawFacing(g, state, cam, opts);
@@ -1064,14 +1064,52 @@ function drawMarker(g, opts, now, px) {
 }
 
 // Little drawn icons for the capturable features and objective letters.
-function drawSiteIcons(g, state, cam) {
-  for (const s of state.sites) {
+// Which flag flies on an objective and how high (0 = bottom of the pole,
+// 1 = top), straight from the capture state: an enemy taking it first
+// lowers the holder's flag (the first half of the capture), then raises its
+// own (the second half). An unheld objective raises the taker's flag over
+// the whole capture. Picture only.
+export function flagState(s) {
+  const c = s.cap > 0 && s.capSide !== null ? s.cap : 0;
+  if (!c) return s.owner === null ? null : { side: s.owner, h: 1 };
+  if (s.owner === null) return { side: s.capSide, h: c };
+  if (s.capSide === s.owner) return { side: s.owner, h: 1 };
+  return c < 0.5 ? { side: s.owner, h: 1 - c / 0.5 } : { side: s.capSide, h: (c - 0.5) / 0.5 };
+}
+
+const POLE = 64, FLAG_W = 36; // screen pixels
+function drawFlagPole(g, s, i, now) {
+  // The pole stands on top of the objective's marker.
+  const top = -15 - POLE;
+  g.fillStyle = 'rgba(20,18,14,0.85)';
+  g.fillRect(-2, top, 4, POLE);
+  g.fillStyle = '#c9c2b0';
+  g.fillRect(-1, top, 2, POLE);
+  g.beginPath(); g.arc(0, top - 1, 2.5, 0, Math.PI * 2); g.fill();
+  const f = flagState(s);
+  if (!f || !FLAGS.ready) return;
+  const key = f.side === 0 ? 'isa' : 'hgh';
+  // At the top it waves (each objective a little out of step); on its way
+  // up or down it hangs, catching the wind as it climbs.
+  const name = f.h >= 1 ? `${key}:wave${1 + (Math.floor(now * 8 + i * 2) % 6)}` : `${key}:raise${1 + Math.min(4, Math.floor(f.h * 5))}`;
+  const fr = FLAGS.frames[name];
+  if (!fr) return;
+  const k = FLAG_W / 96;
+  const low = -15 - fr.h * k - 2; // lowest: the cloth's bottom near the marker
+  const y = low + (top + 2 - low) * Math.min(1, f.h);
+  g.imageSmoothingEnabled = true; // a smooth shrink keeps the emblem readable
+  g.drawImage(FLAGS.img, fr.x, fr.y, fr.w, fr.h, 1 - fr.ax * k, y - fr.ay * k, fr.w * k, fr.h * k);
+}
+
+function drawSiteIcons(g, state, cam, now = 0) {
+  for (const [i, s] of state.sites.entries()) {
     const p = toScreen(cam, s.x, LY(s.x, s.y));
-    if (p.x < -40 || p.y < -40 || p.x > cam.vw + 40 || p.y > cam.vh + 40) continue;
+    if (p.x < -60 || p.y < -40 || p.x > cam.vw + 40 || p.y > cam.vh + 100) continue;
     const col = ownerColour(s.owner);
     g.save();
     g.translate(p.x, p.y);
     if (s.kind === 'objective') {
+      drawFlagPole(g, s, i, now);
       g.fillStyle = 'rgba(20,18,14,0.75)';
       g.beginPath();
       g.arc(0, 0, 15, 0, Math.PI * 2);
