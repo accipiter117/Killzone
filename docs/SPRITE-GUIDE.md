@@ -118,3 +118,19 @@ khaki (the owner's choice), yellow-white flash. Files:
 `assets/sprites/<faction>-tank`. In the game the tank faces the way it last
 drove; under half health it shows the damaged frame; the game adds its own
 smoke and tracers.
+
+## Flags
+Two sheets per side, one row each, wind blowing right, no pole (the game
+draws the pole): `wave` (6 frame loop) and `raise` (5 frames: hanging limp,
+stirring, 30 degrees, 60 degrees, almost fully out). Make the ISA waving
+sheet first and attach it to the Helghast prompts as the style reference.
+Keep the hoist (top-left corner) in the same place in every frame, and no
+lettering (so the game could mirror a flag). ISA: flat teal field, white
+badge with the globe and C mark, ring of stars, pale laurel. Helghast:
+maroon field, black disc, white-outlined black three-arrow triangle with red
+segments. Files: `tools/sprites/source/<side>-flag-<wave|raise>.webp`; run
+`python3 tools/sprites/build_flags.py` to write `assets/sprites/flags.png`
+and `.json` (each frame's rectangle and hoist corner). In the game a pole
+stands on each objective marker: the holder's flag waves at the top; an
+enemy capture lowers it over the first half and raises theirs over the
+second (an unheld objective raises the taker's flag over the whole capture).

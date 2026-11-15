@@ -17,6 +17,18 @@ export function loadUnitSprites(base = 'assets/sprites/') {
   })).then(() => { SPRITES.ready = true; }).catch(() => { SPRITES.ready = false; });
 }
 
+// Objective flags (tools/sprites/build_flags.py): a waving loop and a
+// limp-to-flying sequence per side, each frame with its hoist corner.
+export const FLAGS = { ready: false, img: null, frames: {} };
+export function loadFlags(base = 'assets/sprites/') {
+  return fetch(`${base}flags.json`).then((r) => r.json()).then(async (meta) => {
+    const img = new Image();
+    img.src = base + meta.image;
+    await img.decode();
+    Object.assign(FLAGS, { img, frames: meta.frames, ready: true });
+  }).catch(() => { FLAGS.ready = false; });
+}
+
 // The 8 drawn directions, from a screen angle (radians, y down, 0 = east):
 // columns are S, SE, E, NE, N, NW, W, SW.
 const BY_OCTANT = [2, 1, 0, 7, 6, 5, 4, 3]; // octant 0 = E, 1 = SE, 2 = S ...
