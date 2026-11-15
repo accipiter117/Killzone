@@ -107,7 +107,7 @@ Shelved for now: the code is still here (src/tactics, src/ui/tactics-ui.js) but 
 - **Sound** is synthesised in code: gunfire, explosions, the artillery whistle, a chime when an objective changes hands and a horn when a platoon breaks or rallies. It starts on your first tap and can be switched off in the menu. Your own music (Spotify and so on) keeps playing underneath by default; switch off "Keep my music playing" in the menu if you would rather the game take over the sound (then the iPhone silent switch no longer mutes it).
 - **Reading the battle:** a platoon's badge turns red with a "!" when one of its squads is pinned; soldiers flash when hit; enemies marked by recon get red brackets.
 - **Press and hold** anything (ground, wire, a post, an enemy squad) to see its one rule or what that squad is doing.
-- Drag to pan, pinch to zoom, tap or drag the minimap to jump. In a desktop browser, the space bar pauses and resumes and the arrow keys move the view (on the war map too).
+- Drag to pan, pinch to zoom, tap or drag the minimap to jump. In a desktop browser, the space bar pauses and resumes WASD or the arrow keys move the view, Q and E turn it, and right-drag (or Shift + drag) spins it (on the war map too).
 
 ### Fire and manoeuvre
 

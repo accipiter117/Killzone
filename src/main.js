@@ -735,9 +735,15 @@ document.addEventListener('keydown', (e) => {
   ui.handlers.togglePause();
 });
 
-// Arrow keys pan the view (battle and war map) while held. Screen
+// Arrow keys and WASD pan the view (battle and war map) while held. Screen
 // directions, so they still make sense when the map is turned.
-const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+// WASD as well, so the left hand pans and turns (Q, E) while the right
+// hand stays on the mouse or touchpad. e.code is the key's position, so it
+// works on any keyboard layout.
+const ARROWS = {
+  ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+  KeyA: [-1, 0], KeyD: [1, 0], KeyW: [0, -1], KeyS: [0, 1],
+};
 // Q and E turn the view (anticlockwise, clockwise) while held.
 const TURNS = { KeyQ: -1, KeyE: 1 };
 const held = new Set();
