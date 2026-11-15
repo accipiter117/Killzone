@@ -25,7 +25,9 @@ import { createTacticsUI } from './ui/tactics-ui.js';
 import { battleOptions } from './campaign/battles.js';
 import { loadCampaign, hasSave } from './campaign/save.js';
 
-const PLAYER = 0;
+// Your side: ISA (0) or Helghast (1). Quick battles let you pick; war map
+// battles are always ISA.
+let PLAYER = 0;
 const STANCES = ['cautious', 'balanced', 'aggressive'];
 
 const store = {
@@ -41,7 +43,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), battleMode: store.get('battleMode', 'rt'), route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), mapChoice: store.get('mapType', 'trenches'), mapType: 'trenches', lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), battleMode: 'rt', side: store.get('side', 0) === 1 ? 1 : 0, route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), mapChoice: store.get('mapType', 'trenches'), mapType: 'trenches', lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, scope: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -125,7 +127,7 @@ function newSeed() {
 }
 
 function controllersFor(watch) {
-  return watch ? [createAI(0), createAI(1)] : [createAI(1)];
+  return watch ? [createAI(0), createAI(1)] : [createAI(1 - PLAYER)];
 }
 
 const MAP_KINDS = ['trenches', 'industrial', 'city'];
@@ -135,6 +137,7 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
   const turnBased = !replayLog && (mode || game.battleMode) === 'tb';
   game.seed = seed;
   game.campaign = campaign;
+  PLAYER = campaign ? 0 : game.side;
   // Campaign battles are always yours to command (watch mode stays a
   // quick battle setting).
   game.watch = campaign ? false : store.get('watch', false);
@@ -177,11 +180,13 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
   closeOverlay('overlay-end');
   resize();
   showMinimap();
-  // Open on the ISA lines, a little zoomed in from the full height.
-  // Open close enough to see the troopers, on the ISA lines.
+  // Open close enough to see the troopers, on your own lines. As the
+  // Helghast the map is turned round so you still advance the same way
+  // (except in the tilted look, which keeps north up).
   game.cam.z = Math.min(game.cam.maxZ, (game.cam.vh / st.map.height) * 2);
+  if (PLAYER === 1 && game.cam.canRotate) rotateAt(game.cam, game.cam.vw / 2, game.cam.vh / 2, Math.PI);
   clampCamera(game.cam);
-  centreOn(game.cam, 260, st.map.height / 2);
+  centreOn(game.cam, PLAYER === 0 ? 260 : st.map.width - 260, st.map.height / 2);
   keepAwake(true);
   if (!store.get('seenHelp', false) && !replayLog) {
     pausedBeforeMenu = game.paused; // stay in planning after the help closes
@@ -533,7 +538,7 @@ function openMenu() {
   document.getElementById('seed-input').value = game.seed;
   document.getElementById('length-select').value = String(game.lengthSec);
   document.getElementById('watch-toggle').checked = game.watch;
-  document.getElementById('mode-select').value = game.battleMode;
+  document.getElementById('side-select').value = String(game.side);
   document.getElementById('labels-toggle').checked = game.labelsAll;
   document.getElementById('view-select').value = game.view;
   document.getElementById('map-select').value = game.mapChoice;
@@ -687,8 +692,17 @@ function startCampaign(turns) {
 }
 document.getElementById('st-new').addEventListener('click', () => startCampaign(18));
 document.getElementById('st-new-short').addEventListener('click', () => startCampaign(12));
-document.getElementById('st-quick').addEventListener('click', () => { closeOverlay('overlay-start'); setBattleMode('rt'); startBattle(newSeed()); });
-document.getElementById('st-quick-tb').addEventListener('click', () => { closeOverlay('overlay-start'); setBattleMode('tb'); startBattle(newSeed()); });
+// Quick battle: pick your side. (Turn-based battles are shelved for now: the
+// code stays, but nothing in the menus starts one.)
+function setSide(side) {
+  game.side = side;
+  store.set('side', side);
+  const sel = document.getElementById('side-select');
+  if (sel) sel.value = String(side);
+}
+for (const [id, side] of [['st-quick', 0], ['st-quick-hgh', 1]]) {
+  document.getElementById(id).addEventListener('click', () => { closeOverlay('overlay-start'); setSide(side); startBattle(newSeed()); });
+}
 document.getElementById('btn-go').addEventListener('click', () => {
   if (order('go', {})) { toast(ui, 'GO!', 'Every waiting platoon moves now.'); game.signal = false; }
 });
@@ -699,13 +713,9 @@ for (const b of document.querySelectorAll('#art-delay button')) {
     for (const o of document.querySelectorAll('#art-delay button')) o.classList.toggle('on', o === b);
   });
 }
-function setBattleMode(m) {
-  game.battleMode = m;
-  store.set('battleMode', m);
-}
-document.getElementById('mode-select').addEventListener('change', (e) => {
-  setBattleMode(e.target.value);
-  toast(ui, e.target.value === 'tb' ? 'Turn-based battles' : 'Real-time battles', 'From the next battle (war map battles too).');
+document.getElementById('side-select').addEventListener('change', (e) => {
+  setSide(Number(e.target.value));
+  toast(ui, `Playing as ${SIDE_NAMES[game.side]}`, 'From the next quick battle (war map battles are always ISA).');
 });
 document.getElementById('st-import').addEventListener('click', () => campaignUI.openImport());
 document.getElementById('st-help').addEventListener('click', () => openOverlay('overlay-chelp'));
