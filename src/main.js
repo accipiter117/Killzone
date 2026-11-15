@@ -15,6 +15,7 @@ import { buildTerrain } from './render/terrain.js';
 import { buildTiltTerrain, liftAt, LIFT } from './render/terrain-tilt.js';
 import { createRenderer, drawFrame, drawMinimap } from './render/renderer.js';
 import { loadUnitSprites, loadFlags } from './render/unit-sprites.js';
+import { createHelghanGlobe } from './ui/helghan-globe.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
 import { createAudio, unlockAudio, newFrame, playEvents, uiClick, setMix } from './render/audio.js';
 import { attachMapInput, attachMinimapInput } from './ui/input.js';
@@ -43,7 +44,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), battleMode: 'rt', side: store.get('side', 0) === 1 ? 1 : 0, route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), mapChoice: store.get('mapType', 'trenches'), mapType: 'trenches', lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), battleMode: 'rt', side: store.get('side2', 1) === 0 ? 0 : 1, route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), mapChoice: store.get('mapType', 'trenches'), mapType: 'trenches', lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, scope: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -750,7 +751,7 @@ document.getElementById('st-new-short').addEventListener('click', () => startCam
 // code stays, but nothing in the menus starts one.)
 function setSide(side) {
   game.side = side;
-  store.set('side', side);
+  store.set('side2', side); // new key: Helghast is the default for everyone
   const sel = document.getElementById('side-select');
   if (sel) sel.value = String(side);
 }
@@ -769,7 +770,7 @@ for (const b of document.querySelectorAll('#art-delay button')) {
 }
 document.getElementById('side-select').addEventListener('change', (e) => {
   setSide(Number(e.target.value));
-  toast(ui, `Playing as ${SIDE_NAMES[game.side]}`, 'From the next quick battle (war map battles are always ISA).');
+  toast(ui, `Playing as ${SIDE_NAMES[game.side]}`, 'From the next quick battle.');
 });
 document.getElementById('st-import').addEventListener('click', () => campaignUI.openImport());
 document.getElementById('st-help').addEventListener('click', () => openOverlay('overlay-chelp'));
@@ -955,6 +956,16 @@ function frame(t) {
   });
   requestAnimationFrame(frame);
 }
+
+// The Helghan hologram turns on the start screen, and only while it is open
+// (it is heavy to draw, so it never runs under a battle).
+const globeCanvas = document.getElementById('helghan-globe');
+let globe = null;
+new MutationObserver(() => {
+  const open = !document.getElementById('overlay-start').hidden;
+  if (open && !globe) globe = createHelghanGlobe(globeCanvas);
+  if (globe) { if (open) globe.start(); else globe.stop(); }
+}).observe(document.getElementById('overlay-start'), { attributes: true, attributeFilter: ['hidden'] });
 
 // Portrait: suggest turning sideways (once dismissed, never again).
 const rotateHint = document.getElementById('rotate-hint');

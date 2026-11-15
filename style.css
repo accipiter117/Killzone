@@ -400,3 +400,18 @@ body.tb-mode #timer, body.tb-mode #op, body.tb-mode #support, body.tb-mode #tray
 #art-delay[hidden] { display: none; }
 #art-delay button { min-width: 44px; min-height: 36px; border-radius: 10px; border: 1px solid rgba(236, 230, 214, 0.2); background: transparent; font-size: 12px; font-weight: 700; }
 #art-delay button.on { background: #c4321f; border-color: #ffb3a8; color: #fff; }
+
+/* Start screen: the Helghan survey hologram above the menu (beside it on a
+   short sideways screen). One dark amber look, matching the hologram. */
+#overlay-start { background: #080605; }
+#overlay-start .start-sheet { background: #0c0907; color: #e9d7c2; border: 1px solid #2a1a0e; padding: 12px; display: flex; flex-direction: column; gap: 10px; max-height: 100%; overflow-y: auto; }
+#helghan-globe { display: block; width: 100%; max-width: 360px; margin: 0 auto; aspect-ratio: 360 / 390; border-radius: 10px; background: #0c0907; }
+.start-menu h2 { color: #ffe23d; letter-spacing: 0.04em; }
+.start-menu .small { color: #b08a62; }
+.start-menu button { background: transparent; color: #ff9632; border: 1px solid #7a4a1c; }
+.start-menu button.primary { background: rgba(255, 150, 50, 0.14); color: #ffe23d; border-color: #ff9632; }
+@media (orientation: landscape) and (max-height: 520px) {
+  #overlay-start .start-sheet { flex-direction: row; align-items: center; width: min(100%, 720px); }
+  #helghan-globe { height: calc(100dvh - 60px); width: auto; max-width: none; flex: none; }
+  .start-menu { flex: 1; min-width: 0; }
+}
