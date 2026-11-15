@@ -96,7 +96,7 @@ function applyInner(state, cmd) {
   // within a few seconds of giving it (a misplaced tap is easy on a phone).
   const MOVES = ['move', 'take', 'hold', 'fallback'];
   let v = null;
-  if (type === 'vmove' || type === 'vability') {
+  if (type === 'vmove' || type === 'vability' || type === 'vescort') {
     v = state.vehicles.find((o) => o.side === side);
     if (!v || v.absent) return fail('No tank in this battle (it needs a tank works on the war map)');
     if (!v.alive) return fail('Your tank has been destroyed');
@@ -145,6 +145,7 @@ function applyInner(state, cmd) {
       // The signal: every order held back for it goes at once.
       let n = 0;
       for (const o of state.platoons) if (o.side === side && o.pending && !o.broken) { setOrder(state, o, o.pending); o.pending = null; n++; }
+      for (const tk of state.vehicles) if (tk.side === side && tk.alive && tk.pending) { tankOrder(state, tk, tk.pending); tk.pending = null; n++; }
       if (!n) return fail('No orders are waiting for the signal');
       state.events.push({ type: 'go', side });
       break;
@@ -234,11 +235,38 @@ function applyInner(state, cmd) {
       const pt = point();
       if (!pt) return fail('Bad position');
       if (!amending) v.paidTick = state.tick;
-      v.order = { type: 'move', ...tankSpot(state, pt, side) };
-      v.path = null;
+      // Stops on the way (route), each moved clear of ruins like the goal.
+      const r = route();
+      const order = { type: 'move', ...tankSpot(state, pt, side), ...(r.via ? { via: r.via.map((q) => tankSpot(state, q, side)) } : {}) };
+      if (p.wait) v.pending = order;
+      else { v.pending = null; tankOrder(state, v, order); }
+      break;
+    }
+    case 'vescort': {
+      const pl2 = state.platoons[p.platoon];
+      if (!pl2 || pl2.side !== side) return fail('Pick one of your platoons');
+      if (pl2.broken) return fail(`${pl2.name} has broken`);
+      v.paidTick = state.tick;
+      v.pending = null;
+      tankOrder(state, v, { type: 'escort', platoon: pl2.id });
       break;
     }
     case 'vability': {
+      if (p.kind === 'smoke') {
+        // Smoke launchers: a screen round the tank.
+        const o = cfg.tank.smoke;
+        if (state.tick < v.smokeReady) return fail(`${o.label} is not ready yet`);
+        dropSmoke(state, side, v.x, v.y, o.radius, o.durationSec);
+        v.smokeReady = state.tick + Math.round(o.cooldownSec * cfg.tickRate);
+        sd.abilities++;
+        break;
+      }
+      if (p.kind === 'hulldown') {
+        // Dig in (stop and take far less from the front), or climb out.
+        v.hullDown = !v.hullDown;
+        if (v.hullDown) { v.order = { type: 'idle' }; v.path = null; v.pending = null; sd.abilities++; }
+        break;
+      }
       // Overwatch: a heavy shell fired at once at the best target in range.
       const o = cfg.tank.overwatch;
       if (state.tick < v.abilityReady) return fail(`${o.label} is not ready yet`);
@@ -255,6 +283,13 @@ function applyInner(state, cmd) {
   }
   sd.op -= cost;
   return { ok: true };
+}
+
+// A new movement order for the tank (it climbs out of hull down for it).
+function tankOrder(state, v, order) {
+  v.hullDown = false;
+  v.order = order;
+  v.path = null;
 }
 
 // A tank cannot park inside a ruin: move its goal to the nearest open spot

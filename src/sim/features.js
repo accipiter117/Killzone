@@ -212,10 +212,9 @@ export function updateStrikes(state) {
   state.strikes = state.strikes.filter((s) => s.shellsLeft > 0);
 }
 
-export function dropSmoke(state, side, x, y) {
-  const s = state.cfg.smoke;
-  state.smokes.push({ side, x, y, r: s.radius, end: state.tick + Math.round(s.durationSec * state.cfg.tickRate) });
-  state.events.push({ type: 'smoke', x, y, r: s.radius });
+export function dropSmoke(state, side, x, y, radius = state.cfg.smoke.radius, durationSec = state.cfg.smoke.durationSec) {
+  state.smokes.push({ side, x, y, r: radius, end: state.tick + Math.round(durationSec * state.cfg.tickRate) });
+  state.events.push({ type: 'smoke', x, y, r: radius });
 }
 
 export function updateSmokes(state) {

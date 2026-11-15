@@ -71,6 +71,12 @@ const ui = createUI({
       if (game.vehicle) focusPoint(v.x, v.y);
       return;
     }
+    // Choosing who the tank escorts: the chip picks that platoon.
+    if (game.escortPick && game.vehicle) {
+      const pe = game.match.state.platoons.filter((p) => p.side === PLAYER)[i];
+      if (pe) escortWith(pe);
+      return;
+    }
     game.vehicle = false;
     game.release = null;
     game.scope = null;
@@ -108,9 +114,9 @@ const ui = createUI({
     store.set('minimap', game.minimap);
     showMinimap();
   },
-  tankAbility() {
+  tankAbility(kind = 'overwatch') {
     if (game.replay || game.watch) return;
-    if (order('vability', {})) toast(ui, CONFIG.tank.overwatch.label, ABILITY_HELP.overwatch);
+    if (order('vability', kind === 'overwatch' ? {} : { kind })) toast(ui, CONFIG.tank[kind].label, ABILITY_HELP[kind === 'smoke' ? 'tanksmoke' : kind]);
   },
   togglePause() { game.paused = !game.paused; game.planning = false; },
   cycleSpeed() {
@@ -262,6 +268,7 @@ function action(act) {
     game.armed = next;
     return;
   }
+  if (!pl && game.vehicle) { tankAction(act); return; }
   if (!pl) { toast(ui, 'Select a platoon first', 'Tap one of the platoon chips, bottom left.'); return; }
   if (act === 'hold' && game.scope !== null) {
     const sq = st.squads[game.scope];
@@ -303,6 +310,45 @@ function action(act) {
   }
 }
 
+// Tank orders from the tray: Route, On signal, Escort and Hull down.
+function tankAction(act) {
+  const st = game.match.state;
+  const v = st.vehicles.find((o) => o.side === PLAYER && o.alive);
+  if (!v) return;
+  game.escortPick = act === 'escort' ? !game.escortPick : false;
+  if (act === 'escort') {
+    if (game.escortPick) { game.route = null; toast(ui, 'Tank: escort', 'Tap one of your platoons (or its chip). The tank follows it from just behind, giving covering fire and cover, until you order otherwise.'); }
+    return;
+  }
+  if (act === 'signal') {
+    game.signal = !game.signal;
+    toast(ui, game.signal ? 'Orders wait for the signal' : 'Orders go at once', game.signal ? 'The tank and your platoons hold their move orders until you press GO.' : 'New orders are carried out straight away.');
+    return;
+  }
+  if (act === 'hulldown') {
+    if (order('vability', { kind: 'hulldown' })) toast(ui, v.hullDown ? 'Tank: hull down' : 'Tank: out of cover', v.hullDown ? ABILITY_HELP.hulldown : 'Ready to move again.');
+    return;
+  }
+  if (act === 'route') {
+    if (!game.route) { game.route = []; toast(ui, 'Tank: route', 'Tap the map to add stops (up to five), then press Route again to send it.'); return; }
+    if (!game.route.length) { game.route = null; return; }
+    const last = game.route[game.route.length - 1];
+    if (order('vmove', { x: last.x, y: last.y, via: game.route.slice(0, -1), wait: game.signal })) {
+      toast(ui, `Tank: ${game.signal ? 'route ready, waiting for GO' : 'on the move'}`, `${game.route.length} stop${game.route.length === 1 ? '' : 's'}.`);
+      releaseAfterOrder('tank', v.id);
+    }
+    game.route = null;
+  }
+}
+
+function escortWith(pl) {
+  game.escortPick = false;
+  if (order('vescort', { platoon: pl.id })) {
+    toast(ui, `Tank: escorting ${pl.name}`, 'It follows just behind them. Give the tank a move order to end the escort.');
+    releaseAfterOrder('tank', game.match.state.vehicles.find((o) => o.side === PLAYER).id);
+  }
+}
+
 // Centre the view on a ground point (drawn lifted in the tilted view).
 function lookAt(x, y) {
   const lift = game.tilt ? liftAt(game.match.state.map, x, y) : 0;
@@ -311,6 +357,7 @@ function lookAt(x, y) {
 
 function deselect() {
   game.route = null;
+  game.escortPick = false;
   game.selected = null;
   game.scope = null;
   game.vehicle = false;
@@ -415,16 +462,23 @@ function onTap(sx, sy) {
       const d = Math.hypot(s.x - w.x, s.y - lift - w.y);
       if (d < nd) { nd = d; near = s; }
     }
+    if (near && game.vehicle && game.escortPick) { escortWith(st.platoons[st.squads[near.squad].platoon]); return; }
     if (near) {
       const pid = st.squads[near.squad].platoon;
       if (pid !== game.selected) { game.selected = pid; game.scope = null; game.vehicle = false; game.release = null; return; }
       // A soldier of the selected platoon: pick their squad for squad orders.
       if (near.squad !== game.scope) { game.scope = near.squad; game.release = null; return; }
     }
+    if (game.vehicle && mine && game.escortPick) { toast(ui, 'Tap one of your platoons', 'Or press Escort again to cancel.'); return; }
+    if (game.vehicle && mine && game.route) {
+      if (game.route.length >= st.cfg.orders.maxWaypoints + 1) { toast(ui, 'That is enough stops', 'Press Route to send them.'); return; }
+      game.route.push({ x: Math.round(w.x), y: Math.round(w.y) });
+      return;
+    }
     if (game.vehicle && mine) {
       const t = CONFIG.ui.tile;
       const snap = game.grid ? { x: Math.floor(w.x / t) * t + t / 2, y: Math.floor(w.y / t) * t + t / 2 } : w;
-      if (order('vmove', { x: snap.x, y: snap.y })) { game.marker = { x: mine.order.x, y: mine.order.y, t0: performance.now() / 1000, colour: '#aaffaa' }; releaseAfterOrder('tank', mine.id); }
+      if (order('vmove', { x: snap.x, y: snap.y, wait: game.signal })) { const to = mine.pending || mine.order; game.marker = { x: to.x, y: to.y, t0: performance.now() / 1000, colour: '#aaffaa' }; releaseAfterOrder('tank', mine.id); }
       return;
     }
     if (game.selected !== null) {
@@ -735,6 +789,20 @@ document.addEventListener('keydown', (e) => {
   ui.handlers.togglePause();
 });
 
+// 1, 2 and 3 pick your platoons and 4 the tank (pressing again lets go, like
+// tapping the chip); Esc lets go of whatever is chosen or armed. Same
+// conditions as the space bar.
+document.addEventListener('keydown', (e) => {
+  const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3 }[e.code];
+  if ((n === undefined && e.code !== 'Escape') || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+  if (!game.match || game.match.state.result || campaignUI.visible()) return;
+  if ([...document.querySelectorAll('.overlay')].some((o) => !o.hidden)) return;
+  e.preventDefault();
+  if (n === undefined) { deselect(); return; }
+  ui.handlers.selectCard(n);
+});
+
 // Arrow keys and WASD pan the view (battle and war map) while held. Screen
 // directions, so they still make sense when the map is turned.
 // WASD as well, so the left hand pans and turns (Q, E) while the right
@@ -796,12 +864,14 @@ document.addEventListener('pointerdown', () => { if (game.match && !game.match.s
 function hintText() {
   if (game.replay || game.watch) return '';
   if (game.planning && game.selected === null && !game.vehicle && !game.armed) return 'Planning: pick a platoon to set it up in your zone, plan routes, hold orders for GO. Press \u25B6 to start.';
+  if (game.escortPick) return 'Escort: tap one of your platoons, or its chip.';
+  if (game.route && game.vehicle) return game.route.length ? `Tank route: ${game.route.length} stop${game.route.length === 1 ? '' : 's'}. Tap for more, or Route to send.` : 'Tank route: tap the map to add stops.';
   if (game.route) return game.route.length ? `Route: ${game.route.length} stop${game.route.length === 1 ? '' : 's'}. Tap for more, an objective to finish, or Route to send.` : 'Route: tap the map to add stops.';
   if (game.planning && game.selected !== null && game.match.state.tick === 0) return 'Tap inside the shaded zone to set this platoon up there, or beyond it to give an order.';
   if (game.armed === 'artillery') return 'Tap where the shells should land. They hit everyone, yours too.';
   if (game.armed === 'smoke') return 'Tap where to drop smoke. It blocks sight for a while.';
   if (game.selected !== null) return `${game.match.state.platoons[game.selected].name}: tap an objective to take it, or ground to move (slowed while you decide)`;
-  if (game.vehicle) return 'Tank: tap the ground to drive there (it cannot enter ruins). Overwatch fires a heavy aimed shell.';
+  if (game.vehicle) return 'Tank: tap the ground to drive there (it cannot enter ruins), or use Route, Escort or Hull down.';
   // The general tip only for the opening of a battle; after that the map is left clear.
   return game.match.state.tick < 40 * game.match.state.cfg.tickRate ? 'Tap a unit (bottom left) to command it. Press and hold anything to learn what it does.' : '';
 }
@@ -862,11 +932,11 @@ function frame(t) {
   prune(game.fxs, now);
   const shake = shakeOffset(game.fxs, dt);
   const reveal = game.watch || game.replay;
-  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, scope: game.scope, vehicleSelected: game.vehicle, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, tilt: game.tilt, routeDraft: game.route, deploying: game.planning && st.tick === 0 && !st.tb && game.selected !== null, facing: !st.tb && !game.watch && !game.replay && (game.selected !== null || game.vehicle), grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null) };
+  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, scope: game.scope, vehicleSelected: game.vehicle, escortPick: !!game.escortPick, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, tilt: game.tilt, routeDraft: game.route, deploying: game.planning && st.tick === 0 && !st.tb && game.selected !== null, facing: !st.tb && !game.watch && !game.replay && (game.selected !== null || game.vehicle), grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null) };
   drawFrame(g, game.renderer, st, game.cam, view);
   if (st.tb) tacticsUI.draw(g, game.cam, game.dpr, now);
   // Planning and timing controls.
-  const waiting = st.platoons.filter((p) => p.side === PLAYER && p.pending && !p.broken).length;
+  const waiting = st.platoons.filter((p) => p.side === PLAYER && p.pending && !p.broken).length + st.vehicles.filter((v) => v.side === PLAYER && v.alive && v.pending).length;
   const goBtn = document.getElementById('btn-go');
   goBtn.hidden = !!st.tb || game.replay || game.watch || !waiting;
   if (!goBtn.hidden) document.getElementById('go-count').textContent = `${waiting} waiting`;
@@ -879,7 +949,7 @@ function frame(t) {
   // Turn-based: the chips light up for the unit picked on the grid.
   const tbSel = st.tb && tacticsUI.selected ? st.tb.units.find((u) => u.id === tacticsUI.selected) : null;
   updateUI(ui, st, {
-    now, playerSide: PLAYER, selected: st.tb ? (tbSel && tbSel.kind === 'platoon' ? tbSel.pl : null) : game.selected, scope: game.scope, vehicle: st.tb ? !!(tbSel && tbSel.kind === 'tank') : game.vehicle, armed: game.armed, paused: game.paused, speed: game.speed,
+    now, escortPick: !!game.escortPick, playerSide: PLAYER, selected: st.tb ? (tbSel && tbSel.kind === 'platoon' ? tbSel.pl : null) : game.selected, scope: game.scope, vehicle: st.tb ? !!(tbSel && tbSel.kind === 'tank') : game.vehicle, armed: game.armed, paused: game.paused, speed: game.speed,
     replay: game.replay, watch: game.watch, hint: hintText(),
     banner: game.replay ? 'REPLAY' : game.watch ? 'WATCH MODE' : game.planning ? 'PLANNING' : game.paused ? 'PAUSED' : slow ? 'SLOW MOTION' : '',
   });
