@@ -9,7 +9,8 @@ down with area averaging so the detail survives, and record where its feet
 touch the ground. Every sheet is scaled so the soldier comes out the same
 size. Sheets drawn on white (ChatGPT does not always manage transparency)
 have the white cut away first. Writes one packed atlas PNG and a JSON index
-per unit.
+per unit, plus smaller copies of the atlas (half and quarter size) that the
+game switches to when zoomed out, so soldiers stay crisp at every zoom.
 """
 import colorsys, json, os, sys
 import numpy as np
@@ -18,7 +19,12 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'source')
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, '..', '..', 'assets', 'sprites')
-H = 76  # final standing height in pixels
+H = 192  # standing height in pixels in the full size atlas (the game draws
+# soldiers at about this many screen pixels when fully zoomed in on a phone)
+# Smaller copies for zooming out: each is drawn straight from the ChatGPT
+# sheet at 1/f of the full size (not shrunk from the full atlas), so the
+# detail is averaged properly at every size.
+LEVELS = [1, 2, 4]
 
 # Each unit: its sheets as (sheet, rows, frame names, scale), where scale is
 # (kind, factor): 'h' sizes the sheet so the first frame facing the viewer
@@ -178,12 +184,20 @@ def build(unit, spec):
     for name, _, _, (kind, f) in have:
         if kind == 'as':
             scale[name] = scale.get(f) or scale['stand']
-    tiles = []
+    # Never blow a sheet up past the size ChatGPT drew it: that adds no
+    # detail, only file size and memory. If any sheet would be enlarged,
+    # the whole unit comes out smaller (relative sizes kept) and its height
+    # is recorded, so the game still draws it at the same size on screen.
+    top = max(scale.values())
+    height = H
+    if top > 1:
+        scale = {k: v / top for k, v in scale.items()}
+        height = round(H / top, 2)
+    tiles = {f: [] for f in LEVELS}
     for name, rows, fnames, _ in have:
         im = ims[name]
         W, Hh = im.size
         cw, ch = W / 8, Hh / rows
-        s = scale[name]
         for r, fname in enumerate(fnames):
             for d in range(8):
                 cell = im.crop((round(d * cw), round(r * ch), round((d + 1) * cw), round((r + 1) * ch)))
@@ -193,41 +207,57 @@ def build(unit, spec):
                 rgba = cell.copy()
                 rgba.putalpha(hard)
                 crop = rgba.crop(b)
-                w = max(1, round(crop.width * s)); h = max(1, round(crop.height * s))
                 pre = Image.new('RGBA', crop.size)
                 pre.paste(crop, (0, 0), crop)
-                small = pre.resize((w, h), Image.BOX)
-                arr = np.asarray(small).astype(np.float32)
-                al = arr[..., 3:4]
-                rgb = np.where(al > 0, np.clip(arr[..., :3] * 255 / np.maximum(al, 1), 0, 255), 0)
-                alpha = np.where(arr[..., 3] > 120, 255, 0)
-                out = Image.fromarray(np.dstack([rgb, alpha]).round().astype(np.uint8), 'RGBA')
-                # Feet: the bottom of the figure; across, the middle of its
-                # lowest part (so a rifle or flash sticking out does not shift
-                # him), or of the whole figure when lying down.
-                m = np.asarray(out)[..., 3] > 0
-                ys, xs = np.nonzero(m[h - max(1, h // 5):] if name not in ('prone', 'die') else m)
-                fx = round(xs.mean()) if len(xs) else w // 2
-                tiles.append((f'{fname}:{d}', out, fx, h))
-    PAD, width = 2, 1024
-    x = y = rowh = 0
-    places = {}
-    for key, img, fx, fy in tiles:
-        if x + img.width + PAD > width:
-            x = 0; y += rowh + PAD; rowh = 0
-        places[key] = (x, y, img.width, img.height, fx, fy)
-        x += img.width + PAD
-        rowh = max(rowh, img.height)
-    atlas = Image.new('RGBA', (width, y + rowh + PAD))
-    for key, img, _, _ in tiles:
-        atlas.paste(img, places[key][:2])
-    meta = {'height': H, 'frames': places, 'missing': missing, 'directions': ['S', 'SE', 'E', 'NE', 'N', 'NW', 'W', 'SW']}
-    atlas.save(os.path.join(OUT, f'{unit}.png'), optimize=True)
-    json.dump({**meta, 'image': f'{unit}.png'}, open(os.path.join(OUT, f'{unit}.json'), 'w'))
-    if spec.get('tint'):
-        blue(atlas).save(os.path.join(OUT, spec['tint'] + '.png'), optimize=True)
-        json.dump({**meta, 'image': spec['tint'] + '.png'}, open(os.path.join(OUT, spec['tint'] + '.json'), 'w'))
-    print(unit, 'frames', len(tiles), 'atlas', atlas.size, 'missing', missing, {k: round(v, 3) for k, v in scale.items()})
+                for f in LEVELS:
+                    s = scale[name] / f
+                    w = max(1, round(crop.width * s)); h = max(1, round(crop.height * s))
+                    small = pre.resize((w, h), Image.BOX)
+                    arr = np.asarray(small).astype(np.float32)
+                    al = arr[..., 3:4]
+                    rgb = np.where(al > 0, np.clip(arr[..., :3] * 255 / np.maximum(al, 1), 0, 255), 0)
+                    alpha = np.where(arr[..., 3] > 120, 255, 0)
+                    out = Image.fromarray(np.dstack([rgb, alpha]).round().astype(np.uint8), 'RGBA')
+                    # Feet: the bottom of the figure; across, the middle of its
+                    # lowest part (so a rifle or flash sticking out does not shift
+                    # him), or of the whole figure when lying down.
+                    m = np.asarray(out)[..., 3] > 0
+                    ys, xs = np.nonzero(m[h - max(1, h // 5):] if name not in ('prone', 'die') else m)
+                    fx = round(xs.mean()) if len(xs) else w // 2
+                    tiles[f].append((f'{fname}:{d}', out, fx, h))
+
+    def pack(ts, width):
+        PAD = 2
+        x = y = rowh = 0
+        places = {}
+        for key, img, fx, fy in ts:
+            if x + img.width + PAD > width:
+                x = 0; y += rowh + PAD; rowh = 0
+            places[key] = (x, y, img.width, img.height, fx, fy)
+            x += img.width + PAD
+            rowh = max(rowh, img.height)
+        atlas = Image.new('RGBA', (width, y + rowh + PAD))
+        for key, img, _, _ in ts:
+            atlas.paste(img, places[key][:2])
+        return atlas, places
+
+    names = [unit] + ([spec['tint']] if spec.get('tint') else [])
+    levels = {n: [] for n in names}
+    for f in LEVELS:
+        atlas, places = pack(tiles[f], 2048 // f)
+        suffix = '' if f == 1 else f'@{f}'
+        for n in names:
+            img = atlas if n == unit else blue(atlas)
+            img.save(os.path.join(OUT, f'{n}{suffix}.png'), optimize=True)
+            levels[n].append({'image': f'{n}{suffix}.png', 'shrink': f, 'frames': places})
+    for n in names:
+        full = levels[n][0]
+        meta = {'height': height, 'image': full['image'], 'frames': full['frames'], 'missing': missing,
+                'directions': ['S', 'SE', 'E', 'NE', 'N', 'NW', 'W', 'SW'], 'levels': levels[n][1:]}
+        json.dump(meta, open(os.path.join(OUT, f'{n}.json'), 'w'))
+    tiles = tiles[1]
+    atlas = Image.open(os.path.join(OUT, f'{unit}.png'))
+    print(unit, 'height', height, 'frames', len(tiles), 'atlas', atlas.size, 'missing', missing, {k: round(v, 3) for k, v in scale.items()})
 
 
 only = sys.argv[2:] or list(UNITS)
