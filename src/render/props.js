@@ -42,6 +42,7 @@ export function drawProps(g, state, vb, lift, now) {
 function shape(g, p) {
   const w = p.w, h = p.h;
   if (p.kind === 'cooling' || p.kind === 'stack' || p.kind === 'silo') { g.beginPath(); g.arc(0, 0, w / 2, 0, 6.3); g.fill(); return; }
+  if (p.kind === 'dropship') { g.beginPath(); g.ellipse(-w * 0.05, 0, w * 0.5, h * 0.2, 0, 0, 6.3); g.fill(); return; }
   if (p.kind === 'lamp' || p.kind === 'banner' || p.kind === 'pylon' || p.kind === 'hedgehog' || p.kind === 'deadtree' || p.kind === 'crane' || p.kind === 'cooling' || (p.kind === 'pipes' && !p.cells)) return;
   g.fillRect(-w / 2, -h / 2, w, h);
 }

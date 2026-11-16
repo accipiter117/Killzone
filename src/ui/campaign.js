@@ -18,7 +18,7 @@ import { attachMapInput } from './input.js';
 import { CONFIG } from '../config.js';
 
 const $ = (id) => document.getElementById(id);
-const KIT_NAME = { trenches: 'Trenches', industrial: 'Industrial site', city: 'Ruined city' };
+const KIT_NAME = { trenches: 'Corinth River crossing', industrial: 'Kesh refinery', city: 'Pyrrhus outskirts' };
 const roleName = (r) => CONFIG.roles[r]?.label || r;
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

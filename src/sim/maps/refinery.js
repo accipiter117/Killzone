@@ -128,7 +128,7 @@ export function refineryMap(seedInt, cfg) {
   t.site('comms', 'comms', 880, 170, fR, 'signal box');
   t.site('arc', 'arc', 1470, 330, fR, 'captured arc tower');
   t.site('comms2', 'comms', 1900, 150, fR, 'relay mast');
-  t.site('mg1', 'mg', 900, 690, fR, 'MG on the dock');
+  t.site('mg1', 'mg', 760, 1240, fR, 'MG by the road');
   t.site('mg2', 'mg', 1760, 470, fR, 'MG on the catwalk');
   t.site('control', 'lever', 2380, 910, fR, 'control room');
   t.site('depot0', 'depot', 280, 1350, fR, 'truck park', 0);

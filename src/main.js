@@ -891,7 +891,7 @@ function extraItems(st) {
     if (!lever || lever.owner !== PLAYER) continue;
     const shut = gate.moving ? gate.moving.to : gate.closed;
     const verb = gate.kind === 'bridge' ? (shut ? 'Lower bridge' : 'Raise bridge') : gate.kind === 'door' ? (shut ? 'Open doors' : 'Close doors') : shut ? 'Open barrier' : 'Close barrier';
-    items.push({ key: `g:${gate.id}`, label: gate.moving ? (gate.blocked ? 'Way blocked' : 'Moving...') : verb, sub: `${CONFIG.gates.cost} pt`, off: !!gate.moving, run: () => { if (order('gate', { gate: gate.id })) toast(ui, `The ${gate.name}`, gate.kind === 'bridge' ? 'It takes a few seconds, and will not rise while anyone is on it. Raised, nobody can cross; lowered, anyone can.' : 'It takes a few seconds, and will not shut on anyone standing in it. Shut, it is a solid wall nobody can blast through.'); } });
+    items.push({ key: `g:${gate.id}`, label: gate.moving ? (gate.blocked ? 'Way blocked' : 'Moving...') : verb, sub: (st.map.gates.length > 1 ? `${gate.name.split(' ')[0]}, ` : '') + `${CONFIG.gates.cost} pt`, off: !!gate.moving, run: () => { if (order('gate', { gate: gate.id })) toast(ui, `The ${gate.name}`, gate.kind === 'bridge' ? 'It takes a few seconds, and will not rise while anyone is on it. Raised, nobody can cross; lowered, anyone can.' : 'It takes a few seconds, and will not shut on anyone standing in it. Shut, it is a solid wall nobody can blast through.'); } });
   }
   if (st.sites.some((s) => s.kind === 'depot' && s.owner === PLAYER)) {
     const v = st.vehicles.find((o) => o.side === PLAYER);
