@@ -73,7 +73,7 @@ Shelved for now: the code is still here (src/tactics, src/ui/tactics-ui.js) but 
 - **Select** a unit by tapping its chip or its soldiers on the map: its order tray pops up above the chips (orders plus each squad's ability). Then **tap the map**:
   - tap an objective (A, B, C) or a capturable post (MG nest, arc tower, comms post) to **take** it;
   - tap open ground to **move** there.
-- **Hold** digs the platoon in at the nearest cover. **Fall back** pulls it back towards your edge (even pinned squads crawl back).
+- **Dig in** (the old Hold) stops the platoon at the nearest cover and starts fortifying at once, 1.5 times as fast as troops who are simply waiting. **Digging in:** any squad that stands still (idle, holding or arrived, not pinned) for 5 seconds starts digging; after 6, 16 and 30 seconds of digging it has foxholes under each soldier (crater cover), a crescent of sandbags ahead (sandbag cover), then a trench joining the holes (trench cover, the best). Moving off starts the count again; the earthworks stay on the map for anyone. Numbers in `dig` in `src/config.js`, rules in `src/sim/digging.js`. **Fall back** pulls it back towards your edge (even pinned squads crawl back).
 - **Stance** (per platoon) trades speed for casualties, and decides what happens when things go wrong:
 
   | | Cautious | Balanced | Aggressive |

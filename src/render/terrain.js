@@ -117,7 +117,39 @@ export function buildTerrain(map, seedInt) {
   const built = [];
   for (let i = 0; i < map.grid.length; i++) if (map.grid[i] === T.sandbag) built.push(i);
   if (built.length) addSandbags(built);
-  return { canvas, addCrater: (cr) => drawCrater(g, cr), addSandbags };
+  const addDug = (cells, kind) => paintDug(g, map, cells, kind, () => 0);
+  repaintDug(map, addDug);
+  return { canvas, addCrater: (cr) => drawCrater(g, cr), addSandbags, addDug };
+}
+
+// Earthworks dug in by squads (src/sim/digging.js): foxholes as small pits
+// with a rim of thrown-up earth, trench cells as one dark channel with a lip
+// (painted lip first, then the floor, so neighbouring cells join up).
+// lift(i) raises a cell for the tilted look.
+export function paintDug(g, map, cells, kind, lift) {
+  const c = map.cell;
+  const at = (i) => [(i % map.cols) * c + c / 2, Math.floor(i / map.cols) * c + c / 2 - lift(i)];
+  if (kind === 'foxhole') {
+    for (const i of cells) {
+      const [x, y] = at(i);
+      g.fillStyle = '#7a6d50';
+      g.beginPath(); g.ellipse(x, y, c * 0.62, c * 0.5, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#2b261c';
+      g.beginPath(); g.ellipse(x + 0.5, y + 0.6, c * 0.4, c * 0.3, 0, 0, Math.PI * 2); g.fill();
+    }
+    return;
+  }
+  for (const i of cells) { const [x, y] = at(i); g.fillStyle = '#8b8061'; g.fillRect(x - c * 0.75, y - c * 0.75, c * 1.5, c * 1.5); }
+  for (const i of cells) { const [x, y] = at(i); g.fillStyle = '#2e2a20'; g.fillRect(x - c * 0.5, y - c * 0.5, c, c); }
+}
+
+// Earthworks already dug (when the picture is repainted mid-battle).
+export function repaintDug(map, addDug) {
+  if (!map.dug) return;
+  const fox = [], trench = [];
+  for (let i = 0; i < map.dug.length; i++) if (map.dug[i] === 1) fox.push(i); else if (map.dug[i] === 2) trench.push(i);
+  if (fox.length) addDug(fox, 'foxhole');
+  if (trench.length) addDug(trench, 'trench');
 }
 
 function drawCrater(g, c) {

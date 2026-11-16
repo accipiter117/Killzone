@@ -136,6 +136,10 @@ export const CONFIG = {
     wall: { hit: 0.6, supp: 0.4, speed: 1 }, // never stood in; listed so every ground type has an entry
   },
   wire: { speedMult: 0.22 },
+  // Digging in (src/sim/digging.js): a squad holding still this long starts
+  // to dig (a Dig in order starts at once and digs faster). Levels at these
+  // seconds of digging: foxholes, then sandbags ahead, then a trench line.
+  dig: { waitSec: 5, levels: [6, 16, 30], orderSpeed: 1.5, moveReset: 35, sandbags: { offset: 26, radius: 34, thickness: 9 }, trenchHalf: 6 },
 
   stances: {
     // Pinned behaviour by stance: crawlOn scales how far out a pinned squad

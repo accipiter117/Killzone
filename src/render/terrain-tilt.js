@@ -11,7 +11,7 @@
 
 import { makeFxRandom } from './fx-random.js';
 import { T } from '../sim/map.js';
-import { GROUND } from './terrain.js';
+import { GROUND, paintDug, repaintDug } from './terrain.js';
 
 export const LIFT = 20; // screen rise per level of height, in world units
 
@@ -163,7 +163,9 @@ export function buildTiltTerrain(map, seedInt) {
   const built = [];
   for (let i = 0; i < map.grid.length; i++) if (map.grid[i] === T.sandbag) built.push(i);
   if (built.length) addSandbags(built);
-  return { canvas, lift: LIFT, addCrater: (cr) => drawCrater(g, cr, liftAt(map, cr.x, cr.y)), addSandbags };
+  const addDug = (cells, kind) => paintDug(g, map, cells, kind, (i) => LIFT * map.elev[i]);
+  repaintDug(map, addDug);
+  return { canvas, lift: LIFT, addCrater: (cr) => drawCrater(g, cr, liftAt(map, cr.x, cr.y)), addSandbags, addDug };
 }
 
 // How far up the screen anything standing at (x, y) is drawn.

@@ -276,7 +276,8 @@ function action(act) {
     if (order('squad', { platoon: pl.id, role: sq.role, what: 'hold' })) releaseAfterOrder('squad', sq.id);
     return;
   }
-  if (act === 'hold' || act === 'fallback') order(act, { platoon: pl.id, wait: game.signal });
+  if (act === 'hold' && order('hold', { platoon: pl.id, wait: game.signal })) toast(ui, `${pl.name}: dig in`, 'They stop at the nearest cover and start fortifying at once, faster than troops who just wait: foxholes, then sandbags ahead, then a trench.');
+  if (act === 'fallback') order(act, { platoon: pl.id, wait: game.signal });
   if (act === 'reinforce' && order('reinforce', { platoon: pl.id })) toast(ui, 'Reinforcements', `Fresh soldiers are on their way to ${pl.name}'s weakest squad.`);
   if (act === 'route') {
     // First tap: start adding stops (each tap on the map adds one). Second
@@ -496,7 +497,8 @@ function onTap(sx, sy) {
       const site = siteAt(st, w);
       // Before the battle starts: set the platoon up anywhere in your zone.
       if (game.planning && st.tick === 0 && !site && game.scope === null && !game.route) {
-        const inZone = w.x <= st.cfg.deploy.zone;
+        // Your own deployment zone: the left edge for the ISA, the right for the Helghast.
+        const inZone = PLAYER === 0 ? w.x <= st.cfg.deploy.zone : w.x >= st.map.width - st.cfg.deploy.zone;
         if (inZone) { if (order('deploy', { platoon: pl.id, x: w.x, y: w.y })) toast(ui, `${pl.name} set up here`, 'Tap elsewhere in the shaded zone to move it, or give it orders.'); return; }
       }
       // Drawing a route: each tap adds a stop; an objective finishes it.
