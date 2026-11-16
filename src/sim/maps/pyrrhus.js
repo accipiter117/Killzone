@@ -85,6 +85,7 @@ export function pyrrhusMap(seedInt, cfg) {
   t.gate({ id: 'barrier2', kind: 'barrier', name: 'south checkpoint', x: 1600, y: 1360, w: 12, h: 48, lever: 'post' });
   t.building(1560, 740, 1660, 810, [['e', 0.5, 28]], WK.concrete);
   t.prop('jersey', 1580, 960, 70, 12, 1.57, { low: true });
+  t.prop('tankwreck', 1920, 935, 64, 40, 3.4, { solid: true, side: 'hgh' });
   for (const [x, y] of [[1540, 700], [1540, 1000], [1520, 1180], [1540, 1460], [1520, 560]]) t.prop('hedgehog', x, y, 22, 22, 0.3);
   t.haze(1900, 1340, 170, 90);
   t.prop('pylon', 2260, 380, 18, 18); t.prop('stack', 2280, 1180, 50, 50, 0, { solid: true });

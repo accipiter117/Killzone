@@ -67,7 +67,7 @@ Sizes are in game units (a standing soldier is about 34 tall, a tank about
 Save as `tools/sprites/source/prop-<name>.png` (or .webp) and run
 `python3 tools/sprites/build_props.py`: it cuts the white away, crops, scales
 and writes `assets/sprites/props/<name>.png`. Then add the name to PAINTED
-in src/render/props.js. Done so far: the crashed dropship. The props are drawn in
+in src/render/props.js. Done so far: the crashed dropship and both tank wrecks (one sheet, split by SPLIT in the script). The props are drawn in
 src/render/props.js by kind (dropship, tankwreck, apc, traincar, tanker,
 container, pillbox, pipes, cooling, statue, bus, truck); swapping one for a
 picture means loading the image there and drawing it at the prop's size and
