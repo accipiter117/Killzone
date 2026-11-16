@@ -70,6 +70,7 @@
 
       <div id="cards"></div>
       <div id="support">
+        <div id="extra-sup"></div>
         <button data-act="smoke" class="sup" aria-label="Smoke"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="8" cy="14" r="4"/><circle cx="15" cy="11" r="5"/><circle cx="17" cy="17" r="3"/></svg><small>2 pts</small></button>
         <button data-act="artillery" class="sup art" aria-label="Artillery"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><small>3 pts</small></button>
       </div>
@@ -212,7 +213,10 @@
         <li>Each side has one <b>tank</b> (its own card). Tap the card, then the ground to drive there (1 point). Its main gun shells groups of infantry and the enemy tank; its machine gun sprays anyone close. <b>Overwatch</b> fires an aimed heavy shell. Infantry close behind their tank are covered, and it flattens wire.</li>
         <li><b>Tank orders</b> (in its tray): <b>Route</b> to drive through up to five stops, <b>On signal</b> to hold its order for GO with your platoons, <b>Escort</b> then tap a platoon to have the tank follow just behind it, and <b>Hull down</b> to stop and dig in (hits from in front do less than half damage). <b>Smoke</b> screens the tank and anyone beside it.</li>
         <li>Rifles barely scratch a tank. Hurt it with <b>heavies</b>, grenades, artillery, the arc tower, jetpack dives, your own tank, and <b>engineers</b>: with an enemy tank close, their ability becomes a <b>breaching charge</b>. A knocked out tank stays as a wreck you can hide behind.</li>
-        <li><b>Maps</b> (menu): Trenches, an Industrial site or a Ruined city. On the built-up maps <b>walls</b> block movement and sight and shelter anyone beside them; artillery, grenades and tank shells blow holes in them.</li>
+        <li><b>Maps</b> (menu): three places on Helghan, each side starting in its own surroundings. The <b>Corinth River crossing</b>: the ISA bridgehead on the ash flats against the Helghast bluff and trench line, crossed by a lift bridge and two fords. The <b>Kesh petrusite refinery</b>: the ISA come through the freight yard, the Helghast hold the refinery behind a sludge canal. The <b>Pyrrhus outskirts</b>: a bombed suburb against brutalist blocks, the Autarch's plaza between, a broken highway along the north. <b>Walls</b>, wrecks, containers and freight cars block movement and sight; shells blow holes in them.</li>
+        <li><b>Ground:</b> roads are quicker (tanks most of all) but give no cover; fords are slow and exposed; deep water cannot be crossed; mud drags, tanks worst; <b>vent haze</b> hides anyone in it and a thick bank of it blocks sight both ways. Raised ground (bluffs, docks, catwalks, the highway) gives range and accuracy.</li>
+        <li><b>Gates:</b> hold a <b>lever post</b> (the bridgehouse, the control room, the checkpoint post) and a button appears by the support buttons to raise or lower the lift bridge, or shut or open blast doors and checkpoint barriers (1 point, a few seconds, never on anyone). Shut, they are walls nobody can blast through.</li>
+        <li><b>Vehicle depots:</b> each side starts with one (the landing pad, the motor pool...). Hold a depot and lose your tank, and a <b>Call in tank</b> button brings a fresh one out of it for 3 points. One tank at a time. Take the enemy's depot and they cannot.</li>
         <li><b>High ground</b> gives range and accuracy. Cliffs can only be climbed at ramps, so hills make chokepoints.</li>
         <li>Time slows right down while a platoon is selected, so you can think. Tap the card again to let go.</li>
         <li>Tapped the wrong spot? For 5 seconds after an order you can tap again to change it for free (the card counts down).</li>
@@ -234,9 +238,9 @@
       <div class="row"><span>Map seed</span><input id="seed-input" inputmode="text" maxlength="24" aria-label="Map seed"></div>
       <div class="row"><span>Map (next battle)</span>
         <select id="map-select" aria-label="Map">
-          <option value="trenches">Trenches</option>
-          <option value="industrial">Industrial site</option>
-          <option value="city">Ruined city</option>
+          <option value="trenches">Corinth River crossing</option>
+          <option value="industrial">Kesh petrusite refinery</option>
+          <option value="city">Pyrrhus outskirts</option>
           <option value="random">Random</option>
         </select>
       </div>

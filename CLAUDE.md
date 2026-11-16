@@ -20,8 +20,12 @@ index.html, style.css     page and UI styling (colour tokens for light and dark)
 src/config.js             every tuning number and the player-facing rule texts
 src/sim/                  pure simulation (no DOM, no Math.random)
   rng.js                  mulberry32 on state.rng
-  map.js                  map generation entry (trenches map) and ground helpers; point symmetric so both sides get the same ground
-  maps.js                 the industrial site and ruined city maps (built on the ISA half and mirrored); walls (T.wall)
+  map.js                  map entry and ground helpers: cover types (T), surfaces (S: road, ford, deep water, mud, haze, deck), wall kinds, steps
+  maps/                   the bespoke Helghan maps (river.js, refinery.js, pyrrhus.js) built with kit.js; flip.js mirrors one east to west for testing
+  maps.js                 the old mirrored generators (kept for the mechanics tests: map type 'mirror-trenches' and the old kits)
+  gates.js                lift bridges, blast doors and barriers worked from lever sites
+  callins.js              call-ins from a held vehicle depot (a tank now; aircraft later via config callins)
+  digging.js              squads that hold still dig foxholes, sandbags, then trenches
   battle.js               createBattle, step (one tick), scoring, end of battle
   squads.js               squad behaviour by role, stances, platoon orders
   combat.js               vision, targeting, shooting, suppression, damage
@@ -43,4 +47,4 @@ tools/balance.mjs         AI vs AI balance runs (node tools/balance.mjs [seeds])
 - `npm test` runs every suite in `test/`.
 - `node tools/balance.mjs 10` runs 10 seeds twice with AI profiles swapped and reports win rates and battle length.
 - Browser checks: Playwright from the scratchpad (Chromium is preinstalled), local server `python3 -m http.server 8765`.
-- Fairness: the map is mirrored, so mirrored AIs should split about 50/50. Any choice that breaks a tie (route search, cover search, flank side) must break it in mirror image order for the Helghast, and AI controllers decide from the same moment before orders apply. Check a new mechanic with the balance tool before committing.
+- Maps are bespoke and asymmetric on purpose (the owner's choice): setting first, then mechanics. Each side starts in its own surroundings; fairness comes from matching what matters, not from mirroring. Run `node tools/map-check.mjs` (reachability, route lengths from each start to every site) and `MAP=<type> node tools/balance.mjs 10` for each map, aiming for 40 to 60 percent; `FLIP=1` swaps a map east to west to tell a ground advantage from a side advantage. Lessons so far: each side needs a comparable comms post near home (order point income decides close games), side posts near one start lure its platoons away from B, and the race to B decides most AI games, so start distances matter. Tie-breaks (route search, cover search) still run in mirror image order for the Helghast, and AI controllers decide from the same moment before orders apply. Mechanics tests use the old mirrored map (test/helpers.js MIRROR).

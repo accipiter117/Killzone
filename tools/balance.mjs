@@ -5,9 +5,14 @@
 //
 //   node tools/balance.mjs [seeds] [profileA] [profileB]
 //   node tools/balance.mjs 10 standard aggressive
+//   MAP=industrial node tools/balance.mjs 6     (trenches, industrial, city)
 
 import { createMatch, runToEnd } from '../src/sim/match.js';
 import { createAI } from '../src/sim/ai.js';
+import { CONFIG } from '../src/config.js';
+
+const MAP = process.env.MAP || 'trenches';
+const options = { config: { map: { type: MAP, flip: !!process.env.FLIP }, world: CONFIG.mapSizes[MAP] } };
 
 const seeds = Number(process.argv[2]) || 10;
 const A = process.argv[3] || 'standard';
@@ -22,7 +27,7 @@ for (let seed = 1; seed <= seeds; seed++) {
   for (const swap of [false, true]) {
     const profiles = swap ? [B, A] : [A, B];
     const mapSeed = same ? seed * 2 - (swap ? 0 : 1) : seed;
-    const m = createMatch({ seed: mapSeed, controllers: [createAI(0, profiles[0]), createAI(1, profiles[1])] });
+    const m = createMatch({ seed: mapSeed, options, controllers: [createAI(0, profiles[0]), createAI(1, profiles[1])] });
     const r = runToEnd(m);
     tally.games++;
     tally.length += r.durationSec;

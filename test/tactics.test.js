@@ -3,12 +3,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createBattle, step } from '../src/sim/battle.js';
+import { mirrorBattle } from './helpers.js';
 import {
   createTactics, reachable, shotOdds, moveUnit, fireUnit, grenadeUnit, overwatchUnit, endTurn, aiTurn, liveUnits, unitById, soldiersLeft,
 } from '../src/tactics/tactics.js';
 
 function battle(seed = 'tb') {
-  const s = createBattle(seed, {});
+  const s = mirrorBattle(seed);
   createTactics(s);
   return s;
 }

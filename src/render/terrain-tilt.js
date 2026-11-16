@@ -11,7 +11,8 @@
 
 import { makeFxRandom } from './fx-random.js';
 import { T } from '../sim/map.js';
-import { GROUND, paintDug, repaintDug } from './terrain.js';
+import { GROUND, paintDug, repaintDug, furnish } from './terrain.js';
+import { paintGround } from './ground-art.js';
 
 export const LIFT = 20; // screen rise per level of height, in world units
 
@@ -95,6 +96,8 @@ export function buildTiltTerrain(map, seedInt) {
     }
   }
 
+  paintGround(g, map, r, () => 0, 'under');
+
   // Raised ground, level by level. Each level's top is drawn LIFT higher per
   // level, with a tall banded cliff face filling the drop beneath it.
   const disc = (x, y, rad, col) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill(); };
@@ -128,6 +131,7 @@ export function buildTiltTerrain(map, seedInt) {
     }
   }
 
+  paintGround(g, map, r, (x, y) => liftAt(map, x, y), 'top');
   for (const cr of map.craters) drawCrater(g, cr, liftAt(map, cr.x, cr.y));
   // Rubble: a few clean stones per cell, on whatever level they sit.
   for (let i = 0; i < map.grid.length; i++) {
@@ -203,7 +207,7 @@ function drawRuin(g, b, r, lift) {
   g.fillRect(bx, by, b.w, b.h);
   g.fillStyle = P.floorTile;
   for (let y = by + 3; y < by + b.h - 2; y += 7) for (let x = bx + 3 + ((y - by) % 14 ? 3 : 0); x < bx + b.w - 3; x += 7) if (r() < 0.6) g.fillRect(x, y, 5, 5);
-  if (b.walls === false) return; // built-up maps: real walls are drawn live
+  if (b.walls === false) { furnish(g, { ...b, y: by }, r); return; } // built-up maps: real walls are drawn live
 
   const T_ = 5;
   const runs = [];

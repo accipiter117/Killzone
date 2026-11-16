@@ -7,6 +7,7 @@
 
 import { makeFxRandom } from './fx-random.js';
 import { T } from '../sim/map.js';
+import { paintGround } from './ground-art.js';
 
 const P = {
   ground: '#595747',
@@ -61,6 +62,8 @@ export function buildTerrain(map, seedInt) {
     g.fillRect(x0, 0, x1 - x0, map.height);
   }
 
+  paintGround(g, map, r, () => 0, 'under');
+
   // Raised ground, level by level: shadow, cliff face, then the top.
   const disc = (x, y, rad, col) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill(); };
   const R = c * 0.95; // overlapping discs give smooth, rounded edges
@@ -83,6 +86,7 @@ export function buildTerrain(map, seedInt) {
     }
   }
 
+  paintGround(g, map, r, () => 0, 'top');
   for (const cr of map.craters) drawCrater(g, cr);
 
   // Rubble: a few clean stones per cell.
@@ -179,6 +183,7 @@ function drawRuin(g, b, r) {
   if (b.walls === false) {
     g.fillStyle = 'rgba(255,250,230,0.05)';
     for (let y = b.y + 3; y < b.y + b.h - 2; y += 8) for (let x = b.x + 3; x < b.x + b.w - 3; x += 8) if (r() < 0.55) g.fillRect(x, y, 6, 6);
+    furnish(g, b, r);
     return;
   }
   const T_ = 5, H = 7;
@@ -207,6 +212,40 @@ function drawRuin(g, b, r) {
     g.fillRect(x, y, w, h);
     g.fillStyle = 'rgba(255,248,226,0.25)';
     g.fillRect(x, y, w, 1.2);
+  }
+}
+
+// What is left inside a gutted building: scorch, fallen roof beams, heaps
+// of plaster and brick, the odd table or locker. Drawn on the floor, so it
+// is only a picture (the floor's cover is the rule).
+export function furnish(g, b, r) {
+  const area = b.w * b.h;
+  const at = () => [b.x + 6 + r() * (b.w - 12), b.y + 6 + r() * (b.h - 12)];
+  for (let k = 0; k < area / 9000; k++) {
+    const [x, y] = at();
+    const gr = g.createRadialGradient(x, y, 0, x, y, 28);
+    gr.addColorStop(0, 'rgba(10,8,6,0.35)'); gr.addColorStop(1, 'rgba(10,8,6,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, 28, 0, 6.3); g.fill();
+  }
+  for (let k = 0; k < area / 5000; k++) {
+    const [x, y] = at();
+    g.save(); g.translate(x, y); g.rotate(r.range(-0.8, 0.8));
+    g.fillStyle = 'rgba(14,12,9,0.4)'; g.fillRect(-r.range(18, 34) + 2, 0, r.range(36, 64), 5);
+    g.fillStyle = r() < 0.5 ? '#5a4632' : '#6c6a62'; g.fillRect(-r.range(18, 34), -2, r.range(36, 64), 4);
+    g.restore();
+  }
+  for (let k = 0; k < area / 3000; k++) {
+    const [x, y] = at();
+    for (let j = 0; j < 6; j++) {
+      g.fillStyle = r.pick(['#7d796b', '#6b685c', '#8c887a', '#6e4c3f']);
+      g.fillRect(x + r.range(-8, 8), y + r.range(-6, 6), r.range(3, 6), r.range(2, 5));
+    }
+  }
+  for (let k = 0; k < area / 12000; k++) {
+    const [x, y] = at();
+    g.fillStyle = 'rgba(14,12,9,0.35)'; g.fillRect(x + 2, y + 2, 16, 10);
+    g.fillStyle = r() < 0.5 ? '#4f5356' : '#5d4a36'; g.fillRect(x, y, 16, 10);
+    g.fillStyle = 'rgba(255,248,226,0.15)'; g.fillRect(x, y, 16, 1.2);
   }
 }
 

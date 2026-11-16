@@ -8,6 +8,8 @@ import { resetPlans, resetSquadPlan, thinkSquad } from './squads.js';
 import { callArtillery, dropSmoke } from './features.js';
 import { useAbility } from './abilities.js';
 import { mainGunTarget, shell } from './vehicles.js';
+import { canWorkGate, workGate } from './gates.js';
+import { callinBlocked, callIn } from './callins.js';
 import { members, centroid, feed } from './util.js';
 
 // Fresh soldiers fill the dead places in the platoon's weakest squad. They
@@ -240,6 +242,24 @@ function applyInner(state, cmd) {
       const order = { type: 'move', ...tankSpot(state, pt, side), ...(r.via ? { via: r.via.map((q) => tankSpot(state, q, side)) } : {}) };
       if (p.wait) v.pending = order;
       else { v.pending = null; tankOrder(state, v, order); }
+      break;
+    }
+    case 'callin': {
+      // Bring a tank (later aircraft and more) onto the field from a depot.
+      const why = callinBlocked(state, side, p.what);
+      if (why) return fail(why);
+      cost = cfg.callins[p.what].cost;
+      if (sd.op + 1e-9 < cost) return fail('Not enough order points');
+      callIn(state, side, p.what);
+      break;
+    }
+    case 'gate': {
+      // Work a lift bridge, blast door or barrier from a lever post you hold.
+      const gate = (state.map.gates || []).find((o) => o.id === p.gate);
+      if (!gate) return fail('No such gate');
+      const why = canWorkGate(state, side, gate);
+      if (why) return fail(why);
+      workGate(state, side, gate);
       break;
     }
     case 'vescort': {

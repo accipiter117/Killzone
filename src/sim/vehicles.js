@@ -3,7 +3,7 @@
 // shelter infantry close behind them, and leave a wreck that is cover.
 
 import { next } from './rng.js';
-import { T, cellIndex, canStep, forCells } from './map.js';
+import { T, cellIndex, canStep, forCells, surfName } from './map.js';
 import { findPath, straightClear } from './path.js';
 import { isActive, dist, feed, sideName, nearObjective } from './util.js';
 import { fireShot, damageSoldier, suppress, losClear } from './combat.js';
@@ -14,7 +14,8 @@ export function createVehicles(state) {
   const W = state.map.width, H = state.map.height;
   state.vehicles = [0, 1].map((side) => ({
     id: side, side, kind: 'tank',
-    x: side === 0 ? t.deployX : W - t.deployX, y: H / 2,
+    x: state.map.deploy ? state.map.deploy[side].tank.x : side === 0 ? t.deployX : W - t.deployX,
+    y: state.map.deploy ? state.map.deploy[side].tank.y : H / 2,
     hp: t.hp, maxHp: t.hp, alive: true, radius: t.radius,
     order: { type: 'idle' }, paidTick: -1, path: null, pathTo: null, pathTick: 0,
     facing: side === 0 ? 1 : -1, gunReady: Math.round(2 * state.cfg.tickRate), mgCd: 0, lastFireTick: -9999,
@@ -122,6 +123,7 @@ export function updateVehicles(state, dt) {
       let speed = cfg.speed;
       const here = cellIndex(state.map, v.x, v.y);
       if (here >= 0 && state.map.ramp[here]) speed *= cfg.rampSpeed;
+      speed *= state.cfg.surface[surfName(state.map, v.x, v.y)].tank;
       // Head for the smoothed waypoint; if a cliff edge or ruin is in the
       // way, fall back to the next cell of the route, then to the middle of
       // the current cell, so a tank can never wedge itself for good.

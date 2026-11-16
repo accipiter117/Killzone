@@ -16,6 +16,7 @@ import { buildTiltTerrain, liftAt, LIFT } from './render/terrain-tilt.js';
 import { createRenderer, drawFrame, drawMinimap } from './render/renderer.js';
 import { loadUnitSprites, loadFlags } from './render/unit-sprites.js';
 import { createHelghanGlobe } from './ui/helghan-globe.js';
+import { callinBlocked } from './sim/callins.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
 import { createAudio, unlockAudio, newFrame, playEvents, uiClick, setMix } from './render/audio.js';
 import { attachMapInput, attachMinimapInput } from './ui/input.js';
@@ -879,6 +880,49 @@ function hintText() {
   return game.match.state.tick < 40 * game.match.state.cfg.tickRate ? 'Tap a unit (bottom left) to command it. Press and hold anything to learn what it does.' : '';
 }
 
+// Gates you can work and call-ins you can make appear as pills beside the
+// support buttons; built when the list changes, refreshed every frame.
+const extraSup = document.getElementById('extra-sup');
+function extraItems(st) {
+  if (game.replay || game.watch || st.tb || st.result) return [];
+  const items = [];
+  for (const gate of st.map.gates || []) {
+    const lever = st.sites.find((s) => s.id === gate.lever);
+    if (!lever || lever.owner !== PLAYER) continue;
+    const shut = gate.moving ? gate.moving.to : gate.closed;
+    const verb = gate.kind === 'bridge' ? (shut ? 'Lower bridge' : 'Raise bridge') : gate.kind === 'door' ? (shut ? 'Open doors' : 'Close doors') : shut ? 'Open barrier' : 'Close barrier';
+    items.push({ key: `g:${gate.id}`, label: gate.moving ? (gate.blocked ? 'Way blocked' : 'Moving...') : verb, sub: (st.map.gates.length > 1 ? `${gate.name.split(' ')[0]}, ` : '') + `${CONFIG.gates.cost} pt`, off: !!gate.moving, run: () => { if (order('gate', { gate: gate.id })) toast(ui, `The ${gate.name}`, gate.kind === 'bridge' ? 'It takes a few seconds, and will not rise while anyone is on it. Raised, nobody can cross; lowered, anyone can.' : 'It takes a few seconds, and will not shut on anyone standing in it. Shut, it is a solid wall nobody can blast through.'); } });
+  }
+  if (st.sites.some((s) => s.kind === 'depot' && s.owner === PLAYER)) {
+    const v = st.vehicles.find((o) => o.side === PLAYER);
+    const why = callinBlocked(st, PLAYER, 'tank');
+    if (v && !(v.alive && !v.absent)) items.push({ key: 'c:tank', label: 'Call in tank', sub: `${CONFIG.callins.tank.cost} pts`, off: !!why || st.sides[PLAYER].op < CONFIG.callins.tank.cost, run: () => { if (order('callin', { what: 'tank' })) toast(ui, 'Tank called in', 'A fresh tank rolls out of your depot. One at a time: lose it and you can call another.'); } });
+  }
+  return items;
+}
+function updateExtraSupport(st) {
+  const items = extraItems(st);
+  const key = items.map((i) => i.key).join('|');
+  if (extraSup.dataset.key !== key) {
+    extraSup.dataset.key = key;
+    extraSup.innerHTML = '';
+    for (const it of items) {
+      const b = document.createElement('button');
+      b.className = 'xsup';
+      b.innerHTML = '<span></span><small></small>';
+      b.dataset.k = it.key;
+      b.addEventListener('click', () => { const cur = extraItems(game.match.state).find((x) => x.key === it.key); if (cur && !cur.off) cur.run(); });
+      extraSup.appendChild(b);
+    }
+  }
+  items.forEach((it, k) => {
+    const b = extraSup.children[k];
+    if (b.firstChild.textContent !== it.label) b.firstChild.textContent = it.label;
+    b.lastChild.textContent = it.sub;
+    b.disabled = it.off;
+  });
+}
+
 function frame(t) {
   const now = t / 1000;
   const dt = Math.min(0.25, now - game.last / 1000);
@@ -939,6 +983,7 @@ function frame(t) {
   drawFrame(g, game.renderer, st, game.cam, view);
   if (st.tb) tacticsUI.draw(g, game.cam, game.dpr, now);
   // Planning and timing controls.
+  updateExtraSupport(st);
   const waiting = st.platoons.filter((p) => p.side === PLAYER && p.pending && !p.broken).length + st.vehicles.filter((v) => v.side === PLAYER && v.alive && v.pending).length;
   const goBtn = document.getElementById('btn-go');
   goBtn.hidden = !!st.tb || game.replay || game.watch || !waiting;

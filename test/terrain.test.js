@@ -5,7 +5,7 @@ import { heightAt, rampAt, cellIndex, canStep } from '../src/sim/map.js';
 import { findPath, straightClear } from '../src/sim/path.js';
 import { hitChance, weaponRange } from '../src/sim/combat.js';
 import { applyCommand } from '../src/sim/commands.js';
-import { squadSoldiers } from './helpers.js';
+import { squadSoldiers, mirrorBattle } from './helpers.js';
 
 // Find a cliff: a low cell next to a raised one, with no ramp on either.
 function findCliff(map) {
@@ -21,7 +21,7 @@ function findCliff(map) {
 
 test('every map has high ground and every objective can be reached', () => {
   for (let seed = 1; seed <= 25; seed++) {
-    const s = createBattle(seed);
+    const s = mirrorBattle(seed);
     assert.ok(s.map.hasHeight, `seed ${seed} should have raised ground`);
     const B = s.sites.find((x) => x.id === 'B');
     assert.equal(heightAt(s.map, B.x, B.y), 2, 'B sits on the top of the central hill');
@@ -34,7 +34,7 @@ test('every map has high ground and every objective can be reached', () => {
 });
 
 test('high ground is mirrored so both sides get the same hills', () => {
-  const s = createBattle(8);
+  const s = mirrorBattle(8);
   const n = s.map.elev.length;
   for (let i = 0; i < n; i += 5) {
     assert.equal(s.map.elev[i], s.map.elev[n - 1 - i]);
@@ -43,7 +43,7 @@ test('high ground is mirrored so both sides get the same hills', () => {
 });
 
 test('cliffs cannot be walked through; routes use the ramps', () => {
-  const s = createBattle(3);
+  const s = mirrorBattle(3);
   const cliff = findCliff(s.map);
   assert.ok(cliff);
   assert.equal(canStep(s.map, cellIndex(s.map, cliff.low.x, cliff.low.y), cellIndex(s.map, cliff.high.x, cliff.high.y)), false);
@@ -63,7 +63,7 @@ test('cliffs cannot be walked through; routes use the ramps', () => {
 });
 
 test('a soldier walking into a cliff does not pass through it', () => {
-  const s = createBattle(3);
+  const s = mirrorBattle(3);
   const cliff = findCliff(s.map);
   const sol = squadSoldiers(s, 0)[0];
   for (const m of squadSoldiers(s, 0)) { m.fled = m !== sol; }
@@ -74,7 +74,7 @@ test('a soldier walking into a cliff does not pass through it', () => {
 });
 
 test('high ground gives range and accuracy', () => {
-  const s = createBattle(3);
+  const s = mirrorBattle(3);
   const B = s.sites.find((x) => x.id === 'B');
   const low = { x: 190, y: 550, role: 'rifle' };
   const high = { x: B.x, y: B.y, role: 'rifle' };
@@ -85,7 +85,7 @@ test('high ground gives range and accuracy', () => {
 });
 
 test('a platoon ordered onto the hill climbs it by a ramp', () => {
-  const s = createBattle(5);
+  const s = mirrorBattle(5);
   applyCommand(s, { tick: 0, side: 0, type: 'take', params: { platoon: 1, site: 'B' } });
   for (let i = 0; i < 30 * 70; i++) step(s);
   const up = s.platoons[1].squads.flatMap((id) => squadSoldiers(s, id)).filter((m) => m.alive && heightAt(s.map, m.x, m.y) >= 1);

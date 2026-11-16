@@ -7,6 +7,7 @@ import { updateVision, updateFiring, updateSuppression } from './combat.js';
 import { updateSites, updateEmplacements, updateStrikes, updateSmokes } from './features.js';
 import { thinkSquad, moveSoldiers, resetPlans, updateMedics, updateRoutes } from './squads.js';
 import { updateDigging } from './digging.js';
+import { updateGates } from './gates.js';
 import { updateThrows, updateDives } from './abilities.js';
 import { platoonAlive, feed, sideName } from './util.js';
 import { createVehicles, updateVehicles, updateCharges, updateVehicleVision } from './vehicles.js';
@@ -74,6 +75,15 @@ export function createBattle(seed, options = {}) {
           let x = cfg.deploy.x + jitter[key][0] - (n % 2) * 14;
           let y = baseY + (k - 1) * 62 + (n - 2) * 11;
           if (side === 1) { x = W - x; y = H - y; }
+          // Bespoke maps say where each side's platoons start (each side in
+          // its own surroundings); the squad layout round that point is the
+          // same for both, turned to face the enemy.
+          const dp = map.deploy && map.deploy[side].platoons[pi];
+          if (dp) {
+            const f = side === 0 ? 1 : -1;
+            x = dp.x + f * (jitter[key][0] - (n % 2) * 14);
+            y = dp.y + f * ((k - 1) * 62 + (n - 2) * 11);
+          }
           const hp = cfg.roles[role].hp;
           // A campaign platoon short of men: the empty places are filled as
           // absent (off the field) so reinforcements can still fill them.
@@ -100,7 +110,7 @@ export function createBattle(seed, options = {}) {
     for (const side of [0, 1]) {
       const f = forces[side];
       const sd = state.sides[side];
-      if (!f.tank) { const v = state.vehicles[side]; v.alive = false; v.absent = true; v.hp = 0; }
+      if (!f.tank) { const v = state.vehicles[side]; v.alive = false; v.absent = true; v.hp = 0; sd.noTank = true; }
       if (!f.artillery) { sd.noArtillery = true; sd.artReadyTick = 1e12; }
       sd.op = Math.min(cfg.orders.cap, cfg.orders.start + (f.opBonus || 0));
       if (f.fortified) fortify(state, side);
@@ -164,6 +174,7 @@ export function step(state) {
   updateThrows(state);
   updateDives(state);
   updateSmokes(state);
+  updateGates(state);
   updateSuppression(state, dt);
   // Turn-based battles: objectives, morale and the end are the turn rules' job.
   if (!state.tb) { updateSites(state, dt); checkMorale(state); }

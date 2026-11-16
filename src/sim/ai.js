@@ -3,6 +3,8 @@
 // state but never changes it directly, and uses no randomness, so the same
 // battle always gets the same decisions.
 
+import { canWorkGate, gateCentre } from './gates.js';
+import { callinBlocked } from './callins.js';
 import { members, centroid, dist, platoonStrength, platoonAlive, isActive } from './util.js';
 import { abilityHasTarget, abilityKey } from './abilities.js';
 import { mainGunTarget } from './vehicles.js';
@@ -137,6 +139,8 @@ function decide(state, side, prof, memory) {
   const reserve = !ahead && !threatened && free.length >= 3 && homeObj ? free[free.length - 1] : null;
   if (reserve) {
     if (!(reserve.order.type === 'take' && reserve.order.siteId === homeObj.id) && can(cost.take)) spend({ type: 'take', params: { platoon: reserve.id, site: homeObj.id } }, cost.take);
+    // The reserve guards the home objective, so nobody else needs to.
+    committed.set(homeObj.id, committed.get(homeObj.id) + platoonAlive(state, reserve));
   }
   const lane = (state.map.lanes || []).find((l) => l.side === side);
   for (const pl of free) {
@@ -252,6 +256,28 @@ function decide(state, side, prof, memory) {
     const cur = tank.order.type === 'move' ? tank.order : tank;
     if (goal && dist(goal, cur) > ai.tankReorderDist && op >= cost.vmove + prof.reserve && orders < 3) {
       spend({ type: 'vmove', params: goal }, cost.vmove);
+    }
+  }
+
+  // A new tank from the depot when ours is gone and points allow.
+  if (!callinBlocked(state, side, 'tank') && op >= cfg.callins.tank.cost + prof.reserve) {
+    cmds.push({ side, type: 'callin', params: { what: 'tank' } });
+    op -= cfg.callins.tank.cost;
+  }
+
+  // Gates we hold the lever for: shut them in the enemy's face when they come
+  // close and outnumber us there; open them again once the way is quiet.
+  for (const gate of state.map.gates || []) {
+    if (gate.moving || canWorkGate(state, side, gate) || op < cost.gate + prof.reserve) continue;
+    const c = gateCentre(state.map, gate);
+    const foes = seenFoes.filter((e) => dist(e, c) < 280).length;
+    const ours = state.soldiers.filter((o) => o.side === side && isActive(o) && dist(o, c) < 220).length;
+    const want = foes >= 3 && foes > ours;
+    if (want !== gate.closed && (want || foes === 0) && state.tick - (memory.gateTick?.[gate.id] ?? -1e9) > 20 * cfg.tickRate) {
+      cmds.push({ side, type: 'gate', params: { gate: gate.id } });
+      op -= cost.gate;
+      memory.gateTick = memory.gateTick || {};
+      memory.gateTick[gate.id] = state.tick;
     }
   }
 

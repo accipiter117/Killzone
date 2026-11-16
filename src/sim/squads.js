@@ -1,7 +1,7 @@
 // Squad behaviour. The player orders platoons; each squad works out how to
 // carry the order out according to its role and the platoon's stance.
 
-import { T, findCover, wireAt, forCells, cellIndex, canStep, rampAt, heightAt } from './map.js';
+import { T, findCover, wireAt, forCells, cellIndex, canStep, rampAt, heightAt, surfName } from './map.js';
 import { nextStep, straightClear, findPath } from './path.js';
 import {
   members, centroid, clamp, dist, sideDir, edgeX, siteLabel, nearObjective, isActive, coverName, coverAt, feed,
@@ -769,6 +769,7 @@ export function moveSoldiers(state, dt) {
     }
     if (!flies) {
       speed *= cfg.cover[coverName(state, s.x, s.y)].speed;
+      speed *= cfg.surface[surfName(state.map, s.x, s.y)].speed;
       if (wireAt(state.map, s.x, s.y) > 0) speed *= cfg.wire.speedMult;
     }
     if (sq.mode === 'rout') speed *= cfg.squad.routSpeedMult;

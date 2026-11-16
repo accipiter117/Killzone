@@ -1,7 +1,7 @@
 // Vision, targeting, shooting, suppression and damage.
 
 import { next } from './rng.js';
-import { T } from './map.js';
+import { T, S, surfAt } from './map.js';
 import { terrainAt, heightAt, cellIndex } from './map.js';
 import { coverAt, isActive, dist, feed, sideName } from './util.js';
 import { explodeTank } from './features.js';
@@ -21,6 +21,16 @@ export function losClear(state, x1, y1, x2, y2) {
     for (let k = 2; k < steps - 1; k++) {
       const i = cellIndex(map, x1 + ((x2 - x1) * k) / steps, y1 + ((y2 - y1) * k) / steps);
       if (i >= 0 && map.grid[i] === T.wall) return false;
+    }
+  }
+  // Vent haze: a little of it softens a view, a thick bank of it blocks it.
+  if (map.hasHaze) {
+    const d = Math.hypot(x2 - x1, y2 - y1), steps = Math.floor(d / 10);
+    let n = 0;
+    const lim = state.cfg.surface.haze.blockLen / 10;
+    for (let k = 1; k < steps; k++) {
+      const i = cellIndex(map, x1 + ((x2 - x1) * k) / steps, y1 + ((y2 - y1) * k) / steps);
+      if (i >= 0 && map.surf[i] === S.haze && ++n > lim) return false;
     }
   }
   if (map.hasHeight) {
@@ -84,7 +94,8 @@ export function updateVision(state) {
       const cc = state.cfg.combat.conceal;
       const still = state.tick - (e.lastMoveTick ?? -9999) > cc.stillSec * state.cfg.tickRate && state.tick - e.lastShotTick > cc.revealSec * state.cfg.tickRate;
       const cov = still ? coverAt(state, e.x, e.y).hit : 0;
-      const hide = cov >= 0.5 ? cc.full : cov >= 0.3 ? cc.half : 1;
+      let hide = cov >= 0.5 ? cc.full : cov >= 0.3 ? cc.half : 1;
+      if (state.map.hasHaze && surfAt(state.map, e.x, e.y) === S.haze) hide *= state.cfg.surface.haze.hide;
       for (const s of sol) {
         if (s.side !== side || !isActive(s)) continue;
         const sight = sightOf(state, s) * hide;

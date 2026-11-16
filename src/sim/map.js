@@ -3,17 +3,53 @@
 // Helghast always fight over identical ground (fair for balance testing).
 
 import { range, int } from './rng.js';
-import { industrialMap, cityMap } from './maps.js';
+import { riverMap } from './maps/river.js';
+import { refineryMap } from './maps/refinery.js';
+import { pyrrhusMap } from './maps/pyrrhus.js';
+import { flipMap } from './maps/flip.js';
 
 export const T = { open: 0, trench: 1, rubble: 2, crater: 3, building: 4, sandbag: 5, wall: 6 };
 export const T_NAMES = ['open', 'trench', 'rubble', 'crater', 'building', 'sandbag', 'wall'];
+// The surface under the cover: what the ground is made of, for movement and
+// sight (cover still comes from T). Roads are quick, a ford is slow and
+// exposed, deep water cannot be crossed, mud and ash bog drag, vent haze
+// (petrusite steam) hides whoever stands in it, a bridge deck is a road over
+// water (deep water again when the bridge is raised).
+export const S = { ground: 0, road: 1, ford: 2, deep: 3, mud: 4, haze: 5, deck: 6 };
+export const S_NAMES = ['ground', 'road', 'ford', 'deep', 'mud', 'haze', 'deck'];
+export const surfAt = (map, x, y) => { const i = cellIndex(map, x, y); return i < 0 || !map.surf ? 0 : map.surf[i]; };
+export const surfName = (map, x, y) => S_NAMES[surfAt(map, x, y)];
+
+// What a wall cell is made of, for drawing (map.wallKind). 'prop' walls
+// belong to a set piece (a wreck, a container) that is drawn whole.
+export const WK = { concrete: 0, brick: 1, rock: 2, metal: 3, prop: 4, door: 5, barrier: 6 };
+
+// An empty map of the given size, for the map builders.
+export function blankMap(W, H, cell) {
+  const cols = Math.ceil(W / cell), rows = Math.ceil(H / cell), n = cols * rows;
+  return {
+    width: W, height: H, cell, cols, rows,
+    grid: new Array(n).fill(T.open),
+    wire: new Array(n).fill(0),
+    elev: new Array(n).fill(0), // 0 low ground, 1 and 2 raised ground
+    ramp: new Array(n).fill(0), // 1 where you can walk between heights
+    surf: new Uint8Array(n),
+    wallKind: new Uint8Array(n), // what a wall cell is, for drawing
+    hills: [], trenches: [], wires: [], buildings: [], craters: [], sites: [], tanks: [],
+    props: [], decals: [], gates: [], lanes: [],
+  };
+}
 
 // Which map to build: the trench line (the original), an industrial site or
 // a ruined city (src/sim/maps.js).
 export function generateMap(seedInt, cfg) {
-  if (cfg.map.type === 'industrial') return industrialMap(seedInt, cfg);
-  if (cfg.map.type === 'city') return cityMap(seedInt, cfg);
-  return trenchMap(seedInt, cfg);
+  // Bespoke places on Helghan (src/sim/maps/): the Corinth River crossing,
+  // the Kesh petrusite refinery and the outskirts of Pyrrhus. The older
+  // mirrored generators stay for reference and the war map's tests.
+  if (cfg.map.type === 'mirror-trenches') return trenchMap(seedInt, cfg);
+  const build = cfg.map.type === 'industrial' ? refineryMap : cfg.map.type === 'city' ? pyrrhusMap : riverMap;
+  const map = build(seedInt, cfg);
+  return finishMap(cfg.map.flip ? flipMap(map) : map, cfg);
 }
 
 function trenchMap(seedInt, cfg) {
@@ -144,7 +180,11 @@ function trenchMap(seedInt, cfg) {
 // the high ground, then as a last resort knock the walls down), and note
 // what it has, for the rules and the drawing.
 export function finishMap(map) {
+  if (!map.surf) map.surf = new Uint8Array(map.grid.length);
+  if (!map.wallKind) map.wallKind = new Uint8Array(map.grid.length);
+  for (const k of ['props', 'decals', 'gates']) if (!map[k]) map[k] = [];
   if (!connected(map)) {
+    map.flattened = true; // a map builder's mistake: tools/map-check.mjs reports it
     map.elev.fill(0);
     map.ramp.fill(0);
     if (!connected(map)) for (let i = 0; i < map.grid.length; i++) if (map.grid[i] === T.wall) map.grid[i] = T.rubble;
@@ -153,6 +193,7 @@ export function finishMap(map) {
   map.wallCells = [];
   for (let i = 0; i < map.grid.length; i++) if (map.grid[i] === T.wall) map.wallCells.push(i);
   map.hasWalls = map.wallCells.length > 0;
+  map.hasHaze = map.surf.some((v) => v === S.haze);
   return map;
 }
 
@@ -166,7 +207,8 @@ export const rampAt = (map, x, y) => { const i = cellIndex(map, x, y); return i 
 
 // Can a soldier step from fine cell a to fine cell b?
 // Walls block everyone on foot or in a tank (jetpacks fly over them).
-export const canStep = (map, a, b) => a < 0 || b < 0 || (map.grid[b] !== T.wall && (map.elev[a] === map.elev[b] || map.ramp[a] === 1 || map.ramp[b] === 1));
+// Deep water stops everyone on foot or in a tank (you can always wade out of it).
+export const canStep = (map, a, b) => a < 0 || b < 0 || (map.grid[b] !== T.wall && !(map.surf && map.surf[b] === S.deep) && (map.elev[a] === map.elev[b] || map.ramp[a] === 1 || map.ramp[b] === 1));
 
 function addHighGround(map, g, cfg, [A, B]) {
   const hc = cfg.map.hills;
@@ -238,7 +280,8 @@ function addHighGround(map, g, cfg, [A, B]) {
 // Can every site and the far deployment be reached from the ISA deployment?
 function connected(map) {
   const n = map.elev.length, seen = new Uint8Array(n);
-  const start = cellIndex(map, 190, map.height / 2);
+  const st0 = map.deploy ? map.deploy[0].platoons[1] : { x: 190, y: map.height / 2 };
+  const start = cellIndex(map, st0.x, st0.y);
   const q = [start];
   seen[start] = 1;
   while (q.length) {
@@ -251,12 +294,14 @@ function connected(map) {
       if (!seen[j] && canStep(map, i, j)) { seen[j] = 1; q.push(j); }
     }
   }
-  const targets = [...map.sites.map((s) => [s.x, s.y]), [map.width - 190, map.height / 2]];
+  const far = map.deploy ? map.deploy[1].platoons.map((p) => [p.x, p.y]) : [[map.width - 190, map.height / 2]];
+  const targets = [...map.sites.map((s) => [s.x, s.y]), ...far];
   return targets.every(([x, y]) => seen[cellIndex(map, x, y)]);
 }
 
-export function siteAt(id, kind, p, r) {
+export function siteAt(id, kind, p, r, name) {
   const names = { comms: 'comms post', arc: 'arc tower', mg1: 'MG nest', mg2: 'MG nest' };
+  if (name) names[id] = name;
   return { id, kind, name: names[id] || id, x: Math.round(p.x), y: Math.round(p.y), r, owner: null, capSide: null, cap: 0, fireCd: 0 };
 }
 
@@ -322,7 +367,7 @@ export function findCover(map, x, y, radius, score, mirror = false) {
   let best = null, bestScore = -Infinity;
   forCells(map, x - radius, y - radius, x + radius, y + radius, (i, cx, cy) => {
     const t = map.grid[i];
-    if (t === T.open || t === T.wall || map.wire[i] > 0) return;
+    if (t === T.open || t === T.wall || map.wire[i] > 0 || (map.surf && map.surf[i] === S.deep)) return;
     if ((cx - x) ** 2 + (cy - y) ** 2 > radius * radius) return;
     const s = score(cx, cy, t);
     if (s > bestScore || (mirror && s === bestScore)) { bestScore = s; best = { x: cx, y: cy }; }
