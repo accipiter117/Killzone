@@ -10,10 +10,17 @@ export const SPRITES = { ready: false, units: {} };
 export function loadUnitSprites(base = 'assets/sprites/') {
   return Promise.all(Object.entries(UNITS).map(async ([key, file]) => {
     const meta = await (await fetch(`${base}${file}.json`)).json();
-    const img = new Image();
-    img.src = base + meta.image;
-    await img.decode();
-    SPRITES.units[key] = { meta, img };
+    // The full size atlas plus its smaller copies (half and quarter size)
+    // for zooming out; all loaded up front so switching between them is
+    // instant. Older atlases without copies just have the one level.
+    const levels = [{ image: meta.image, shrink: 1, frames: meta.frames }, ...(meta.levels || [])];
+    const imgs = await Promise.all(levels.map(async (l) => {
+      const img = new Image();
+      img.src = base + l.image;
+      await img.decode();
+      return { img, shrink: l.shrink, frames: l.frames };
+    }));
+    SPRITES.units[key] = { meta, img: imgs[0].img, levels: imgs };
   })).then(() => { SPRITES.ready = true; }).catch(() => { SPRITES.ready = false; });
 }
 
@@ -41,8 +48,8 @@ export function dirFromAngle(a) {
 const FRAME = { walk1: 'run1', walk2: 'run2', walk3: 'run3', walk4: 'run4', fall1: 'hit', fall2: 'fall' };
 export const sheetFrame = (f) => FRAME[f] || f;
 
-// A standing soldier in the sheets is this many pixels tall; the code-drawn
-// troopers are about 80, so the new sprites are scaled to match.
+// The code-drawn troopers are about this many pixels tall; the sprites are
+// scaled to match (whatever height their atlas was cut at).
 const SIZE = 80;
 
 // Tanks: the side view is drawn this many code-drawn tank pixels long, so
@@ -57,13 +64,28 @@ export const tankScale = (key, ps) => {
 // Draw a frame with its feet at (x, y); s is the code-drawn trooper scale
 // (or, with k given, the exact sprite scale). Returns the top of the drawn
 // figure, or false if the frame is missing.
+//
+// Level of detail: the atlas comes in a full size and smaller copies. Each
+// draw picks the smallest copy that still has at least one of its pixels
+// for every screen pixel, so zoomed in shows the full detail and zoomed
+// out uses a properly shrunk copy (no shimmer, less work). Shrinking is
+// smoothed; enlarging keeps hard pixels.
 export function drawUnit(g, key, frame, dir, x, y, s, k = 0) {
   const u = SPRITES.units[key];
   if (!u) return false;
-  const r = u.meta.frames[`${sheetFrame(frame)}:${dir}`];
-  if (!r) return false;
-  const [sx, sy, w, h, fx, fy] = r;
+  const name = `${sheetFrame(frame)}:${dir}`;
+  if (!u.meta.frames[name]) return false;
   k = k || (s * SIZE) / u.meta.height;
-  g.drawImage(u.img, sx, sy, w, h, x - fx * k, y - fy * k, w * k, h * k);
-  return y - fy * k;
+  const m = g.getTransform();
+  const screen = k * Math.hypot(m.a, m.b); // screen pixels per full size atlas pixel
+  let lv = u.levels[0];
+  for (const l of u.levels) if (l.frames[name] && screen * l.shrink <= 1.001) lv = l;
+  const [sx, sy, w, h, fx, fy] = lv.frames[name];
+  const kk = k * lv.shrink;
+  const smooth = g.imageSmoothingEnabled;
+  g.imageSmoothingEnabled = screen * lv.shrink < 0.999;
+  if (g.imageSmoothingEnabled) g.imageSmoothingQuality = 'high';
+  g.drawImage(lv.img, sx, sy, w, h, x - fx * kk, y - fy * kk, w * kk, h * kk);
+  g.imageSmoothingEnabled = smooth;
+  return y - fy * kk;
 }

@@ -113,6 +113,8 @@
       const r = unit.meta.frames[`${f}:${d}`];
       if (!r) return false;
       const [sx, sy, w, h, fx, fy] = r;
+      s *= 76 / unit.meta.height; // the scales here were set for 76 pixel tall atlases
+      g.imageSmoothingEnabled = s < 1;
       g.drawImage(unit.img, sx, sy, w, h, Math.round(x - fx * s), Math.round(y - fy * s), Math.round(w * s), Math.round(h * s));
       return true;
     }

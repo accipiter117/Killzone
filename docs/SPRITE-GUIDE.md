@@ -72,7 +72,14 @@ bottom: [ROWS]. [RULES]"
    frame's foot point.
 3. Output: `assets/sprites/<faction>-<unit>.png` (atlas) and `.json`
    (frame rectangles and foot points, keyed `frame:direction`, direction 0
-   to 7 in the order above).
+   to 7 in the order above), plus `@2` and `@4` copies at half and quarter
+   size, listed under `levels` in the JSON. The full atlas is cut at up to
+   192 pixels standing (what a phone shows fully zoomed in), but never
+   enlarged past the size ChatGPT drew the sheet; the game picks the copy
+   that matches each soldier's size on screen, so zoomed out stays crisp.
+   Detail is limited by the art itself: ChatGPT's "pixel art" is drawn in
+   chunky blocks (each art pixel several sheet pixels wide), so briefs for
+   more detailed units must ask for fine pixel art (see below).
 4. Check the result in `sprite-review.html` before it goes into the game.
 
 ## In the game
@@ -82,7 +89,8 @@ bottom: [ROWS]. [RULES]"
 - Frames: stand; run1 to run4 while moving; fire and aim alternating while
   shooting; prone1 and prone2 when pinned (alternating while crawling); hit,
   fall, dead when killed; throw1 to throw3 for a grenade.
-- Battle size: a standing soldier is about 34 world units tall.
+- Battle size: a standing soldier is about 34 world units tall (about 100
+  screen pixels, 200 real pixels on a phone, when fully zoomed in).
 - Atlases in the game (src/render/unit-sprites.js): `isa-rifle-blue` (the ISA
   set with its grey armour tinted towards ISA blue, the owner's chosen look),
   `hgh-rifle`, and `grapple`. Jetpack troopers keep the code-drawn look
