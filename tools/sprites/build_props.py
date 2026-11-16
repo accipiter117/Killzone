@@ -18,9 +18,15 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'source')
 OUT = os.path.join(HERE, '..', '..', 'assets', 'sprites', 'props')
-WIDTH = {'dropship': 440}  # pixels wide in the atlas, per prop (default 160)
+WIDTH = {'dropship': 440, 'pillbox': 110}  # pixels wide in the atlas, per prop (default 160)
 # Sheets holding several props side by side: split at the gaps, left to right.
-SPLIT = {'tankwrecks': ['tankwreck-isa', 'tankwreck-hgh']}
+SPLIT = {
+    'tankwrecks': ['tankwreck-isa', 'tankwreck-hgh'],
+    'containers': ['container-orange', 'container-teal', 'container-mustard', 'container-grey'],
+    'freight': ['traincar-red', 'traincar-green', 'traincar-grey', 'tanker'],
+}
+for _n in SPLIT['containers']: WIDTH[_n] = 240
+for _n in SPLIT['freight']: WIDTH[_n] = 280
 
 
 def cut(im, crop=True):
