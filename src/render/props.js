@@ -15,7 +15,24 @@ const SHADOW = 'rgba(14,12,9,0.42)';
 // tools/sprites/build_props.py). A prop whose picture has loaded is drawn
 // from it, at its width and the picture's own proportions; until then (or
 // if it fails) the code-drawn art below stands in.
-const PAINTED = ['dropship', 'tankwreck-isa', 'tankwreck-hgh'];
+const PAINTED = ['dropship', 'tankwreck-isa', 'tankwreck-hgh', 'container-orange', 'container-teal', 'container-mustard', 'container-grey',
+  'traincar-red', 'traincar-green', 'traincar-grey', 'tanker', 'pillbox'];
+// Which picture a prop uses: by kind, and for containers and freight cars
+// by the colour the map builder gave it (anything else falls to a near one).
+const BY_COL = {
+  container: { '#7a4a2c': 'orange', '#3f6f74': 'teal', '#a08a3c': 'mustard', '#6c6f73': 'grey', '#4a4f52': 'grey' },
+  traincar: { '#6a3b2a': 'red', '#5b3326': 'red', '#4b5a3a': 'green', '#3f4a52': 'grey' },
+};
+const DEFAULT_COL = { container: 'orange', traincar: 'red' };
+function pictureOf(p) {
+  if (p.kind === 'tankwreck') return `tankwreck-${p.side || 'isa'}`;
+  if (BY_COL[p.kind]) return `${p.kind}-${BY_COL[p.kind][p.col] || DEFAULT_COL[p.kind]}`;
+  return p.kind;
+}
+// How a picture sits on its footprint: scale the prop's width (keeping the
+// picture's proportions), or stretch to w x h times these factors (long
+// thin props whose pictures are stockier than their footprint).
+const STRETCH = { container: [1, 1.45], traincar: [1, 1.6], tanker: [1, 1.7], pillbox: [1.2, 1.2] };
 const PROP_IMG = {};
 const PAINT_SCALE = { tankwreck: 1.3 };
 export function loadPropArt(base = 'assets/sprites/props/') {
@@ -47,9 +64,11 @@ export function drawProps(g, state, vb, lift, now) {
     if (left < 0.45) { g.rotate(p.ang || 0); remains(g, p); g.restore(); continue; }
     // Shadow first (not rotated, so it always falls down and to the right).
     // Tank wrecks come in each side's colours (p.side: 'isa' or 'hgh').
-    const img = PROP_IMG[p.kind === 'tankwreck' ? `tankwreck-${p.side || 'isa'}` : p.kind];
+    const img = PROP_IMG[pictureOf(p)];
     // Painted wrecks are drawn a little larger, to match the live tanks.
-    const w = img ? p.w * (PAINT_SCALE[p.kind] || 1) : p.w, ih = img ? (w * img.height) / img.width : 0;
+    const st = STRETCH[p.kind];
+    const w = img ? p.w * (st ? st[0] : PAINT_SCALE[p.kind] || 1) : p.w;
+    const ih = img ? (st ? p.h * st[1] : (w * img.height) / img.width) : 0;
     if (!p.flat) {
       g.fillStyle = SHADOW; g.save(); g.translate(4, 5); g.rotate(p.ang || 0);
       if (img) { g.beginPath(); g.ellipse(0, 0, w * 0.42, ih * 0.36, 0, 0, 6.3); g.fill(); } else shape(g, p);
