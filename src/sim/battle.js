@@ -6,6 +6,7 @@ import { generateMap, forCells, T } from './map.js';
 import { updateVision, updateFiring, updateSuppression } from './combat.js';
 import { updateSites, updateEmplacements, updateStrikes, updateSmokes } from './features.js';
 import { thinkSquad, moveSoldiers, resetPlans, updateMedics, updateRoutes } from './squads.js';
+import { updateDigging } from './digging.js';
 import { updateThrows, updateDives } from './abilities.js';
 import { platoonAlive, feed, sideName } from './util.js';
 import { createVehicles, updateVehicles, updateCharges, updateVehicleVision } from './vehicles.js';
@@ -153,6 +154,7 @@ export function step(state) {
 
   updateRoutes(state);
   updateMedics(state);
+  updateDigging(state, dt);
   moveSoldiers(state, dt);
   updateVehicles(state, dt);
   updateFiring(state, dt);

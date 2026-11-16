@@ -31,7 +31,7 @@ export function ingest(fxs, events, now) {
     // screen (fxs.ly maps a ground point to its screen y). Craters and
     // sandbags are painted by the terrain itself, so they stay as they are.
     let e = e0;
-    if (fxs.ly && e.type !== 'crater' && e.type !== 'sandbags') {
+    if (fxs.ly && e.type !== 'crater' && e.type !== 'sandbags' && e.type !== 'dug') {
       e = { ...e0 };
       if (e.y !== undefined) e.y = fxs.ly(e.x, e.y);
       if (e.y1 !== undefined) e.y1 = fxs.ly(e.x1, e.y1);
@@ -107,6 +107,9 @@ export function ingest(fxs, events, now) {
         break;
       case 'sandbags':
         if (fxs.terrain) fxs.terrain.addSandbags(e.cells);
+        break;
+      case 'dug':
+        if (fxs.terrain && fxs.terrain.addDug) fxs.terrain.addDug(e.cells, e.kind);
         break;
       case 'mark':
         fxs.marks.push({ x: e.x, y: e.y, r: e.r, t0: now, life: 0.8 });

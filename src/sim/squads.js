@@ -374,7 +374,7 @@ export function thinkSquad(state, sq) {
     if (!sq.holdSpot) sq.holdSpot = findCover(state.map, c.x, c.y, 90, (x, y) => -Math.hypot(x - c.x, y - c.y) + 2.5 * state.cfg.squad.highCoverBonus * heightAt(state.map, x, y), sq.side === 1) || c;
     const there = dist(c, sq.holdSpot) < cfg.squad.arriveDist * 1.5;
     sq.mode = 'hold';
-    sq.status = there ? (firing ? 'Dug in, firing' : 'Dug in') : 'Moving to cover';
+    sq.status = there ? (firing ? 'Holding, firing' : 'Holding') : 'Moving to cover';
     formUp(state, sq, list, sq.holdSpot, there);
     return;
   }
