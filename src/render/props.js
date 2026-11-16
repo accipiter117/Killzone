@@ -10,6 +10,20 @@
 import { T } from '../sim/map.js';
 
 const SHADOW = 'rgba(14,12,9,0.42)';
+
+// Painted set pieces from the owner's ChatGPT pictures (cut by
+// tools/sprites/build_props.py). A prop whose picture has loaded is drawn
+// from it, at its width and the picture's own proportions; until then (or
+// if it fails) the code-drawn art below stands in.
+const PAINTED = ['dropship'];
+const PROP_IMG = {};
+export function loadPropArt(base = 'assets/sprites/props/') {
+  for (const name of PAINTED) {
+    const img = new Image();
+    img.onload = () => { PROP_IMG[name] = img; };
+    img.src = `${base}${name}.png`;
+  }
+}
 const HI = 'rgba(255,248,226,0.22)';
 
 // How much of a solid prop is still standing (1 for low props).
@@ -33,7 +47,12 @@ export function drawProps(g, state, vb, lift, now) {
     // Shadow first (not rotated, so it always falls down and to the right).
     if (!p.flat) { g.fillStyle = SHADOW; g.save(); g.translate(4, 5); g.rotate(p.ang || 0); shape(g, p); g.restore(); }
     g.rotate(p.ang || 0);
-    (ART[p.kind] || box)(g, p, now);
+    const img = PROP_IMG[p.kind];
+    if (img) {
+      const h = (p.w * img.height) / img.width;
+      g.imageSmoothingEnabled = true;
+      g.drawImage(img, -p.w / 2, -h / 2, p.w, h);
+    } else (ART[p.kind] || box)(g, p, now);
     g.restore();
   }
 }
