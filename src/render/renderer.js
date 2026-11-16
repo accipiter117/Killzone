@@ -10,6 +10,8 @@ import { getSprite25, W25, H25, ANCHOR_X, ANCHOR_Y } from './sprites25d.js';
 import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './pixel-troopers.js';
 import { getTank, TANK_W, TANK_H, TANK_FOOT } from './tanks.js';
 import { liftAt } from './terrain-tilt.js';
+import { drawProps } from './props.js';
+import { drawHaze, drawGates } from './map-live.js';
 import { SPRITES, FLAGS, drawUnit, dirFromAngle, tankScale } from './unit-sprites.js';
 import { fx } from './fx-random.js';
 
@@ -79,12 +81,15 @@ export function drawFrame(g, r, state, cam, opts) {
   g.drawImage(terrain.canvas, 0, 0);
   drawWire(g, r, state, cam);
   drawWalls(g, state, cam, opts);
+  drawGates(g, state, now, px, opts);
+  drawProps(g, state, viewBounds(cam), opts.tilt ? (x, y) => liftAt(state.map, x, y) : () => 0, now);
   drawSitesWorld(g, state, now, px, fxs);
   drawBodies(g, r, state, fxs, now, px, opts.view);
   drawTanks(g, state, now);
   drawGrid(g, state, cam, opts, px);
   drawOrderLine(g, state, opts, px);
   drawSoldiers(g, r, state, opts, px);
+  drawHaze(g, state, now, viewBounds(cam));
   drawSmoke(g, fxs, state.smokes, now, state.tick, state.cfg.tickRate);
   drawEffects(g, fxs, now, px);
   drawStrikes(g, state, now, px, opts);
@@ -359,6 +364,17 @@ const WALL_TONES = {
   industrial: [['#8a4b36', '#6e3a2a'], ['#3f6f74', '#2f5458'], ['#a08a3c', '#7d6b2c'], ['#6c6f73', '#505357']],
   city: [['#857c6e', '#665e52'], ['#7a6a5c', '#5c5045'], ['#8e877a', '#6d675c']],
 };
+// By wall kind (map.wallKind): concrete, Helghast brick, rock, steel, (prop:
+// drawn by props.js), blast door, checkpoint barrier.
+const KIND_TONES = [
+  [['#858277', '#615e56'], ['#7b786e', '#5a574f']],
+  [['#6e4c3f', '#4e362c'], ['#634438', '#463027']],
+  [['#776d5b', '#53493c'], ['#6b6252', '#4b4337']],
+  [['#62676b', '#45494d'], ['#5a5f63', '#3f4347']],
+  null,
+  [['#5d6366', '#3b4043']],
+  [['#9a3326', '#62201a']],
+];
 
 // Walls are drawn live, cell by cell, so knocked-down sections disappear at
 // once (and leave rubble). From above: a shadow, the top, and a bevel. In
@@ -369,7 +385,10 @@ function drawWalls(g, state, cam, opts) {
   const vb = viewBounds(cam);
   const c = map.cell, cols = map.cols;
   const tones = WALL_TONES[map.kind] || WALL_TONES.city;
+  const wk = map.wallKind;
   const isWall = (i) => map.grid[i] === T.wall;
+  // Set-piece walls are drawn whole by drawProps.
+  const drawn = (i) => isWall(i) && !(wk && wk[i] === 4);
   const vis = [];
   for (const i of map.wallCells) {
     const x = (i % cols) * c, y = ((i / cols) | 0) * c;
@@ -386,28 +405,38 @@ function drawWalls(g, state, cam, opts) {
       g.fillRect(x + 5 - (i % 2) * 3, y + 6, 4, 3);
     }
   }
-  const tone = (i) => tones[Math.floor((i % cols) / 7 + Math.floor(i / cols / 3) * 3) % tones.length];
+  const tone = (i) => {
+    const set = wk && map.kindedWalls ? KIND_TONES[wk[i]] : tones;
+    return set[Math.floor((i % cols) / 7 + Math.floor(i / cols / 3) * 3) % set.length];
+  };
+  const stripes = (i, x, y) => {
+    if (!wk) return;
+    if (wk[i] === 5 && (i % cols) % 2 === 0) { g.fillStyle = '#c9a227'; g.fillRect(x + 2, y + 2, c - 4, 2); }
+    if (wk[i] === 6) { g.fillStyle = '#e8e2d0'; if ((i % cols + ((i / cols) | 0)) % 2) g.fillRect(x, y, c, c); }
+  };
   if (opts.tilt) {
     const WH = 14;
     for (const i of vis) {
-      if (!isWall(i)) continue;
+      if (!drawn(i)) continue;
       const x = (i % cols) * c, y0 = ((i / cols) | 0) * c, y = LY(x + c / 2, y0 + c / 2) - c / 2;
       const [top, side] = tone(i);
       if (!isWall(i + cols)) { g.fillStyle = side; g.fillRect(x, y + c - WH, c, WH); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x, y + c - 3, c, 3); }
       g.fillStyle = top;
       g.fillRect(x, y - WH, c, c);
+      stripes(i, x, y - WH);
       if (!isWall(i - cols)) { g.fillStyle = 'rgba(255,248,226,0.3)'; g.fillRect(x, y - WH, c, 1.5); }
     }
     return;
   }
   g.fillStyle = 'rgba(20,18,14,0.4)';
-  for (const i of vis) if (isWall(i)) g.fillRect((i % cols) * c + 3, ((i / cols) | 0) * c + 3, c, c);
+  for (const i of vis) if (drawn(i)) g.fillRect((i % cols) * c + 3, ((i / cols) | 0) * c + 3, c, c);
   for (const i of vis) {
-    if (!isWall(i)) continue;
+    if (!drawn(i)) continue;
     const x = (i % cols) * c, y = ((i / cols) | 0) * c;
     const [top, side] = tone(i);
     g.fillStyle = top;
     g.fillRect(x, y, c, c);
+    stripes(i, x, y);
     g.fillStyle = side;
     if (!isWall(i + 1)) g.fillRect(x + c - 2, y, 2, c);
     if (!isWall(i + cols)) g.fillRect(x, y + c - 2, c, 2);
@@ -1142,6 +1171,16 @@ function drawSiteIcons(g, state, cam, now = 0) {
         g.beginPath(); g.moveTo(0, 8); g.lineTo(0, -6); g.stroke();
         g.beginPath(); g.arc(0, -6, 5, -2.6, -0.5); g.stroke();
         g.beginPath(); g.arc(0, -6, 9, -2.5, -0.6); g.stroke();
+      } else if (s.kind === 'lever') {
+        // A lever in its quadrant.
+        g.beginPath(); g.arc(0, 5, 7, Math.PI, 0); g.stroke();
+        g.beginPath(); g.moveTo(0, 5); g.lineTo(5, -6); g.stroke();
+        g.beginPath(); g.arc(5, -6, 2.2, 0, Math.PI * 2); g.fill();
+      } else if (s.kind === 'depot') {
+        // A tank silhouette: hull, turret, gun.
+        g.fillRect(-8, 0, 16, 6);
+        g.fillRect(-4, -4, 8, 5);
+        g.fillRect(3, -3, 7, 2);
       }
     }
     g.restore();

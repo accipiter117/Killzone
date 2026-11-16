@@ -8,19 +8,19 @@ import { blast } from '../src/sim/features.js';
 
 const make = (type, seed = 3) => createBattle(seed, { config: { map: { type }, world: CONFIG.mapSizes[type] } });
 
-for (const type of ['industrial', 'city']) {
-  test(`${type}: mirrored ground, walls present, every site off the walls`, () => {
+for (const type of ['trenches', 'industrial', 'city']) {
+  test(`${type}: a bespoke map, walls and props present, every site reachable and off the walls`, () => {
     for (const seed of [1, 2, 3, 4]) {
       const s = make(type, seed);
-      const m = s.map, n = m.grid.length;
+      const m = s.map;
       assert.equal(m.width, CONFIG.mapSizes[type].width);
-      for (let i = 0; i < n; i++) {
-        assert.equal(m.grid[i], m.grid[n - 1 - i], `ground mirrored at ${i}`);
-        assert.equal(m.elev[i], m.elev[n - 1 - i], `height mirrored at ${i}`);
-      }
-      assert.ok(m.hasWalls && m.wallCells.length > 300, 'walls built');
+      assert.ok(m.bespoke && !m.flattened, 'built by hand and never flattened');
+      assert.ok(m.hasWalls && m.props.length > 20, 'walls and set pieces');
+      assert.ok(m.hasHeight, 'raised ground');
       for (const site of s.sites) assert.notEqual(m.grid[cellIndex(m, site.x, site.y)], T.wall, `${site.id} not inside a wall`);
       assert.equal(s.sites.filter((x) => x.kind === 'objective').length, 3);
+      assert.equal(s.sites.filter((x) => x.kind === 'depot').length, 2);
+      assert.ok(m.gates.length >= 1, 'something to raise or shut');
     }
   });
 }

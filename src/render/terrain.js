@@ -7,6 +7,7 @@
 
 import { makeFxRandom } from './fx-random.js';
 import { T } from '../sim/map.js';
+import { paintGround } from './ground-art.js';
 
 const P = {
   ground: '#595747',
@@ -61,6 +62,8 @@ export function buildTerrain(map, seedInt) {
     g.fillRect(x0, 0, x1 - x0, map.height);
   }
 
+  paintGround(g, map, r, () => 0, 'under');
+
   // Raised ground, level by level: shadow, cliff face, then the top.
   const disc = (x, y, rad, col) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill(); };
   const R = c * 0.95; // overlapping discs give smooth, rounded edges
@@ -83,6 +86,7 @@ export function buildTerrain(map, seedInt) {
     }
   }
 
+  paintGround(g, map, r, () => 0, 'top');
   for (const cr of map.craters) drawCrater(g, cr);
 
   // Rubble: a few clean stones per cell.

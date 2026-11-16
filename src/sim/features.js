@@ -137,7 +137,7 @@ export function breakWalls(state, x, y, r) {
   if (!map.hasWalls || r <= 0) return;
   const cells = [];
   forCells(map, x - r, y - r, x + r, y + r, (i, cx, cy) => {
-    if (map.grid[i] === T.wall && (cx - x) ** 2 + (cy - y) ** 2 <= r * r) { map.grid[i] = T.rubble; cells.push(i); }
+    if (map.grid[i] === T.wall && !(map.gateCell && map.gateCell[i]) && (cx - x) ** 2 + (cy - y) ** 2 <= r * r) { map.grid[i] = T.rubble; cells.push(i); }
   });
   if (!cells.length) return;
   if (!map.broken) map.broken = new Uint8Array(map.grid.length);

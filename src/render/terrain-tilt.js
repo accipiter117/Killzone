@@ -12,6 +12,7 @@
 import { makeFxRandom } from './fx-random.js';
 import { T } from '../sim/map.js';
 import { GROUND, paintDug, repaintDug } from './terrain.js';
+import { paintGround } from './ground-art.js';
 
 export const LIFT = 20; // screen rise per level of height, in world units
 
@@ -95,6 +96,8 @@ export function buildTiltTerrain(map, seedInt) {
     }
   }
 
+  paintGround(g, map, r, () => 0, 'under');
+
   // Raised ground, level by level. Each level's top is drawn LIFT higher per
   // level, with a tall banded cliff face filling the drop beneath it.
   const disc = (x, y, rad, col) => { g.fillStyle = col; g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill(); };
@@ -128,6 +131,7 @@ export function buildTiltTerrain(map, seedInt) {
     }
   }
 
+  paintGround(g, map, r, (x, y) => liftAt(map, x, y), 'top');
   for (const cr of map.craters) drawCrater(g, cr, liftAt(map, cr.x, cr.y));
   // Rubble: a few clean stones per cell, on whatever level they sit.
   for (let i = 0; i < map.grid.length; i++) {

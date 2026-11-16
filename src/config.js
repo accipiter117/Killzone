@@ -17,10 +17,10 @@ export const CONFIG = {
     margin: { narrow: 0.2, clear: 0.6 }, // score gap as a share of total score: below narrow = narrow win, below clear = clear win, else crushing
   },
 
-  world: { width: 3000, height: 1100, cell: 10 },
+  world: { width: 3000, height: 1200, cell: 10 },
   // Each map's size: the trench line is long and thin; the built-up maps are
   // deeper (the view can be turned to suit).
-  mapSizes: { trenches: { width: 3000, height: 1100 }, industrial: { width: 2400, height: 1500 }, city: { width: 2200, height: 1700 } },
+  mapSizes: { trenches: { width: 3000, height: 1200 }, industrial: { width: 2600, height: 1500 }, city: { width: 2400, height: 1700 } },
 
   map: {
     trenchX: [300, 360], // ISA trench centre line (Helghast is mirrored)
@@ -64,7 +64,7 @@ export const CONFIG = {
     amendSec: 5, // a movement order can be changed free for this long after giving it
     squadFollowUpSec: 10, // after a paid platoon order, its squads can be placed one by one free for this long (part of the same order)
     commsRegenMult: 1.75, // owning the comms post speeds refill by this much
-    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0, vescort: 1, focus: 1, squad: 1, holdfire: 0, go: 0, deploy: 0 },
+    cost: { move: 1, take: 1, hold: 1, fallback: 1, stance: 0, artillery: 3, smoke: 2, ability: 0, reinforce: 2, vmove: 1, vability: 0, vescort: 1, gate: 1, callin: 0, focus: 1, squad: 1, holdfire: 0, go: 0, deploy: 0 },
     maxWaypoints: 4, // stops on a route before its last point
     maxDelaySec: 30, // longest delay for a timed barrage
   },
@@ -136,6 +136,29 @@ export const CONFIG = {
     wall: { hit: 0.6, supp: 0.4, speed: 1 }, // never stood in; listed so every ground type has an entry
   },
   wire: { speedMult: 0.22 },
+  // Ground surfaces (src/sim/map.js S): speed on foot and for tanks, how
+  // much a route search dislikes them, and vent haze hiding troops in it.
+  // Roads are the quick way across but give no cover of their own; a ford is
+  // slow and in the open; mud and ash bog drag tanks most of all.
+  surface: {
+    ground: { speed: 1, tank: 1, cost: 1 },
+    road: { speed: 1.25, tank: 1.45, cost: 0.75 },
+    ford: { speed: 0.5, tank: 0.55, cost: 2.4 },
+    deep: { speed: 0.3, tank: 0.3, cost: 99 },
+    mud: { speed: 0.75, tank: 0.5, cost: 1.5 },
+    haze: { speed: 1, tank: 1, cost: 1, hide: 0.45, blockLen: 70 },
+    deck: { speed: 1.25, tank: 1.45, cost: 0.75 },
+  },
+  // Gates worked from a lever post: lift bridges, blast doors, checkpoint
+  // barriers. The side holding the lever can raise or lower (close or open)
+  // them; it takes a few seconds and waits for the way to be clear.
+  gates: { moveSec: 4, cost: 1 },
+  // Call-ins from a vehicle depot you hold: what can be brought onto the
+  // field, for how many order points, and how many of it you may have out
+  // at once. Aircraft and other support will join this list.
+  callins: {
+    tank: { label: 'Tank', cost: 3, max: 1, site: 'depot' },
+  },
   // Digging in (src/sim/digging.js): a squad holding still this long starts
   // to dig (a Dig in order starts at once and digs faster). Levels at these
   // seconds of digging: foxholes, then sandbags ahead, then a trench line.
@@ -272,7 +295,7 @@ export const CONFIG = {
 
   ai: {
     thinkSec: 4,
-    siteValue: { objective: 10, comms: 4, mg: 3, arc: 3 },
+    siteValue: { objective: 10, comms: 4, mg: 3, arc: 3, lever: 3, depot: 2 },
     threatRadius: 320, // enemies seen this close to a site count as massing on it
     threatValue: 0.6, // extra value per enemy soldier massing on a site
     reinforceBelow: 0.65, tankRetreatHp: 0.35, tankRetreatX: 200, tankBehind: 90, tankReorderDist: 120, focusRange: 380, focusEverySec: 30, // the AI reinforces a platoon below this strength

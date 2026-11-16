@@ -6,14 +6,14 @@
 // on the map for whoever holds the spot later. Pinned squads stop digging;
 // moving off starts the count again elsewhere (the earthworks stay).
 
-import { T, cellIndex, forCells } from './map.js';
+import { T, S, cellIndex, forCells } from './map.js';
 import { members, centroid } from './util.js';
 
 const STILL_MODES = new Set(['idle', 'hold', 'arrived']);
 export const DIG_LEVELS = ['', 'foxholes', 'sandbags', 'trench'];
 
 // Ground that can be dug or built on (never walls, ruins, trenches or wire).
-const diggable = (map, i) => i >= 0 && map.wire[i] === 0 && (map.grid[i] === T.open || map.grid[i] === T.rubble || map.grid[i] === T.crater);
+const diggable = (map, i) => i >= 0 && map.wire[i] === 0 && (!map.surf || map.surf[i] === S.ground || map.surf[i] === S.mud || map.surf[i] === S.haze) && (map.grid[i] === T.open || map.grid[i] === T.rubble || map.grid[i] === T.crater);
 
 export function updateDigging(state, dt) {
   if (state.tb) return;

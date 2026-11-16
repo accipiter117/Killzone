@@ -1,3 +1,4 @@
+import { MIRROR } from './helpers.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMatch, runToEnd } from '../src/sim/match.js';
@@ -37,7 +38,7 @@ test('both AI controllers decide from the same moment (no second mover edge)', (
   // one side all six once.)
   const wins = [0, 0];
   for (let seed = 1; seed <= 12; seed++) {
-    const r = runToEnd(createMatch({ seed, controllers: [createAI(0), createAI(1)] }));
+    const r = runToEnd(createMatch({ seed, options: { config: MIRROR }, controllers: [createAI(0), createAI(1)] }));
     if (r.winner !== null) wins[r.winner]++;
   }
   assert.ok(wins[0] >= 2 && wins[1] >= 2, `wins ${wins}`);
