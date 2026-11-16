@@ -16,6 +16,7 @@ import { buildTiltTerrain, liftAt, LIFT } from './render/terrain-tilt.js';
 import { createRenderer, drawFrame, drawMinimap } from './render/renderer.js';
 import { loadUnitSprites, loadFlags } from './render/unit-sprites.js';
 import { createHelghanGlobe } from './ui/helghan-globe.js';
+import { loadPropArt } from './render/props.js';
 import { callinBlocked } from './sim/callins.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
 import { createAudio, unlockAudio, newFrame, playEvents, uiClick, setMix } from './render/audio.js';
@@ -1026,6 +1027,7 @@ showRotateHint();
 // troopers stand in until they are ready.
 loadUnitSprites();
 loadFlags();
+loadPropArt();
 const params = new URLSearchParams(location.search);
 const urlSeed = params.get('seed');
 // A link with a seed opens that battle straight away; otherwise the start
