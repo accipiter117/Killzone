@@ -30,7 +30,7 @@ export function callIn(state, side, what) {
     const v = state.vehicles.find((o) => o.side === side);
     const t = state.cfg.tank;
     // The old tank's burnt hull stays where it died.
-    if (!v.absent && !v.alive) state.map.props.push({ kind: 'tankwreck', x: v.x, y: v.y, w: 64, h: 40, ang: v.facing > 0 ? 0 : Math.PI, col: '#3d3a31', turret: 0.9 });
+    if (!v.absent && !v.alive) state.map.props.push({ kind: 'tankwreck', x: v.x, y: v.y, w: 64, h: 40, ang: v.facing > 0 ? 0 : Math.PI, side: side === 0 ? 'isa' : 'hgh', col: '#3d3a31', turret: 0.9 });
     Object.assign(v, {
       x: depot.x, y: depot.y, hp: t.hp, maxHp: t.hp, alive: true, absent: false,
       order: { type: 'idle' }, pending: null, path: null, pathTo: null, hullDown: false,

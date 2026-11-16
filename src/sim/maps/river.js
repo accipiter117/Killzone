@@ -114,6 +114,8 @@ export function riverMap(seedInt, cfg) {
   t.building(2760, 880, 2900, 990, [['w', 0.5, 70]], WK.metal);
   t.prop('truck', 2660, 1040, 48, 22, 0);
   t.prop('container', 2660, 900, 60, 24, 0.2, { solid: true, col: '#4a4f52' });
+  // A Helghast tank knocked out by the ISA bombardment, behind the bluff.
+  t.prop('tankwreck', 2300, 780, 64, 40, 2.6, { solid: true, side: 'hgh' });
   t.prop('hedgehog', 2200, 380, 22, 22); t.prop('hedgehog', 2240, 860, 22, 22); t.prop('hedgehog', 2180, 760, 22, 22);
   t.prop('stack', 2860, 300, 44, 44, 0, { solid: true });
   t.prop('pylon', 2270, 150, 18, 18, 0);

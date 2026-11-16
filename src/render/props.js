@@ -15,8 +15,9 @@ const SHADOW = 'rgba(14,12,9,0.42)';
 // tools/sprites/build_props.py). A prop whose picture has loaded is drawn
 // from it, at its width and the picture's own proportions; until then (or
 // if it fails) the code-drawn art below stands in.
-const PAINTED = ['dropship'];
+const PAINTED = ['dropship', 'tankwreck-isa', 'tankwreck-hgh'];
 const PROP_IMG = {};
+const PAINT_SCALE = { tankwreck: 1.3 };
 export function loadPropArt(base = 'assets/sprites/props/') {
   for (const name of PAINTED) {
     const img = new Image();
@@ -45,13 +46,19 @@ export function drawProps(g, state, vb, lift, now) {
     g.translate(p.x, p.y - lift(p.x, p.y));
     if (left < 0.45) { g.rotate(p.ang || 0); remains(g, p); g.restore(); continue; }
     // Shadow first (not rotated, so it always falls down and to the right).
-    if (!p.flat) { g.fillStyle = SHADOW; g.save(); g.translate(4, 5); g.rotate(p.ang || 0); shape(g, p); g.restore(); }
+    // Tank wrecks come in each side's colours (p.side: 'isa' or 'hgh').
+    const img = PROP_IMG[p.kind === 'tankwreck' ? `tankwreck-${p.side || 'isa'}` : p.kind];
+    // Painted wrecks are drawn a little larger, to match the live tanks.
+    const w = img ? p.w * (PAINT_SCALE[p.kind] || 1) : p.w, ih = img ? (w * img.height) / img.width : 0;
+    if (!p.flat) {
+      g.fillStyle = SHADOW; g.save(); g.translate(4, 5); g.rotate(p.ang || 0);
+      if (img) { g.beginPath(); g.ellipse(0, 0, w * 0.42, ih * 0.36, 0, 0, 6.3); g.fill(); } else shape(g, p);
+      g.restore();
+    }
     g.rotate(p.ang || 0);
-    const img = PROP_IMG[p.kind];
     if (img) {
-      const h = (p.w * img.height) / img.width;
       g.imageSmoothingEnabled = true;
-      g.drawImage(img, -p.w / 2, -h / 2, p.w, h);
+      g.drawImage(img, -w / 2, -ih / 2, w, ih);
     } else (ART[p.kind] || box)(g, p, now);
     g.restore();
   }
