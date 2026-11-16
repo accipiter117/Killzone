@@ -46,7 +46,7 @@ export function kit(W, H, cell, kindName, seedInt, salt) {
     // A fixed bridge: a deck you can cross, drawn over the water.
     bridge(pts, hw) {
       pts = P(pts);
-      map.decals.push({ kind: 'road', pts, w: hw, style: 'concrete', lines: false });
+      map.decals.push({ kind: 'road', pts, w: hw, style: 'concrete', lines: false, cap: 'butt' });
       alongLine(pts, hw, (i) => { map.surf[i] = S.deck; });
     },
     river(pts, hw) {

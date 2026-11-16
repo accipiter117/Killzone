@@ -58,7 +58,7 @@ export function riverMap(seedInt, cfg) {
   t.sandbags(1260, 470, 40, 0); t.prop('crates', 1300, 520, 28, 20, 0, { low: true });
   t.prop('crates', 1180, 860, 42, 28, 0.4, { low: true });
   t.prop('deadtree', 300, 300, 30, 30); t.prop('deadtree', 400, 560, 26, 26); t.prop('deadtree', 1100, 1000, 30, 30);
-  // The Helghast checkpoint on the west bridge approach (objective B).
+  // The Helghast checkpoint on the west bridge approach, now abandoned.
   t.prop('jersey', 1470, 590, 70, 12, 0, { low: true });
   t.prop('jersey', 1470, 700, 70, 12, 0, { low: true });
   t.sandbags(1500, 646, 46, Math.PI);
@@ -67,7 +67,7 @@ export function riverMap(seedInt, cfg) {
 
   // ---- The crossings. -------------------------------------------------------
   // The lift bridge carries the highway; its deck is a gate.
-  t.road([[1708, 642], [1800, 640]], 26, 'asphalt');
+  t.road([[1708, 642], [2110, 640]], 26, 'asphalt');
   const bridge = t.gate({ id: 'bridge', kind: 'bridge', name: 'lift bridge', x: 1650, y: 642, w: 150, h: 48, lever: 'lever' });
   // North ford: a gravel bar.
   t.ford([[1560, 236], [1770, 222]], 36);
@@ -116,6 +116,7 @@ export function riverMap(seedInt, cfg) {
   t.prop('container', 2660, 900, 60, 24, 0.2, { solid: true, col: '#4a4f52' });
   t.prop('hedgehog', 2200, 380, 22, 22); t.prop('hedgehog', 2240, 860, 22, 22); t.prop('hedgehog', 2180, 760, 22, 22);
   t.prop('stack', 2860, 300, 44, 44, 0, { solid: true });
+  t.prop('pylon', 2270, 150, 18, 18, 0);
   t.prop('lamp', 2300, 640, 6, 6); t.prop('lamp', 2600, 540, 6, 6);
   t.craters(14, 2100, 40, 2960, 1160, 10, 20);
   t.debris(2100, 0, W, H, 0.03);
@@ -123,10 +124,11 @@ export function riverMap(seedInt, cfg) {
   // ---- Sites. ----------------------------------------------------------------------
   const objR = cfg.map.objectiveRadius, fR = cfg.map.featureRadius;
   t.site('A', 'objective', 630, 830, objR);
-  t.site('B', 'objective', 1480, 646, objR);
+  t.site('B', 'objective', 1800, 644, objR);
   t.site('C', 'objective', 2430, 400, objR);
   t.site('comms', 'comms', 820, 200, fR, 'comms mast');
-  t.site('arc', 'arc', 2160, 980, fR);
+  t.site('arc', 'arc', 1380, 250, fR, 'captured arc tower');
+  t.site('comms2', 'comms', 2250, 170, fR, 'relay mast');
   t.site('mg1', 'mg', 1260, 460, fR);
   t.site('mg2', 'mg', 1940, 830, fR);
   t.site('lever', 'lever', 1980, 555, fR, 'bridgehouse');
@@ -137,7 +139,7 @@ export function riverMap(seedInt, cfg) {
   t.petrol([[2340, 560], [1990, 1150], [1350, 1100], [2620, 700]]);
 
   t.deploy(0, [[260, 300], [230, 620], [270, 940]], [150, 760]);
-  t.deploy(1, [[2760, 280], [2790, 640], [2770, 1000]], [2880, 500]);
+  t.deploy(1, [[2640, 230], [2590, 640], [2570, 1000]], [2880, 500]);
   // Flanking routes for the AI: the ISA round by the north ford, the
   // Helghast by the south ford.
   t.lane(0, [1700, 230], 'C');

@@ -139,6 +139,8 @@ function decide(state, side, prof, memory) {
   const reserve = !ahead && !threatened && free.length >= 3 && homeObj ? free[free.length - 1] : null;
   if (reserve) {
     if (!(reserve.order.type === 'take' && reserve.order.siteId === homeObj.id) && can(cost.take)) spend({ type: 'take', params: { platoon: reserve.id, site: homeObj.id } }, cost.take);
+    // The reserve guards the home objective, so nobody else needs to.
+    committed.set(homeObj.id, committed.get(homeObj.id) + platoonAlive(state, reserve));
   }
   const lane = (state.map.lanes || []).find((l) => l.side === side);
   for (const pl of free) {

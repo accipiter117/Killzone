@@ -280,6 +280,27 @@ const ART = {
     rr(g, (p.cab || 0) - 10, -h / 2, 20, h, 2, '#5d5a52');
     g.fillStyle = '#2c3a40'; g.fillRect((p.cab || 0) - 6, -6, 12, 12);
   },
+  // A cluster of oil drums (low cover).
+  barrels(g, p) {
+    const n = Math.max(2, Math.round((p.w * p.h) / 120));
+    for (let k = 0; k < n; k++) {
+      const a = k * 2.4, d = (k % 3) * 0.28;
+      const x = Math.cos(a) * d * p.w * 0.5, y = Math.sin(a) * d * p.h * 0.5;
+      g.fillStyle = 'rgba(14,12,9,0.4)'; g.beginPath(); g.arc(x + 1.5, y + 2, 5, 0, 6.3); g.fill();
+      g.fillStyle = k % 3 === 0 ? '#8a3a26' : k % 3 === 1 ? '#3f5a4a' : '#6b6a60'; g.beginPath(); g.arc(x, y, 5, 0, 6.3); g.fill();
+      g.strokeStyle = 'rgba(20,18,14,0.6)'; g.lineWidth = 1; g.beginPath(); g.arc(x, y, 3, 0, 6.3); g.stroke();
+      g.fillStyle = HI; g.fillRect(x - 3, y - 4, 4, 1.2);
+    }
+  },
+  // A valve house: a squat steel hut with a wheel on its roof.
+  valve(g, p) {
+    const w = p.w, h = p.h;
+    rr(g, -w / 2, -h / 2, w, h, 2, '#5e6266');
+    g.fillStyle = 'rgba(0,0,0,0.15)'; for (let x = -w / 2 + 4; x < w / 2; x += 6) g.fillRect(x, -h / 2 + 1, 2, h - 2);
+    g.strokeStyle = '#a53a2b'; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, Math.min(w, h) * 0.25, 0, 6.3); g.stroke();
+    g.beginPath(); g.moveTo(-Math.min(w, h) * 0.25, 0); g.lineTo(Math.min(w, h) * 0.25, 0); g.moveTo(0, -Math.min(w, h) * 0.25); g.lineTo(0, Math.min(w, h) * 0.25); g.stroke();
+    g.fillStyle = HI; g.fillRect(-w / 2, -h / 2, w, 1.5);
+  },
   // A bus burnt to its frame.
   bus(g, p) {
     const w = p.w, h = p.h;

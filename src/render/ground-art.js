@@ -90,6 +90,7 @@ function road(g, d, r, L) {
   const w = d.w * 2;
   const style = d.style || 'asphalt';
   strokePath(g, d.pts, L); g.strokeStyle = 'rgba(20,18,14,0.35)'; g.lineWidth = w + 8; g.stroke();
+  if (d.cap === 'butt') { g.lineCap = 'butt'; }
   if (style === 'dirt') {
     strokePath(g, d.pts, L); g.strokeStyle = C.dirt; g.lineWidth = w; g.stroke();
     for (const o of [-0.45, 0.45]) {
@@ -135,6 +136,7 @@ function road(g, d, r, L) {
     strokePath(g, d.pts, L); g.strokeStyle = C.line; g.lineWidth = 2; g.stroke();
     g.setLineDash([]);
   }
+  g.lineCap = 'round';
 }
 
 function rail(g, d, L) {
@@ -188,7 +190,7 @@ function pad(g, d, r, L) {
   const s = d.joint || 40;
   for (let x = d.x0 + s; x < d.x1; x += s) { g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y1); g.stroke(); }
   for (let y = y0 + s; y < y1; y += s) { g.beginPath(); g.moveTo(d.x0, y); g.lineTo(d.x1, y); g.stroke(); }
-  for (let k = 0; k < (d.x1 - d.x0) * (d.y1 - d.y0) / 4000; k++) {
+  for (let k = 0; k < (d.x1 - d.x0) * (d.y1 - d.y0) / 16000; k++) {
     g.fillStyle = C.concreteStain;
     g.beginPath(); g.ellipse(r.range(d.x0, d.x1), r.range(y0, y1), r.range(6, 22), r.range(4, 14), r() * 3, 0, 6.3); g.fill();
   }

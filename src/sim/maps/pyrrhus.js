@@ -44,11 +44,11 @@ export function pyrrhusMap(seedInt, cfg) {
     t.ruin(x0, y0, x1, y1, 0.22);
   }
   // The church (A) and its tower.
-  t.building(820, 560, 1060, 760, [['w', 0.5, 50], ['e', 0.5, 40], ['s', 0.3, 34], ['n', 0.7, 34]], WK.brick);
-  t.ruin(820, 560, 1060, 760, 0.12);
-  t.raise(1060, 560, 1130, 630, 2, 'concrete', { rails: false });
-  t.raise(1060, 630, 1130, 680, 1, 'concrete', { rails: false });
-  t.stairs(1070, 680, 1120, 700); t.ramp(1095, 630, 18);
+  t.building(540, 600, 780, 800, [['w', 0.5, 50], ['e', 0.5, 40], ['s', 0.3, 34], ['n', 0.7, 34]], WK.brick);
+  t.ruin(540, 600, 780, 800, 0.12);
+  t.raise(780, 600, 850, 670, 2, 'concrete', { rails: false });
+  t.raise(780, 670, 850, 720, 1, 'concrete', { rails: false });
+  t.stairs(790, 720, 840, 740); t.ramp(815, 670, 18);
   // The park: dead trees, craters, mud.
   for (const [x, y] of [[300, 1450], [380, 1520], [460, 1440], [540, 1560], [600, 1470], [340, 1600], [500, 1640]]) t.prop('deadtree', x, y, 30, 30);
   t.craters(10, 240, 1400, 640, 1680, 14, 26);
@@ -57,7 +57,7 @@ export function pyrrhusMap(seedInt, cfg) {
   // Burnt-out vehicles along the avenue.
   t.prop('bus', 480, 830, 90, 28, 0.08, { solid: true });
   t.prop('apc', 1000, 900, 58, 30, -0.3, { solid: true });
-  t.prop('tankwreck', 1250, 820, 64, 40, 0.6, { solid: true, col: '#4e4a3d' });
+  t.prop('tankwreck', 900, 820, 64, 40, 0.6, { solid: true, col: '#4e4a3d' });
   t.prop('truck', 820, 1390, 48, 22, 0.2, { solid: true });
   t.prop('lamp', 600, 830, 6, 6); t.prop('lamp', 900, 830, 6, 6); t.prop('lamp', 1200, 890, 6, 6);
   t.prop('crates', 760, 1080, 30, 30, 0, { low: true });
@@ -65,11 +65,11 @@ export function pyrrhusMap(seedInt, cfg) {
   t.debris(0, 0, 1150, H, 0.05);
 
   // ---- The Autarch's plaza (B). ----------------------------------------------------
-  t.raise(1140, 700, 1480, 1020, 1, 'concrete');
-  for (const [x, y] of [[1140, 860], [1480, 860], [1310, 700], [1310, 1020]]) t.ramp(x, y, 34);
-  t.prop('statue', 1310, 860, 60, 60, 0, { solid: true, shrink: 0.6 });
-  for (const [x, y] of [[1180, 740], [1440, 740], [1180, 980], [1440, 980]]) t.prop('banner', x, y, 6, 6);
-  t.prop('jersey', 1200, 860, 50, 12, 1.57, { low: true }); t.prop('jersey', 1420, 860, 50, 12, 1.57, { low: true });
+  t.raise(1040, 700, 1380, 1020, 1, 'concrete');
+  for (const [x, y] of [[1040, 860], [1380, 860], [1210, 700], [1210, 1020]]) t.ramp(x, y, 34);
+  t.prop('statue', 1210, 860, 60, 60, 0, { solid: true, shrink: 0.6 });
+  for (const [x, y] of [[1080, 740], [1340, 740], [1080, 980], [1340, 980]]) t.prop('banner', x, y, 6, 6);
+  t.prop('jersey', 1100, 860, 50, 12, 1.57, { low: true }); t.prop('jersey', 1320, 860, 50, 12, 1.57, { low: true });
 
   // ---- The blocks (Helghast, east). --------------------------------------------------
   const blocks = [[1560, 300, 1680, 620], [1780, 300, 2080, 520], [1780, 1000, 2080, 1260], [1560, 1100, 1680, 1300], [1780, 1440, 2100, 1640]];
@@ -94,11 +94,12 @@ export function pyrrhusMap(seedInt, cfg) {
 
   // ---- Sites. -----------------------------------------------------------------------------
   const objR = cfg.map.objectiveRadius, fR = cfg.map.featureRadius;
-  t.site('A', 'objective', 940, 660, objR);
-  t.site('B', 'objective', 1310, 790, objR);
-  t.site('C', 'objective', 1970, 730, objR);
-  t.site('comms', 'comms', 1095, 595, fR, 'church tower');
-  t.site('arc', 'arc', 1940, 200, fR);
+  t.site('A', 'objective', 660, 700, objR);
+  t.site('B', 'objective', 1210, 790, objR);
+  t.site('C', 'objective', 1880, 730, objR);
+  t.site('comms', 'comms', 815, 635, fR, 'church tower');
+  t.site('arc', 'arc', 980, 440, fR, 'captured arc tower');
+  t.site('comms2', 'comms', 1640, 190, fR, 'relay mast');
   t.site('mg1', 'mg', 640, 190, fR, 'MG on the highway');
   t.site('mg2', 'mg', 1620, 1180, fR, 'MG in the block');
   t.site('post', 'lever', 1610, 775, fR, 'checkpoint post');
@@ -107,7 +108,7 @@ export function pyrrhusMap(seedInt, cfg) {
   t.petrol([[1700, 980], [2200, 1000], [880, 300], [1460, 1500]]);
 
   t.deploy(0, [[200, 400], [180, 860], [200, 1260]], [100, 860]);
-  t.deploy(1, [[2240, 400], [2260, 860], [2230, 1260]], [2320, 860]);
+  t.deploy(1, [[2300, 400], [2320, 860], [2320, 1330]], [2350, 860]);
   t.lane(0, [1500, 190], 'C');
   t.lane(1, [1150, 1360], 'A');
   return t.map;

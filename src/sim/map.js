@@ -6,6 +6,7 @@ import { range, int } from './rng.js';
 import { riverMap } from './maps/river.js';
 import { refineryMap } from './maps/refinery.js';
 import { pyrrhusMap } from './maps/pyrrhus.js';
+import { flipMap } from './maps/flip.js';
 
 export const T = { open: 0, trench: 1, rubble: 2, crater: 3, building: 4, sandbag: 5, wall: 6 };
 export const T_NAMES = ['open', 'trench', 'rubble', 'crater', 'building', 'sandbag', 'wall'];
@@ -45,10 +46,10 @@ export function generateMap(seedInt, cfg) {
   // Bespoke places on Helghan (src/sim/maps/): the Corinth River crossing,
   // the Kesh petrusite refinery and the outskirts of Pyrrhus. The older
   // mirrored generators stay for reference and the war map's tests.
-  if (cfg.map.type === 'industrial') return finishMap(refineryMap(seedInt, cfg), cfg);
-  if (cfg.map.type === 'city') return finishMap(pyrrhusMap(seedInt, cfg), cfg);
   if (cfg.map.type === 'mirror-trenches') return trenchMap(seedInt, cfg);
-  return finishMap(riverMap(seedInt, cfg), cfg);
+  const build = cfg.map.type === 'industrial' ? refineryMap : cfg.map.type === 'city' ? pyrrhusMap : riverMap;
+  const map = build(seedInt, cfg);
+  return finishMap(cfg.map.flip ? flipMap(map) : map, cfg);
 }
 
 function trenchMap(seedInt, cfg) {

@@ -37,4 +37,19 @@ for (const type of ['trenches', 'industrial', 'city']) {
   for (const o of out) console.log('  !', o);
   bad += out.length;
 }
-process.exit(bad ? 1 : 0);
+process.exitCode = bad ? 1 : 0;
+
+// Route lengths from each side's middle platoon to every objective: for
+// fairness the two sides' distances to their own objective, to B and to the
+// enemy's objective should be close.
+import { findPath } from '../src/sim/path.js';
+for (const type of ['trenches', 'industrial', 'city']) {
+  const cfg = merge(CONFIG, { map: { type }, world: CONFIG.mapSizes[type] });
+  const map = generateMap(seed, cfg);
+  const len = (a, b) => { const p = findPath(map, a, b, { maxNodes: 200000 }); if (!p) return NaN; let d = 0, q = a; for (const r of p) { d += Math.hypot(r.x - q.x, r.y - q.y); q = r; } return Math.round(d); };
+  const objs = ['A', 'B', 'C'].map((id) => map.sites.find((s) => s.id === id));
+  const row = (side) => objs.map((o) => len(map.deploy[side].platoons[1], o));
+  const [i, h] = [row(0), row(1)];
+  console.log(`${type} routes  ISA to A/B/C ${i.join('/')}   Helghast to C/B/A ${[h[2], h[1], h[0]].join('/')}`);
+  if (process.env.ALL) for (const s of map.sites) console.log(`   ${s.id.padEnd(8)} ISA ${String(len(map.deploy[0].platoons[1], s)).padStart(5)}  Helghast ${String(len(map.deploy[1].platoons[1], s)).padStart(5)}`);
+}

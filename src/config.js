@@ -295,7 +295,7 @@ export const CONFIG = {
 
   ai: {
     thinkSec: 4,
-    siteValue: { objective: 10, comms: 4, mg: 3, arc: 3, lever: 3, depot: 2 },
+    siteValue: { objective: 10, comms: 6, mg: 3, arc: 3, lever: 1.5, depot: 2 },
     threatRadius: 320, // enemies seen this close to a site count as massing on it
     threatValue: 0.6, // extra value per enemy soldier massing on a site
     reinforceBelow: 0.65, tankRetreatHp: 0.35, tankRetreatX: 200, tankBehind: 90, tankReorderDist: 120, focusRange: 380, focusEverySec: 30, // the AI reinforces a platoon below this strength
