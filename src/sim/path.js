@@ -7,7 +7,7 @@ import { cellIndex, canStep, T, S_NAMES } from './map.js';
 import { CONFIG } from '../config.js';
 
 // What each ground surface costs a route (roads cheap, fords and mud dear).
-const SURF_COST = S_NAMES.map((n) => CONFIG.surface[n].cost);
+let SURF_COST = null; // filled on first use (map.js and this module import each other)
 
 // Cost of entering a wire cell, in cells of open ground. Engineers cut wire,
 // so it costs them little.
@@ -66,6 +66,7 @@ export function findPath(map, a, b, { engineer = false, maxNodes = 24000, mirror
   const B = T.building, grid = map.grid;
   const blocked = vehicle ? (j) => grid[j] === B : null;
   const tight = vehicle ? (j, x, y) => (x > 0 && grid[j - 1] === B) || (x < cols - 1 && grid[j + 1] === B) || (y > 0 && grid[j - cols] === B) || (y < rows - 1 && grid[j + cols] === B) : null;
+  if (!SURF_COST) SURF_COST = S_NAMES.map((n) => CONFIG.surface[n].cost);
   const gx = goal % cols, gy = (goal / cols) | 0;
   const g = new Float32Array(cols * rows).fill(Infinity);
   const from = new Int32Array(cols * rows).fill(-1);

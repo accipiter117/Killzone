@@ -36,9 +36,14 @@ export const GROUND = {
 
 export function buildTerrain(map, seedInt) {
   const canvas = document.createElement('canvas');
-  canvas.width = map.width;
-  canvas.height = map.height;
+  // Big maps paint their ground at half resolution (a 6000 x 4000 picture
+  // would be far too heavy); everything is drawn in world units through a
+  // scale, so the rest of the code does not need to know.
+  const res = map.width * map.height > 8e6 ? 0.5 : 1;
+  canvas.width = Math.ceil(map.width * res);
+  canvas.height = Math.ceil(map.height * res);
   const g = canvas.getContext('2d');
+  g.setTransform(res, 0, 0, res, 0, 0);
   const r = makeFxRandom(seedInt ^ 0x5bd1e995);
   const c = map.cell;
   const cellXY = (i) => [(i % map.cols) * c + c / 2, Math.floor(i / map.cols) * c + c / 2];

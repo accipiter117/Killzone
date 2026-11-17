@@ -75,6 +75,7 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 #timer { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 17px; min-width: 42px; }
 #timer.low { color: #ff6b5f; }
 #objs { display: flex; gap: 4px; }
+#objs[hidden] { display: none; }
 #objs span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-weight: 700; font-size: 12px; border: 1.5px solid #a49d8c; color: #d8d2c0; }
 #objs span.o0 { border-color: #3d6fb0; background: #3d6fb0; color: #fff; }
 #objs span.o1 { border-color: #c24f1c; background: #c24f1c; color: #fff; }

@@ -111,6 +111,8 @@ export function updateUI(ui, state, view) {
   e.timer.textContent = fmtTime(left);
   e.timer.classList.toggle('low', left < 60);
   const objectives = state.sites.filter((s) => s.kind === 'objective');
+  // Skirmish maps have no lettered objectives: hide the A B C chips.
+  e.objs[0]?.parentElement.toggleAttribute('hidden', !objectives.length);
   objectives.forEach((s, i) => {
     const el = e.objs[i];
     el.className = s.owner === null ? '' : `o${s.owner}`;
@@ -354,7 +356,7 @@ export function showEnd(ui, state, playerSide, replayCheck) {
   else if (watching) title.textContent = r.winner === 0 ? 'ISA victory' : 'Helghast victory';
   else title.textContent = r.winner === playerSide ? 'Victory' : 'Defeat';
   title.className = r.winner === null || watching ? '' : r.winner === playerSide ? 'win' : 'lose';
-  const how = r.reason === 'broken' ? 'Every platoon on the losing side broke and ran.' : 'Time ran out.';
+  const how = r.reason === 'hq' ? 'Their headquarters fell.' : r.reason === 'broken' ? 'Every platoon on the losing side broke and ran.' : 'Time ran out.';
   $('#end-margin').textContent = `${how} ${MARGIN_TEXT[r.margin]}`;
   const rows = [
     ['', 'ISA', 'Helghast'],

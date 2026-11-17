@@ -156,10 +156,11 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
     game.mapType = campaign.rec.mapType;
   } else if (!replayLog) {
     const choice = mapType || game.mapChoice;
-    game.mapType = choice === 'random' ? MAP_KINDS[Math.floor(Math.random() * MAP_KINDS.length)] : MAP_KINDS.includes(choice) ? choice : 'trenches';
+    // 'skirmish' is the generated map (type 'random'): fog of war and an HQ to find.
+    game.mapType = choice === 'skirmish' ? 'random' : choice === 'random' ? MAP_KINDS[Math.floor(Math.random() * MAP_KINDS.length)] : MAP_KINDS.includes(choice) ? choice : 'trenches';
   }
   const size = CONFIG.mapSizes[game.mapType];
-  game.options = replayLog ? replayLog.options : campaign ? battleOptions(campaign.rec) : { config: { battle: { durationSec: game.lengthSec }, map: { type: game.mapType, weather: game.weatherChoice }, world: { width: size.width, height: size.height } } };
+  game.options = replayLog ? replayLog.options : campaign ? battleOptions(campaign.rec) : { config: { battle: { durationSec: game.mapType === 'random' ? CONFIG.skirmish.durationSec : game.lengthSec }, map: { type: game.mapType, weather: game.weatherChoice }, world: { width: size.width, height: size.height } } };
   game.replay = !!replayLog;
   game.match = createMatch({ seed, options: game.options, controllers: replayLog || turnBased ? [] : controllersFor(game.watch), replayLog });
   if (turnBased) createTactics(game.match.state);
@@ -199,7 +200,10 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
   game.cam.z = Math.min(game.cam.maxZ, (game.cam.vh / st.map.height) * 2);
   if (PLAYER === 1 && game.cam.canRotate) rotateAt(game.cam, game.cam.vw / 2, game.cam.vh / 2, Math.PI);
   clampCamera(game.cam);
-  centreOn(game.cam, PLAYER === 0 ? 260 : st.map.width - 260, st.map.height / 2);
+  // Skirmish: open on your own HQ (it can be in any corner).
+  const myHq = st.sites.find((x) => x.kind === 'hq' && x.home === PLAYER);
+  if (myHq) centreOn(game.cam, myHq.x, myHq.y);
+  else centreOn(game.cam, PLAYER === 0 ? 260 : st.map.width - 260, st.map.height / 2);
   keepAwake(true);
   showForecast(st);
   if (!store.get('seenHelp', false) && !replayLog) {
@@ -208,7 +212,7 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
     openOverlay('overlay-help');
   }
   if (campaign) return;
-  try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}&map=${game.mapType}`); } catch { /* file:// */ }
+  try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}&map=${game.mapType === 'random' ? 'skirmish' : game.mapType}`); } catch { /* file:// */ }
 }
 
 // The weather forecast: a toast as the battle opens, and a chip by the
@@ -707,7 +711,7 @@ document.getElementById('labels-toggle').addEventListener('change', (e) => {
 });
 const menuSeed = () => document.getElementById('seed-input').value.trim() || newSeed();
 document.getElementById('btn-new').addEventListener('click', () => { closeOverlay('overlay-menu'); startBattle(newSeed()); });
-document.getElementById('btn-restart').addEventListener('click', () => { closeOverlay('overlay-menu'); startBattle(menuSeed(), { mapType: game.mapType }); });
+document.getElementById('btn-restart').addEventListener('click', () => { closeOverlay('overlay-menu'); startBattle(menuSeed(), { mapType: game.mapType === 'random' ? 'skirmish' : game.mapType }); });
 document.getElementById('btn-help').addEventListener('click', () => { closeOverlay('overlay-menu'); openOverlay('overlay-help'); });
 document.getElementById('btn-replay').addEventListener('click', () => {
   const src = game.replay ? game.original : { log: game.match.log, print: fingerprint(game.match.state) };
@@ -715,7 +719,7 @@ document.getElementById('btn-replay').addEventListener('click', () => {
   startBattle(src.log.seed, { replayLog: JSON.parse(JSON.stringify(src.log)) });
   game.speed = 2;
 });
-document.getElementById('btn-end-restart').addEventListener('click', () => startBattle(game.replay ? game.original.log.seed : game.seed, { mapType: game.replay ? game.original.log.options.config.map?.type : game.mapType }));
+document.getElementById('btn-end-restart').addEventListener('click', () => startBattle(game.replay ? game.original.log.seed : game.seed, { mapType: (game.replay ? game.original.log.options.config.map?.type : game.mapType) === 'random' ? 'skirmish' : game.replay ? game.original.log.options.config.map?.type : game.mapType }));
 document.getElementById('btn-end-new').addEventListener('click', () => startBattle(newSeed()));
 
 // ---- Campaign and the start menu ------------------------------------------------
@@ -805,6 +809,7 @@ function setSide(side) {
 for (const [id, side] of [['st-quick', 0], ['st-quick-hgh', 1]]) {
   document.getElementById(id).addEventListener('click', () => { closeOverlay('overlay-start'); setSide(side); startBattle(newSeed()); });
 }
+document.getElementById('st-skirmish').addEventListener('click', () => { closeOverlay('overlay-start'); startBattle(newSeed(), { mapType: 'skirmish' }); });
 document.getElementById('btn-go').addEventListener('click', () => {
   if (order('go', {})) { toast(ui, 'GO!', 'Every waiting platoon moves now.'); game.signal = false; }
 });
