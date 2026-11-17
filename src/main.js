@@ -19,7 +19,7 @@ import { createHelghanGlobe } from './ui/helghan-globe.js';
 import { loadPropArt } from './render/props.js';
 import { loadGroundSprites } from './render/ground-sprites.js';
 import { createBlood, ingestBlood, rebakeBlood } from './render/blood.js';
-import { callinBlocked } from './sim/callins.js';
+import { callinBlocked, nextReserve } from './sim/callins.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
 import { createAudio, unlockAudio, newFrame, playEvents, uiClick, setMix } from './render/audio.js';
 import { attachMapInput, attachMinimapInput } from './ui/input.js';
@@ -77,6 +77,8 @@ const ui = createUI({
       return;
     }
     // Choosing who the tank escorts: the chip picks that platoon.
+    // Cards past the tank (4 and 5) are the fourth and fifth platoons.
+    if (i > 3) i -= 1;
     if (game.escortPick && game.vehicle) {
       const pe = game.match.state.platoons.filter((p) => p.side === PLAYER)[i];
       if (pe) escortWith(pe);
@@ -86,7 +88,7 @@ const ui = createUI({
     game.release = null;
     game.scope = null;
     const pl = game.match.state.platoons.filter((p) => p.side === PLAYER)[i];
-    if (!pl || game.replay) return;
+    if (!pl || pl.reserve || game.replay) return;
     if (game.watch) { focusPlatoon(pl); return; }
     game.selected = game.selected === pl.id ? null : pl.id;
     game.armed = null;
@@ -842,11 +844,12 @@ document.addEventListener('keydown', (e) => {
   ui.handlers.togglePause();
 });
 
-// 1, 2 and 3 pick your platoons and 4 the tank (pressing again lets go, like
+// 1, 2 and 3 pick your platoons and 4 the tank (5 and 6 the reserve
+// platoons in a skirmish, once called in) (pressing again lets go, like
 // tapping the chip); Esc lets go of whatever is chosen or armed. Same
 // conditions as the space bar.
 document.addEventListener('keydown', (e) => {
-  const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3 }[e.code];
+  const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3, Numpad5: 4, Numpad6: 5 }[e.code];
   if ((n === undefined && e.code !== 'Escape') || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
   if (!game.match || game.match.state.result || campaignUI.visible()) return;
@@ -941,6 +944,13 @@ function extraItems(st) {
     const shut = gate.moving ? gate.moving.to : gate.closed;
     const verb = gate.kind === 'bridge' ? (shut ? 'Lower bridge' : 'Raise bridge') : gate.kind === 'door' ? (shut ? 'Open doors' : 'Close doors') : shut ? 'Open barrier' : 'Close barrier';
     items.push({ key: `g:${gate.id}`, label: gate.moving ? (gate.blocked ? 'Way blocked' : 'Moving...') : verb, sub: (st.map.gates.length > 1 ? `${gate.name.split(' ')[0]}, ` : '') + `${CONFIG.gates.cost} pt`, off: !!gate.moving, run: () => { if (order('gate', { gate: gate.id })) toast(ui, `The ${gate.name}`, gate.kind === 'bridge' ? 'It takes a few seconds, and will not rise while anyone is on it. Raised, nobody can cross; lowered, anyone can.' : 'It takes a few seconds, and will not shut on anyone standing in it. Shut, it is a solid wall nobody can blast through.'); } });
+  }
+  // Skirmish reserves: shown while any are left, greyed (with the reason
+  // on a long press via the label) until enough supply points are held.
+  if (nextReserve(st, PLAYER)) {
+    const why = callinBlocked(st, PLAYER, 'platoon');
+    const c = CONFIG.callins.platoon;
+    items.push({ key: 'c:platoon', label: 'Call in platoon', sub: why && why.startsWith('Hold') ? `need ${why.match(/\d+/)[0]} supply` : `${c.cost} pts`, off: !!why || st.sides[PLAYER].op < c.cost, run: () => { if (order('callin', { what: 'platoon' })) toast(ui, 'Platoon called in', 'A fresh platoon marches out of your HQ. Hold more supply points to bring up the next.'); } });
   }
   if (st.sites.some((s) => s.kind === 'depot' && s.owner === PLAYER)) {
     const v = st.vehicles.find((o) => o.side === PLAYER);

@@ -43,9 +43,10 @@ function build(seed, cfg, opts = {}) {
     [[0.09, 0.5], [0.91, 0.5]], [[0.2, 0.12], [0.8, 0.88]], [[0.2, 0.88], [0.8, 0.12]],
   ];
   const lay = pick(layouts);
-  const flip = rand(0, 1) < 0.5; // which side gets which corner
+  // The ISA always take the western HQ: routing, rallying and facing all
+  // assume the ISA start in the west (the corners still vary north/south).
+  rand(0, 1); // (was a coin for swapping sides; kept so seeds make the same maps)
   const hq = lay.map(([fx, fy]) => ({ x: Math.round(W * fx + rand(-140, 140)), y: Math.round(H * fy + rand(-140, 140)) }));
-  if (flip) hq.reverse();
   const mid = { x: (hq[0].x + hq[1].x) / 2, y: (hq[0].y + hq[1].y) / 2 };
   const axis = Math.atan2(hq[1].y - hq[0].y, hq[1].x - hq[0].x);
 
@@ -161,6 +162,9 @@ function build(seed, cfg, opts = {}) {
     t.prop('crates', h.x + 100, h.y + 70, 40, 26, 0.1, { low: true });
     const s = t.site(`hq${side}`, 'hq', h.x, h.y, objR, side ? 'Helghast headquarters' : 'ISA headquarters', side);
     s.home = side;
+    // Two MG nests guard the approach (behind the outer sandbags): a raid
+    // has to silence or take them before it can sit on the HQ.
+    for (const a of [-1, 1]) t.site(`hqmg${side}${a < 0 ? 'a' : 'b'}`, 'mg', Math.round(h.x + Math.cos(f + a * 0.7) * 125), Math.round(h.y + Math.sin(f + a * 0.7) * 125), fR, 'HQ MG nest', side);
     // The army forms up in front of its HQ, facing the middle of the map.
     const fx = Math.cos(f), fy = Math.sin(f), px = -fy, py = fx;
     t.deploy(side, [-1, 0, 1].map((o) => [Math.round(h.x + fx * 230 + px * o * 190), Math.round(h.y + fy * 230 + py * o * 190)]), [Math.round(h.x - fx * 40 + px * 200), Math.round(h.y - fy * 40 + py * 200)]);
@@ -304,6 +308,7 @@ function accept(map) {
     return seen;
   };
   const r0 = reach(map.deploy[0].platoons[1]);
+  map.reach = r0; // kept: the AI's scouting points are put on reachable ground
   for (const s of map.sites) if (!r0[cellIndex(map, s.x, s.y)]) return false;
   for (const p of [...map.deploy[1].platoons, map.deploy[0].tank, map.deploy[1].tank]) if (!r0[cellIndex(map, p.x, p.y)]) return false;
   // Fairness: route lengths from each HQ to its four nearest supply points

@@ -21,7 +21,7 @@ src/config.js             every tuning number and the player-facing rule texts
 src/sim/                  pure simulation (no DOM, no Math.random)
   rng.js                  mulberry32 on state.rng
   map.js                  map entry and ground helpers: cover types (T), surfaces (S: road, ford, deep water, mud, haze, deck), wall kinds, steps
-  maps/                   the bespoke Helghan maps (river.js, refinery.js, pyrrhus.js) built with kit.js; flip.js mirrors one east to west for testing
+  maps/                   the bespoke Helghan maps (river.js, refinery.js, pyrrhus.js) built with kit.js; flip.js mirrors one east to west for testing; random.js generates skirmish maps (map type 'random': HQs, fog of war over unexplored ground in state.explored, reserve platoons; the ISA always take the western HQ)
   maps.js                 the old mirrored generators (kept for the mechanics tests: map type 'mirror-trenches' and the old kits)
   gates.js                lift bridges, blast doors and barriers worked from lever sites
   callins.js              call-ins from a held vehicle depot (a tank now; aircraft later via config callins)

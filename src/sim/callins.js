@@ -11,10 +11,26 @@ export function depotFor(state, side) {
   return held.find((s) => s.id === `depot${side}`) || held[0] || null;
 }
 
+// Skirmish reserves: how many supply points a side holds, and the next
+// platoon still waiting off the field.
+export const supplyHeld = (state, side) => state.sites.filter((s) => s.kind === 'supply' && s.owner === side).length;
+export const nextReserve = (state, side) => state.platoons.find((p) => p.side === side && p.reserve) || null;
+const hqOf = (state, side) => state.sites.find((s) => s.kind === 'hq' && s.home === side) || null;
+
 export function callinBlocked(state, side, what) {
   const c = state.cfg.callins[what];
   if (!c) return 'Nothing like that to call in';
   if (state.tick === 0) return 'Call-ins arrive once the battle has started';
+  if (what === 'platoon') {
+    const hq = hqOf(state, side);
+    if (!hq) return 'Reserves only come up in a skirmish';
+    if (hq.owner !== side) return 'Retake your HQ first';
+    if (!nextReserve(state, side)) return 'Every platoon is already in the field';
+    const called = state.platoons.filter((p) => p.side === side && p.calledIn).length;
+    const need = c.needSupply[Math.min(called, c.needSupply.length - 1)];
+    if (supplyHeld(state, side) < need) return `Hold ${need} supply points to bring up the next platoon`;
+    return null;
+  }
   if (!depotFor(state, side)) return 'Hold a vehicle depot first';
   if (what === 'tank') {
     if (state.sides[side].noTank) return 'No tank works to send one (war map)';
@@ -25,6 +41,7 @@ export function callinBlocked(state, side, what) {
 }
 
 export function callIn(state, side, what) {
+  if (what === 'platoon') return callInPlatoon(state, side);
   const depot = depotFor(state, side);
   if (what === 'tank') {
     const v = state.vehicles.find((o) => o.side === side);
@@ -42,4 +59,30 @@ export function callIn(state, side, what) {
     feed(state, `${sideName(side)} tank rolls out of the ${depot.name}`, side, depot);
     state.events.push({ type: 'callin', what, side, x: depot.x, y: depot.y });
   }
+}
+
+// A reserve platoon marches out of the HQ: its soldiers, every place filled,
+// appear round the HQ and wait for orders.
+function callInPlatoon(state, side) {
+  const pl = nextReserve(state, side), hq = hqOf(state, side);
+  const W = state.map.width, H = state.map.height;
+  pl.reserve = false;
+  pl.calledIn = true;
+  pl.order = { type: 'idle' };
+  pl.orderTick = state.tick;
+  pl.squads.forEach((id, k) => {
+    const sq = state.squads[id];
+    sq.mode = 'idle';
+    sq.status = 'Awaiting orders';
+    sq.path = null;
+    sq.soldiers.forEach((sid, n) => {
+      const s = state.soldiers[sid];
+      const x = Math.max(10, Math.min(W - 10, hq.x + (k - 1) * 46 + (n % 2) * 12 - 6));
+      const y = Math.max(10, Math.min(H - 10, hq.y + 50 + (n - 2) * 10));
+      Object.assign(s, { x, y, tx: x, ty: y, hp: s.maxHp, alive: true, fled: false, downed: false, target: -1, markUntil: 0 });
+    });
+  });
+  state.sides[side].callins = (state.sides[side].callins || 0) + 1;
+  feed(state, `${sideName(side)} ${pl.name} marches out of the HQ`, side, hq);
+  state.events.push({ type: 'callin', what: 'platoon', side, x: hq.x, y: hq.y, platoon: pl.id });
 }

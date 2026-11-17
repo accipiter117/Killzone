@@ -45,12 +45,13 @@ test('ground is explored as soldiers walk over it', () => {
 test('taking the enemy HQ wins the battle', () => {
   const s = skirmish(2);
   const hq = s.sites.find((x) => x.kind === 'hq' && x.home === 1);
-  // Send the defenders far off and sit an ISA platoon on the HQ.
+  // Send the defenders far off (their tank too) and sit an ISA platoon on the HQ.
   const off = s.sites.find((x) => x.kind === 'hq' && x.home === 0);
   for (const q of s.squads) if (q.side === 1) place(s, q.id, (off.x + hq.x) / 2, (off.y + hq.y) / 2);
   for (const q of s.squads) if (q.side === 0) place(s, q.id, off.x, off.y);
+  for (const v of s.vehicles) if (v.side === 1) { v.alive = false; v.hp = 0; }
   for (const id of s.platoons.find((p) => p.side === 0).squads) place(s, id, hq.x, hq.y);
-  run(s, (CONFIG.skirmish.hqSec + 10) * CONFIG.tickRate);
+  run(s, (2 * CONFIG.skirmish.hqSec + 15) * CONFIG.tickRate); // neutralise, then take
   assert.ok(s.result, 'the battle ended');
   assert.equal(s.result.winner, 0);
   assert.equal(s.result.reason, 'hq');
@@ -63,4 +64,30 @@ test('the AI does not head for an HQ it has not found', () => {
   const hq = s.sites.find((x) => x.kind === 'hq' && x.home === 1);
   assert.ok(!cmds.some((c) => c.type === 'take' && c.params.site === hq.id), 'no take order on the unknown HQ');
   assert.ok(cmds.length > 0, 'but it does give orders (scouting or taking known ground)');
+});
+
+test('reserve platoons wait off the field until enough supply is held, then march out of the HQ', async () => {
+  const { applyCommand } = await import('../src/sim/commands.js');
+  const s = skirmish(4);
+  const reserves = s.platoons.filter((p) => p.side === 0 && p.reserve);
+  assert.equal(reserves.length, CONFIG.skirmish.reserves);
+  assert.ok(reserves.every((p) => p.squads.every((id) => s.squads[id].soldiers.every((sid) => !s.soldiers[sid].alive))));
+  run(s, 30);
+  s.sides[0].op = 6;
+  const r1 = applyCommand(s, { tick: s.tick, side: 0, type: 'callin', params: { what: 'platoon' } });
+  assert.ok(!r1.ok, 'blocked without supply points');
+  const supply = s.sites.filter((x) => x.kind === 'supply');
+  for (const x of supply.slice(0, CONFIG.callins.platoon.needSupply[0])) x.owner = 0;
+  const r2 = applyCommand(s, { tick: s.tick, side: 0, type: 'callin', params: { what: 'platoon' } });
+  assert.ok(r2.ok, r2.reason);
+  const pl = reserves[0];
+  assert.ok(!pl.reserve);
+  const hq = s.sites.find((x) => x.kind === 'hq' && x.home === 0);
+  const men = pl.squads.flatMap((id) => s.squads[id].soldiers.map((sid) => s.soldiers[sid]));
+  assert.ok(men.every((m) => m.alive && Math.hypot(m.x - hq.x, m.y - hq.y) < 150), 'all at the HQ');
+  // The next one needs more ground.
+  s.sides[0].op = 6;
+  assert.ok(!applyCommand(s, { tick: s.tick, side: 0, type: 'callin', params: { what: 'platoon' } }).ok);
+  run(s, 60);
+  assert.ok(!pl.broken, 'a fresh platoon is not broken');
 });

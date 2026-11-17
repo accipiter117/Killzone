@@ -17,6 +17,23 @@ const PROFILES = {
   cautious: { stanceStrong: 'cautious', stanceWeak: 'cautious', reserve: 2 },
 };
 
+// The nearest cell to (x, y) that troops can reach (water, walls and
+// walled-in ground are skipped), searching outwards in square rings.
+function reachableNear(map, x, y) {
+  const c = map.cell, cx = Math.floor(x / c), cy = Math.floor(y / c);
+  if (!map.reach) return { x: Math.round(x), y: Math.round(y) };
+  for (let r = 0; r < 60; r++) {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const i = cx + dx, j = cy + dy;
+      if (i < 0 || j < 0 || i >= map.cols || j >= map.rows) continue;
+      const k = j * map.cols + i;
+      if (map.reach[k] && map.grid[k] === 0) return { x: i * c + c / 2, y: j * c + c / 2 };
+    }
+  }
+  return null;
+}
+
 // Unexplored ground worth scouting: the middles of coarse regions of the
 // map that this side has seen less than half of.
 function scoutPoints(state, side) {
@@ -25,7 +42,9 @@ function scoutPoints(state, side) {
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     let seen = 0, all = 0;
     for (let y = Math.floor((j * e.rows) / ny); y < Math.floor(((j + 1) * e.rows) / ny); y += 2) for (let x = Math.floor((i * e.cols) / nx); x < Math.floor(((i + 1) * e.cols) / nx); x += 2) { all++; seen += e.grid[side][y * e.cols + x]; }
-    if (seen < all * 0.5) out.push({ id: `scout${i}.${j}`, kind: 'scout', x: Math.round(((i + 0.5) * W) / nx), y: Math.round(((j + 0.5) * H) / ny), r: 150, owner: null });
+    if (seen >= all * 0.5) continue;
+    const p = reachableNear(state.map, ((i + 0.5) * W) / nx, ((j + 0.5) * H) / ny);
+    if (p) out.push({ id: `scout${i}.${j}`, kind: 'scout', x: p.x, y: p.y, r: 150, owner: null });
   }
   return out;
 }
@@ -177,6 +196,8 @@ function decide(state, side, prof, memory) {
       else if (site.owner === side) v *= threat > 0 || ahead ? 0.9 : 0.15;
       v += ai.threatValue * threat; // a site the enemy is massing on must be answered
       if (site.id === current) v *= 1.5;
+      // The longer the enemy HQ stays hidden, the more scouting matters.
+      if (site.kind === 'scout') v *= 1 + state.tick / (cfg.tickRate * ai.scoutGrowSec);
       const have = committed.get(site.id);
       // How many soldiers a site needs: enough to beat what we can see there,
       // plus a garrison that is bigger for objectives and for high ground
@@ -284,6 +305,11 @@ function decide(state, side, prof, memory) {
     }
   }
 
+  // Skirmish: bring up a reserve platoon as soon as the ground held allows.
+  if (!callinBlocked(state, side, 'platoon') && op >= cfg.callins.platoon.cost) {
+    cmds.push({ side, type: 'callin', params: { what: 'platoon' } });
+    op -= cfg.callins.platoon.cost;
+  }
   // A new tank from the depot when ours is gone and points allow.
   if (!callinBlocked(state, side, 'tank') && op >= cfg.callins.tank.cost + prof.reserve) {
     cmds.push({ side, type: 'callin', params: { what: 'tank' } });

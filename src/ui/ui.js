@@ -30,14 +30,18 @@ export function createUI(handlers) {
   };
   const e = ui.els;
   for (let i = 0; i < 6; i++) e.opPips.appendChild(document.createElement('i')).appendChild(document.createElement('b'));
-  for (let i = 0; i < 4; i++) {
+  // Card 3 is the tank (key 4); cards 4 and 5 are skirmish reserve
+  // platoons 4 and 5 (keys 5 and 6), shown once called in, before the tank.
+  for (const i of [0, 1, 2, 4, 5, 3]) {
     const b = document.createElement('button');
+    const n = i < 3 ? i + 1 : i;
     b.className = i === 3 ? 'card tank' : 'card';
-    b.setAttribute('aria-label', i === 3 ? 'Tank' : `Platoon ${i + 1}`);
-    b.innerHTML = `<span class="name">${i === 3 ? TANK_ICON : i + 1}</span><span class="bar"><i></i></span>`;
+    b.setAttribute('aria-label', i === 3 ? 'Tank' : `Platoon ${n}`);
+    b.innerHTML = `<span class="name">${i === 3 ? TANK_ICON : n}</span><span class="bar"><i></i></span>`;
     b.addEventListener('click', () => handlers.selectCard(i));
+    if (i > 3) b.hidden = true;
     e.cards.appendChild(b);
-    ui.cards.push(b);
+    ui.cards[i] = b;
   }
   for (const [act, btn] of Object.entries(e.actions)) btn.addEventListener('click', () => handlers.action(act));
   e.pause.addEventListener('click', handlers.togglePause);
@@ -142,9 +146,10 @@ export function updateUI(ui, state, view) {
   const live = !(view.replay || view.watch);
   const mine = state.platoons.filter((p) => p.side === view.playerSide);
   // Campaign battles can bring fewer than three platoons (or no tank).
-  for (let i = 0; i < 3; i++) ui.cards[i].hidden = i >= mine.length;
-  mine.forEach((pl, i) => {
-    const card = ui.cards[i];
+  for (const i of [0, 1, 2, 4, 5]) { const pl = mine[i < 3 ? i : i - 1]; ui.cards[i].hidden = !pl || !!pl.reserve; }
+  mine.forEach((pl, k) => {
+    if (k > 4) return;
+    const card = ui.cards[k < 3 ? k : k + 1];
     const str = platoonStrength(state, pl);
     card.classList.toggle('sel', view.selected === pl.id);
     card.classList.toggle('broken', pl.broken);

@@ -27,11 +27,12 @@ function reinforce(state, pl) {
   const alive = members(state, weakest);
   const anyone = squads.flatMap((q) => members(state, q));
   const W = state.map.width, H = state.map.height;
-  const home = { x: pl.side === 0 ? cfg.deploy.x : W - cfg.deploy.x, y: H / 2 };
+  const hq = state.sites.find((x) => x.kind === 'hq' && x.home === pl.side);
+  const home = hq ? { x: hq.x, y: hq.y } : { x: pl.side === 0 ? cfg.deploy.x : W - cfg.deploy.x, y: H / 2 };
   const c = alive.length ? centroid(alive) : anyone.length ? centroid(anyone) : home;
   // They arrive at the nearest objective or post this side holds, if one is
   // within reach of the squad, otherwise at their own lines; then they run.
-  let at = { x: home.x, y: c.y };
+  let at = hq ? home : { x: home.x, y: c.y };
   let bestD = cfg.reinforce.nearSiteReach;
   for (const site of state.sites) {
     if (site.owner !== pl.side) continue;
@@ -90,6 +91,7 @@ function applyInner(state, cmd) {
   if (['move', 'take', 'hold', 'fallback', 'stance', 'ability', 'reinforce', 'focus', 'squad', 'holdfire', 'deploy'].includes(type)) {
     pl = state.platoons[p.platoon];
     if (!pl || pl.side !== side) return fail('Not your platoon');
+    if (pl.reserve) return fail(`${pl.name} is still in reserve: call it in first`);
     // A platoon regrouping after breaking can still be reinforced.
     const regrouping = pl.broken && !pl.rallied && type === 'reinforce';
     if (pl.broken && !regrouping) return fail(`${pl.name} has broken and will not take orders`);

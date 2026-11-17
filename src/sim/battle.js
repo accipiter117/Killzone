@@ -49,12 +49,19 @@ export function createBattle(seed, options = {}) {
   for (const side of [0, 1]) {
     const f = forces && forces[side];
     const list = f ? f.platoons : cfg.platoons.map((roles, pi) => ({ roles, name: PLATOON_NAMES[pi] }));
+    // Skirmish: platoons held in reserve, off the field until called in at
+    // the HQ (made now, empty, so every soldier list keeps its size).
+    if (map.skirmish && !f) for (let k = 0; k < cfg.skirmish.reserves; k++) {
+      const roles = cfg.platoons[k % cfg.platoons.length];
+      list.push({ roles, name: PLATOON_NAMES[list.length] || `Platoon ${list.length + 1}`, alive: roles.map(() => 0), reserve: true });
+    }
     const spread = list.length === 3 ? cfg.deploy.spreadY : list.map((_, i) => (i + 1) / (list.length + 1));
-    list.forEach(({ roles, name, alive, ref }, pi) => {
+    list.forEach(({ roles, name, alive, ref, reserve }, pi) => {
       const pl = {
         id: state.platoons.length, side, index: pi, name: name || PLATOON_NAMES[pi] || `Platoon ${pi + 1}`, ref: ref ?? null,
         squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, reinforceReadyTick: 0, holdFire: false, pending: null, breakBase: 0, paidTick: -1, brokeTick: 0, focus: -1, focusUntil: 0, size: roles.length * cfg.soldiersPerSquad,
       };
+      if (reserve) pl.reserve = true;
       state.platoons.push(pl);
       const baseY = H * spread[pi];
       roles.forEach((role, k) => {
@@ -247,6 +254,7 @@ function checkMorale(state) {
   const W = state.map.width;
   const label = (pl) => (pl.side === 0 ? pl.name : `Helghast ${pl.name}`);
   for (const pl of state.platoons) {
+    if (pl.reserve) continue; // not on the field yet
     const alive = platoonAlive(state, pl);
     if (pl.broken) {
       if (pl.rallied || alive === 0) continue;
@@ -300,7 +308,7 @@ function platoonPos(state, pl) {
   return n ? { x: x / n, y: y / n } : null;
 }
 
-export const sideBroken = (state, side) => state.platoons.every((pl) => pl.side !== side || pl.broken);
+export const sideBroken = (state, side) => state.platoons.every((pl) => pl.side !== side || pl.broken || pl.reserve);
 
 function checkEnd(state) {
   // Skirmish: taking the enemy's headquarters wins outright.
