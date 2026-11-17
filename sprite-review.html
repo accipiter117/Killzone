@@ -73,7 +73,6 @@
     </section>
 
     <ul>
-      <li>"ISA (blue)" is the ISA sheets with the grey armour tinted towards the ISA's blue so the sides read apart at a glance; "ISA (as drawn)" is ChatGPT's original colours.</li>
       <li>The grapple pair is one sprite: the direction is the way the ISA soldier faces.</li>
     </ul>
   </main>
@@ -86,8 +85,8 @@
       await img.decode();
       return { meta, img };
     };
-    const [HGH, ISA, ISA_BLUE, GRAPPLE] = await Promise.all(['hgh-rifle', 'isa-rifle', 'isa-rifle-blue', 'grapple'].map(loadUnit));
-    const SIDES = { Helghast: HGH, 'ISA (blue)': ISA_BLUE, 'ISA (as drawn)': ISA };
+    const [HGH, ISA, GRAPPLE] = await Promise.all(['hgh-rifle', 'isa-rifle', 'grapple'].map(loadUnit));
+    const SIDES = { Helghast: HGH, ISA };
 
     const DIRS = ['Facing you', 'Front right', 'Right', 'Back right', 'Away', 'Back left', 'Left', 'Front left'];
     // Each action: a list of [frame, seconds]; the grapple uses its own sheet.
@@ -100,7 +99,7 @@
       Grenade: [['throw1', 0.3], ['throw2', 0.28], ['throw3', 0.35], ['stand', 0.7]],
       Grapple: [['grapple1', 0.3], ['grapple2', 0.35], ['grapple3', 0.3], ['grapple4', 0.35]],
     };
-    let side = 'ISA (blue)', act = 'Run', dir = 2, spin = false;
+    let side = 'ISA', act = 'Run', dir = 2, spin = false;
 
     const frameAt = (name, t) => {
       const seq = ACTS[name], total = seq.reduce((a, [, s]) => a + s, 0);
@@ -202,7 +201,7 @@
       items.sort((a, b) => a.y - b.y);
       for (const it of items) {
         if (it.grapple) { shadow(fg, it.x, it.y + 1, 16); sprite(fg, GRAPPLE, it.f, it.d, it.x, it.y, S); continue; }
-        const unit = it.tr.side === 0 ? ISA_BLUE : HGH;
+        const unit = it.tr.side === 0 ? ISA : HGH;
         shadow(fg, it.x, it.y + 1, 9);
         if (!sprite(fg, unit, it.f, it.d, it.x, it.y, S)) sprite(fg, unit, it.fallback || 'stand', it.d, it.x, it.y, S);
         // A tracer now and then from the firers.

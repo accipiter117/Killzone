@@ -4,7 +4,7 @@
 // plus the ISA v Helghast grapple. Loaded in the background; until they are
 // ready (or if they fail) the code-drawn troopers are used instead.
 
-const UNITS = { isa: 'isa-rifle-blue', hgh: 'hgh-rifle', grapple: 'grapple', 'isa-tank': 'isa-tank', 'hgh-tank': 'hgh-tank' };
+const UNITS = { isa: 'isa-rifle', hgh: 'hgh-rifle', grapple: 'grapple', 'isa-tank': 'isa-tank', 'hgh-tank': 'hgh-tank' };
 export const SPRITES = { ready: false, units: {} };
 
 export function loadUnitSprites(base = 'assets/sprites/') {
