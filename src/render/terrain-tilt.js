@@ -13,6 +13,7 @@ import { makeFxRandom } from './fx-random.js';
 import { T } from '../sim/map.js';
 import { GROUND, paintDug, repaintDug, furnish } from './terrain.js';
 import { paintGround } from './ground-art.js';
+import { drawCraterSprite, drawRubbleSprite, rubbleKind } from './ground-sprites.js';
 
 export const LIFT = 20; // screen rise per level of height, in world units
 
@@ -138,6 +139,7 @@ export function buildTiltTerrain(map, seedInt) {
     if (map.grid[i] !== T.rubble || r() < 0.72) continue;
     const [x, y0] = cellXY(i);
     const y = y0 - LIFT * map.elev[i];
+    if (r() < 0.45 && drawRubbleSprite(g, x, y, rubbleKind(map, i), r.range(12, 18), r())) continue;
     g.fillStyle = 'rgba(20,18,14,0.3)';
     g.fillRect(x - 2, y + 2, 6, 3);
     g.fillStyle = r.pick(P.pebble);
@@ -181,6 +183,7 @@ export function liftAt(map, x, y) {
 // A shell hole seen from the side: a raised lip, the far wall lit, the near
 // wall in shade and a dark floor.
 function drawCrater(g, cr, lift) {
+  if (drawCraterSprite(g, cr, lift)) return;
   const x = cr.x, y = cr.y - lift, rr = cr.r;
   g.fillStyle = 'rgba(20,18,14,0.25)';
   g.beginPath(); g.ellipse(x + 3, y + 3, rr * 1.08, rr * 0.8, 0, 0, Math.PI * 2); g.fill();

@@ -16,7 +16,7 @@ const SHADOW = 'rgba(14,12,9,0.42)';
 // from it, at its width and the picture's own proportions; until then (or
 // if it fails) the code-drawn art below stands in.
 const PAINTED = ['dropship', 'tankwreck-isa', 'tankwreck-hgh', 'container-orange', 'container-teal', 'container-mustard', 'container-grey',
-  'traincar-red', 'traincar-green', 'traincar-grey', 'tanker', 'pillbox', 'apc', 'bus', 'truck', 'statue', 'bridge-down', 'bridge-up', 'arctower'];
+  'traincar-red', 'traincar-green', 'traincar-grey', 'tanker', 'pillbox', 'apc', 'bus', 'truck', 'statue', 'bridge-down', 'bridge-up', 'arctower', 'mgnest'];
 // Which picture a prop uses: by kind, and for containers and freight cars
 // by the colour the map builder gave it (anything else falls to a near one).
 const BY_COL = {

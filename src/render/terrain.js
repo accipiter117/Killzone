@@ -8,6 +8,7 @@
 import { makeFxRandom } from './fx-random.js';
 import { T } from '../sim/map.js';
 import { paintGround } from './ground-art.js';
+import { drawCraterSprite, drawRubbleSprite, rubbleKind } from './ground-sprites.js';
 
 const P = {
   ground: '#595747',
@@ -89,10 +90,12 @@ export function buildTerrain(map, seedInt) {
   paintGround(g, map, r, () => 0, 'top');
   for (const cr of map.craters) drawCrater(g, cr);
 
-  // Rubble: a few clean stones per cell.
+  // Rubble: now and then a painted pile (brick by brick walls), otherwise a
+  // few clean stones per cell.
   for (let i = 0; i < map.grid.length; i++) {
     if (map.grid[i] !== T.rubble || r() < 0.75) continue;
     const [x, y] = cellXY(i);
+    if (r() < 0.45 && drawRubbleSprite(g, x, y, rubbleKind(map, i), r.range(12, 18), r())) continue;
     g.fillStyle = 'rgba(20,18,14,0.3)';
     g.fillRect(x - 2, y + 1, 5, 3);
     g.fillStyle = r.pick(P.stone);
@@ -157,6 +160,7 @@ export function repaintDug(map, addDug) {
 }
 
 function drawCrater(g, c) {
+  if (drawCraterSprite(g, c)) return;
   g.fillStyle = 'rgba(20,18,14,0.25)';
   g.beginPath();
   g.ellipse(c.x + 2, c.y + 2, c.r * 1.05, c.r * 0.95, 0, 0, Math.PI * 2);

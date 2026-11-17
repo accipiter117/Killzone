@@ -18,7 +18,7 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'source')
 OUT = os.path.join(HERE, '..', '..', 'assets', 'sprites', 'props')
-WIDTH = {'dropship': 440, 'pillbox': 110, 'statue': 140, 'apc': 150, 'bus': 230, 'truck': 130, 'bridge-down': 240, 'bridge-up': 140, 'arctower': 160}  # pixels wide in the atlas, per prop (default 160)
+WIDTH = {'dropship': 440, 'pillbox': 110, 'statue': 140, 'apc': 150, 'bus': 230, 'truck': 130, 'bridge-down': 240, 'bridge-up': 140, 'arctower': 160, 'mgnest': 160}  # pixels wide in the atlas, per prop (default 160)
 # Sheets holding several props side by side: split at the gaps, left to right.
 SPLIT = {
     'tankwrecks': ['tankwreck-isa', 'tankwreck-hgh'],
@@ -26,7 +26,13 @@ SPLIT = {
     'freight': ['traincar-red', 'traincar-green', 'traincar-grey', 'tanker'],
     'vehicles': ['apc', 'bus', 'truck'],
     'liftbridge': ['bridge-down', 'bridge-up'],
+    'craters': ['crater-1', 'crater-2', 'crater-3', 'crater-4'],
+    'rubble': ['rubble-c1', 'rubble-c2', 'rubble-c3', 'rubble-c4', 'rubble-b1', 'rubble-b2', 'rubble-b3', 'rubble-b4'],
 }
+# Sheets in rows: how many rows (each row is then split into its columns).
+ROWS = {'rubble': 2}
+for _n in SPLIT['craters']: WIDTH[_n] = 128
+for _n in SPLIT['rubble']: WIDTH[_n] = 48
 for _n in SPLIT['containers']: WIDTH[_n] = 240
 for _n in SPLIT['freight']: WIDTH[_n] = 280
 
@@ -52,8 +58,9 @@ def cut(im, crop=True):
     return Image.fromarray(a[ys.min():ys.max() + 1, xs.min():xs.max() + 1])
 
 
-def split(a, n):
-    """n pieces, split at the widest empty column runs."""
+def split(a, n, keep=False):
+    """n pieces, split at the widest empty column runs (keep: return the
+    uncropped bands as arrays, for splitting a sheet into rows first)."""
     cols = (a[..., 3] > 0).sum(axis=0) > 0
     runs, x, w = [], 0, len(cols)
     while x < w:
@@ -67,6 +74,7 @@ def split(a, n):
     out = []
     for k in range(n):
         piece = a[:, edges[k]:edges[k + 1]]
+        if keep: out.append(piece); continue
         ys, xs = np.where(piece[..., 3] > 0)
         out.append(Image.fromarray(piece[ys.min():ys.max() + 1, xs.min():xs.max() + 1]))
     return out
@@ -87,7 +95,13 @@ def main():
     for path in sorted(glob.glob(os.path.join(SRC, 'prop-*.*'))):
         name = os.path.splitext(os.path.basename(path))[0][5:]
         if name in SPLIT:
-            for piece, part in zip(split(cut(Image.open(path), crop=False), len(SPLIT[name])), SPLIT[name]):
+            a = cut(Image.open(path), crop=False)
+            rows = ROWS.get(name, 1)
+            bands = [a] if rows == 1 else [np.asarray(b) for b in split(np.ascontiguousarray(a.transpose(1, 0, 2)), rows, keep=True)]
+            if rows > 1: bands = [b.transpose(1, 0, 2) for b in bands]
+            per = len(SPLIT[name]) // rows
+            pieces = [p for b in bands for p in split(b, per)]
+            for piece, part in zip(pieces, SPLIT[name]):
                 save(piece, part)
         else:
             save(cut(Image.open(path)), name)
