@@ -4,7 +4,7 @@
 
 import { next } from './rng.js';
 import { T, cellIndex, canStep, forCells, surfName } from './map.js';
-import { findPath, straightClear } from './path.js';
+import { coarsePath, findPath, straightClear } from './path.js';
 import { isActive, dist, feed, sideName, nearObjective } from './util.js';
 import { fireShot, damageSoldier, suppress, losClear } from './combat.js';
 import { breakWalls } from './features.js';
@@ -49,7 +49,9 @@ function nextWaypoint(state, v, to) {
   const age = state.tick - (v.pathTick ?? -9999);
   const stale = !v.path || !v.pathTo || (Math.hypot(v.pathTo.x - to.x, v.pathTo.y - to.y) > 40 && age > 15) || age > 150;
   if (stale) {
-    v.path = findPath(state.map, v, to, { maxNodes: 20000, mirror: v.side === 1, vehicle: true });
+    // Skirmish maps: long drives are planned on the coarse grid (path.js).
+    const far = state.map.skirmish && Math.hypot(to.x - v.x, to.y - v.y) > 400;
+    v.path = (far && coarsePath(state.map, v, to, true)) || findPath(state.map, v, to, { maxNodes: 20000, mirror: v.side === 1, vehicle: true });
     v.pathTo = { x: to.x, y: to.y };
     v.pathTick = state.tick;
   }

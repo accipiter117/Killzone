@@ -4,6 +4,7 @@
 // battle always gets the same decisions.
 
 import { canWorkGate, gateCentre } from './gates.js';
+import { isExplored } from './battle.js';
 import { callinBlocked } from './callins.js';
 import { members, centroid, dist, platoonStrength, platoonAlive, isActive } from './util.js';
 import { abilityHasTarget, abilityKey } from './abilities.js';
@@ -15,6 +16,38 @@ const PROFILES = {
   aggressive: { stanceStrong: 'aggressive', stanceWeak: 'aggressive', reserve: 0 },
   cautious: { stanceStrong: 'cautious', stanceWeak: 'cautious', reserve: 2 },
 };
+
+// The nearest cell to (x, y) that troops can reach (water, walls and
+// walled-in ground are skipped), searching outwards in square rings.
+function reachableNear(map, x, y) {
+  const c = map.cell, cx = Math.floor(x / c), cy = Math.floor(y / c);
+  if (!map.reach) return { x: Math.round(x), y: Math.round(y) };
+  for (let r = 0; r < 60; r++) {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const i = cx + dx, j = cy + dy;
+      if (i < 0 || j < 0 || i >= map.cols || j >= map.rows) continue;
+      const k = j * map.cols + i;
+      if (map.reach[k] && map.grid[k] === 0) return { x: i * c + c / 2, y: j * c + c / 2 };
+    }
+  }
+  return null;
+}
+
+// Unexplored ground worth scouting: the middles of coarse regions of the
+// map that this side has seen less than half of.
+function scoutPoints(state, side) {
+  const e = state.explored, nx = 8, ny = 6, out = [];
+  const W = state.map.width, H = state.map.height;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    let seen = 0, all = 0;
+    for (let y = Math.floor((j * e.rows) / ny); y < Math.floor(((j + 1) * e.rows) / ny); y += 2) for (let x = Math.floor((i * e.cols) / nx); x < Math.floor(((i + 1) * e.cols) / nx); x += 2) { all++; seen += e.grid[side][y * e.cols + x]; }
+    if (seen >= all * 0.5) continue;
+    const p = reachableNear(state.map, ((i + 0.5) * W) / nx, ((j + 0.5) * H) / ny);
+    if (p) out.push({ id: `scout${i}.${j}`, kind: 'scout', x: p.x, y: p.y, r: 150, owner: null });
+  }
+  return out;
+}
 
 export function createAI(side, profile = 'standard') {
   const memory = { smokeTick: {}, fallbackTick: {}, focusTick: {} };
@@ -125,8 +158,14 @@ function decide(state, side, prof, memory) {
   // Read where the enemy is massing: seen enemies near each site, and how
   // many of our soldiers this pass has already committed to it. The
   // strongest platoons choose first.
-  const near = new Map(state.sites.map((st) => [st.id, seenFoes.filter((e) => dist(e, st) < ai.threatRadius).length]));
-  const committed = new Map(state.sites.map((st) => [st.id, 0]));
+  // On a skirmish map the AI only knows the sites it has explored (or holds),
+  // like the player; while the enemy HQ is still unknown it also weighs
+  // scouting the nearest unexplored ground.
+  const known = state.sites.filter((st) => st.owner === side || isExplored(state, side, st.x, st.y));
+  const targets = [...known];
+  if (state.explored && !known.some((st) => st.kind === 'hq' && st.home !== side)) targets.push(...scoutPoints(state, side));
+  const near = new Map(targets.map((st) => [st.id, seenFoes.filter((e) => dist(e, st) < ai.threatRadius).length]));
+  const committed = new Map(targets.map((st) => [st.id, 0]));
   const free = mine.filter((pl) => {
     if (pl.order.type === 'fallback') return state.tick - (memory.fallbackTick[pl.id] || 0) > 25 * cfg.tickRate;
     return true;
@@ -134,7 +173,7 @@ function decide(state, side, prof, memory) {
   // A reserve: while not ahead, the weakest platoon waits at our home
   // objective until the enemy threatens something of ours, so a push can be
   // answered instead of everyone being committed at once.
-  const homeObj = state.sites.filter((s) => s.kind === 'objective').sort((a, b) => (side === 0 ? a.x - b.x : b.x - a.x))[0];
+  const homeObj = state.sites.find((s) => s.kind === 'hq' && s.home === side) || state.sites.filter((s) => s.kind === 'objective').sort((a, b) => (side === 0 ? a.x - b.x : b.x - a.x))[0];
   const threatened = state.sites.some((s) => s.owner === side && near.get(s.id) > 0) || (homeObj && homeObj.owner !== side && homeObj.owner !== null);
   const reserve = !ahead && !threatened && free.length >= 3 && homeObj ? free[free.length - 1] : null;
   if (reserve) {
@@ -150,13 +189,15 @@ function decide(state, side, prof, memory) {
     const alive = platoonAlive(state, pl);
     const current = pl.order.type === 'take' ? pl.order.siteId : null;
     let best = null, bestScore = -Infinity;
-    for (const site of state.sites) {
+    for (const site of targets) {
       let v = (ai.siteValue[site.kind] || 1) * (1 + ai.highGroundValue * heightAt(state.map, site.x, site.y)); // hills are worth more
       const threat = near.get(site.id);
       if (site.owner === foe) v *= 1.3;
       else if (site.owner === side) v *= threat > 0 || ahead ? 0.9 : 0.15;
       v += ai.threatValue * threat; // a site the enemy is massing on must be answered
       if (site.id === current) v *= 1.5;
+      // The longer the enemy HQ stays hidden, the more scouting matters.
+      if (site.kind === 'scout') v *= 1 + state.tick / (cfg.tickRate * ai.scoutGrowSec);
       const have = committed.get(site.id);
       // How many soldiers a site needs: enough to beat what we can see there,
       // plus a garrison that is bigger for objectives and for high ground
@@ -189,6 +230,11 @@ function decide(state, side, prof, memory) {
       }
     }
     if (lane && dist(c, lane.via) <= 150) memory.lane[pl.id] = true;
+    if (best.kind === 'scout') {
+      // Scouting: a move order into the unexplored ground.
+      if (!(pl.order.type === 'move' && Math.hypot(pl.order.x - best.x, pl.order.y - best.y) < 60) && can(cost.move)) spend({ type: 'move', params: { platoon: pl.id, x: best.x, y: best.y } }, cost.move);
+      continue;
+    }
     if (can(cost.take)) spend({ type: 'take', params: { platoon: pl.id, site: best.id } }, cost.take);
   }
 
@@ -259,6 +305,11 @@ function decide(state, side, prof, memory) {
     }
   }
 
+  // Skirmish: bring up a reserve platoon as soon as the ground held allows.
+  if (!callinBlocked(state, side, 'platoon') && op >= cfg.callins.platoon.cost) {
+    cmds.push({ side, type: 'callin', params: { what: 'platoon' } });
+    op -= cfg.callins.platoon.cost;
+  }
   // A new tank from the depot when ours is gone and points allow.
   if (!callinBlocked(state, side, 'tank') && op >= cfg.callins.tank.cost + prof.reserve) {
     cmds.push({ side, type: 'callin', params: { what: 'tank' } });

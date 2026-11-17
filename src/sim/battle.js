@@ -49,12 +49,19 @@ export function createBattle(seed, options = {}) {
   for (const side of [0, 1]) {
     const f = forces && forces[side];
     const list = f ? f.platoons : cfg.platoons.map((roles, pi) => ({ roles, name: PLATOON_NAMES[pi] }));
+    // Skirmish: platoons held in reserve, off the field until called in at
+    // the HQ (made now, empty, so every soldier list keeps its size).
+    if (map.skirmish && !f) for (let k = 0; k < cfg.skirmish.reserves; k++) {
+      const roles = cfg.platoons[k % cfg.platoons.length];
+      list.push({ roles, name: PLATOON_NAMES[list.length] || `Platoon ${list.length + 1}`, alive: roles.map(() => 0), reserve: true });
+    }
     const spread = list.length === 3 ? cfg.deploy.spreadY : list.map((_, i) => (i + 1) / (list.length + 1));
-    list.forEach(({ roles, name, alive, ref }, pi) => {
+    list.forEach(({ roles, name, alive, ref, reserve }, pi) => {
       const pl = {
         id: state.platoons.length, side, index: pi, name: name || PLATOON_NAMES[pi] || `Platoon ${pi + 1}`, ref: ref ?? null,
         squads: [], order: { type: 'idle' }, orderTick: 0, stance: 'balanced', broken: false, rallied: false, rallyAt: -1, reinforceReadyTick: 0, holdFire: false, pending: null, breakBase: 0, paidTick: -1, brokeTick: 0, focus: -1, focusUntil: 0, size: roles.length * cfg.soldiersPerSquad,
       };
+      if (reserve) pl.reserve = true;
       state.platoons.push(pl);
       const baseY = H * spread[pi];
       roles.forEach((role, k) => {
@@ -119,8 +126,20 @@ export function createBattle(seed, options = {}) {
   }
   // Squads that start with nobody (a campaign platoon that lost a squad).
   for (const sq of state.squads) if (!sq.soldiers.some((id) => state.soldiers[id].alive)) sq.mode = 'dead';
-  state.durationTicks = Math.round(cfg.battle.durationSec * cfg.tickRate);
+  // Skirmish maps are twice the size: the hunt for the enemy HQ gets longer.
+  state.durationTicks = Math.round((map.skirmish ? cfg.skirmish.durationSec : cfg.battle.durationSec) * cfg.tickRate);
   chooseWeather(state, seedInt);
+  if (map.skirmish) {
+    const c = cfg.skirmish.exploreCell, cols = Math.ceil(map.width / c), rows = Math.ceil(map.height / c);
+    state.explored = { cell: c, cols, rows, grid: [new Uint8Array(cols * rows), new Uint8Array(cols * rows)] };
+    // Each side knows the ground round its own headquarters.
+    for (const s of state.sites) if (s.kind === 'hq') {
+      const r = cfg.skirmish.homeKnown;
+      for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) if (((i + 0.5) * c - s.x) ** 2 + ((j + 0.5) * c - s.y) ** 2 < r * r) state.explored.grid[s.home][j * cols + i] = 1;
+    }
+    state.tick = 0;
+    updateExplored(state);
+  }
   updateVision(state);
   updateVehicleVision(state);
   return state;
@@ -156,8 +175,11 @@ export function step(state) {
 
   for (const sd of state.sides) {
     const comms = state.sites.some((s) => s.kind === 'comms' && s.owner === sd.id);
-    sd.op = Math.min(cfg.orders.cap, sd.op + (dt / cfg.orders.regenSec) * (comms ? cfg.orders.commsRegenMult : 1));
+    // Supply points (skirmish) each add a little to the order point income.
+    const supply = state.sites.filter((s) => s.kind === 'supply' && s.owner === sd.id).length;
+    sd.op = Math.min(cfg.orders.cap, sd.op + (dt / cfg.orders.regenSec) * ((comms ? cfg.orders.commsRegenMult : 1) + supply * cfg.skirmish.supplyRegen));
   }
+  updateExplored(state);
   if (state.tick % cfg.combat.visionEveryTicks === 0) { updateVision(state); updateVehicleVision(state); }
   const thinkEvery = cfg.squad.thinkEveryTicks;
   const perSide = state.squads.length / 2;
@@ -191,11 +213,37 @@ export function step(state) {
   }
   if (state.tick % cfg.tickRate === 0 && !state.tb) {
     for (const site of state.sites) {
-      if (site.kind === 'objective' && site.owner !== null) state.sides[site.owner].score += cfg.battle.scorePerObjectiveSec;
+      if ((site.kind === 'objective' || site.kind === 'supply') && site.owner !== null) state.sides[site.owner].score += cfg.battle.scorePerObjectiveSec;
     }
   }
   if (!state.tb) checkEnd(state);
 }
+
+// Explored ground (skirmish): each side's map of where its troops have been
+// able to see, in coarse cells. Unexplored ground is black on the player's
+// screen, and the AI only knows about sites it has explored.
+export function updateExplored(state) {
+  if (!state.explored || state.tick % state.cfg.combat.visionEveryTicks !== 0) return;
+  const e = state.explored, c = e.cell, cols = e.cols, rows = e.rows;
+  const mark = (side, x, y, r) => {
+    const g = e.grid[side], r2 = (r / c) ** 2, cx = x / c, cy = y / c;
+    for (let j = Math.max(0, Math.floor(cy - r / c)); j <= Math.min(rows - 1, Math.floor(cy + r / c)); j++) {
+      for (let i = Math.max(0, Math.floor(cx - r / c)); i <= Math.min(cols - 1, Math.floor(cx + r / c)); i++) {
+        if ((i + 0.5 - cx) ** 2 + (j + 0.5 - cy) ** 2 <= r2) g[j * cols + i] = 1;
+      }
+    }
+  };
+  const sight = state.cfg.skirmish.exploreSight;
+  for (const s of state.soldiers) if (s.alive && !s.fled) mark(s.side, s.x, s.y, sight);
+  for (const v of state.vehicles) if (v.alive && !v.absent) mark(v.side, v.x, v.y, sight * 1.2);
+}
+
+export const isExplored = (state, side, x, y) => {
+  const e = state.explored;
+  if (!e) return true;
+  const i = Math.floor(y / e.cell) * e.cols + Math.floor(x / e.cell);
+  return !!e.grid[side][i];
+};
 
 // Morale. A platoon that falls below its break point routs to its own edge.
 // The first time, the survivors regroup there and come back into the fight
@@ -206,6 +254,7 @@ function checkMorale(state) {
   const W = state.map.width;
   const label = (pl) => (pl.side === 0 ? pl.name : `Helghast ${pl.name}`);
   for (const pl of state.platoons) {
+    if (pl.reserve) continue; // not on the field yet
     const alive = platoonAlive(state, pl);
     if (pl.broken) {
       if (pl.rallied || alive === 0) continue;
@@ -259,9 +308,12 @@ function platoonPos(state, pl) {
   return n ? { x: x / n, y: y / n } : null;
 }
 
-export const sideBroken = (state, side) => state.platoons.every((pl) => pl.side !== side || pl.broken);
+export const sideBroken = (state, side) => state.platoons.every((pl) => pl.side !== side || pl.broken || pl.reserve);
 
 function checkEnd(state) {
+  // Skirmish: taking the enemy's headquarters wins outright.
+  const lost = state.sites.find((s) => s.kind === 'hq' && s.owner !== null && s.owner !== s.home);
+  if (lost) return finish(state, lost.owner, 'hq');
   const b0 = sideBroken(state, 0), b1 = sideBroken(state, 1);
   if (b0 || b1) return finish(state, b0 && b1 ? null : b0 ? 1 : 0, 'broken');
   if (state.tick >= state.durationTicks) {

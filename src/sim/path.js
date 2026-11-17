@@ -7,7 +7,7 @@ import { cellIndex, canStep, T, S_NAMES } from './map.js';
 import { CONFIG } from '../config.js';
 
 // What each ground surface costs a route (roads cheap, fords and mud dear).
-const SURF_COST = S_NAMES.map((n) => CONFIG.surface[n].cost);
+let SURF_COST = null; // filled on first use (map.js and this module import each other)
 
 // Cost of entering a wire cell, in cells of open ground. Engineers cut wire,
 // so it costs them little.
@@ -66,6 +66,7 @@ export function findPath(map, a, b, { engineer = false, maxNodes = 24000, mirror
   const B = T.building, grid = map.grid;
   const blocked = vehicle ? (j) => grid[j] === B : null;
   const tight = vehicle ? (j, x, y) => (x > 0 && grid[j - 1] === B) || (x < cols - 1 && grid[j + 1] === B) || (y > 0 && grid[j - cols] === B) || (y < rows - 1 && grid[j + cols] === B) : null;
+  if (!SURF_COST) SURF_COST = S_NAMES.map((n) => CONFIG.surface[n].cost);
   const gx = goal % cols, gy = (goal / cols) | 0;
   const g = new Float32Array(cols * rows).fill(Infinity);
   const from = new Int32Array(cols * rows).fill(-1);
@@ -128,6 +129,93 @@ export function straightClear(map, a, b, allowWire = false) {
   return true;
 }
 
+// Long routes on a skirmish map: planned on a coarse grid (COARSE fine cells
+// a side), where a step between two coarse cells is allowed only if troops
+// can walk straight between their centres. The whole coarse map is small
+// enough to search every time, so a detour of any length round a river to
+// its bridge is found at once; soldiers still find their own way round the
+// small things on each leg. Built once per map and kept on it.
+const COARSE = 4;
+function coarseOf(map, vehicle = false) {
+  const slot = vehicle ? 'coarseV' : 'coarse';
+  if (map[slot]) return map[slot];
+  const k = COARSE, cols = Math.ceil(map.cols / k), rows = Math.ceil(map.rows / k), c = map.cell * k;
+  const open = new Uint8Array(cols * rows), pt = new Array(cols * rows).fill(null);
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    // The cell's point: the walkable fine cell nearest its middle.
+    let best = null, bd = Infinity, n = 0;
+    for (let y = j * k; y < Math.min(map.rows, j * k + k); y++) for (let x = i * k; x < Math.min(map.cols, i * k + k); x++) {
+      const f = y * map.cols + x;
+      if (map.grid[f] === T.wall || (vehicle && map.grid[f] === T.building) || (map.surf && map.surf[f] === 3) || (map.reach && !map.reach[f])) continue;
+      n++;
+      const d = Math.abs(x - (i * k + k / 2 - 0.5)) + Math.abs(y - (j * k + k / 2 - 0.5));
+      if (d < bd) { bd = d; best = { x: x * map.cell + map.cell / 2, y: y * map.cell + map.cell / 2 }; }
+    }
+    if (n * 2 >= k * k) { open[j * cols + i] = 1; pt[j * cols + i] = best; }
+  }
+  map[slot] = { cols, rows, c, open, pt, edge: new Map(), vehicle };
+  return map[slot];
+}
+// Tanks cannot enter ruins: a straight leg must also miss every building cell.
+function clearOfRuins(map, a, b) {
+  const steps = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 5);
+  for (let k = 0; k <= steps; k++) {
+    const i = cellIndex(map, a.x + ((b.x - a.x) * k) / steps, a.y + ((b.y - a.y) * k) / steps);
+    if (i >= 0 && map.grid[i] === T.building) return false;
+  }
+  return true;
+}
+function coarseStep(map, cg, i, j) {
+  const key = i < j ? i * 1e6 + j : j * 1e6 + i;
+  let ok = cg.edge.get(key);
+  if (ok === undefined) { ok = straightClear(map, cg.pt[i], cg.pt[j], cg.vehicle) && (!cg.vehicle || clearOfRuins(map, cg.pt[i], cg.pt[j])); cg.edge.set(key, ok); }
+  return ok;
+}
+export function coarsePath(map, a, b, vehicle = false) {
+  if (!SURF_COST) SURF_COST = S_NAMES.map((n) => CONFIG.surface[n].cost);
+  const cg = coarseOf(map, vehicle), cols = cg.cols, rows = cg.rows, n = cols * rows;
+  const near = (p) => {
+    const ci = Math.min(cols - 1, Math.floor(p.x / cg.c)), cj = Math.min(rows - 1, Math.floor(p.y / cg.c));
+    for (let r = 0; r < 4; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const i = ci + dx, j = cj + dy;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || i < 0 || j < 0 || i >= cols || j >= rows) continue;
+      const q = j * cols + i;
+      if (cg.open[q] && straightClear(map, p, cg.pt[q], vehicle)) return q;
+    }
+    return -1;
+  };
+  const start = near(a), goal = near(b);
+  if (start < 0 || goal < 0) return null;
+  const gx = goal % cols, gy = (goal / cols) | 0;
+  const g = new Float32Array(n).fill(Infinity), from = new Int32Array(n).fill(-1);
+  const open = new Heap();
+  g[start] = 0;
+  open.push(0, start);
+  while (open.size) {
+    const i = open.pop();
+    if (i === goal) break;
+    const x = i % cols, y = (i / cols) | 0;
+    for (const [dx, dy, st] of NB) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+      const j = ny * cols + nx;
+      if (!cg.open[j]) continue;
+      const fj = cellIndex(map, cg.pt[j].x, cg.pt[j].y);
+      const cost = g[i] + st * (map.surf ? SURF_COST[map.surf[fj]] : 1);
+      if (cost >= g[j] || !coarseStep(map, cg, i, j)) continue;
+      g[j] = cost;
+      from[j] = i;
+      open.push(cost + Math.hypot(gx - nx, gy - ny), j);
+    }
+  }
+  if (from[goal] < 0 && goal !== start) return null;
+  const pts = [];
+  for (let i = goal; i !== start && i >= 0; i = from[i]) pts.push(cg.pt[i]);
+  pts.reverse();
+  pts.push({ x: b.x, y: b.y });
+  return pts.map((p) => ({ x: p.x, y: p.y }));
+}
+
 // The next point a squad at `from` should walk to on its way to `to`.
 // Routes are cached on the squad and refreshed when the destination moves,
 // every few seconds, or when the squad has wandered off them.
@@ -140,7 +228,9 @@ export function nextStep(state, sq, from, to) {
   const age = state.tick - (sq.pathTick ?? -9999);
   const stale = !sq.path || !sq.pathTo || (Math.hypot(sq.pathTo.x - to.x, sq.pathTo.y - to.y) > 40 && age > 15) || age > 150;
   if (stale) {
-    sq.path = findPath(map, from, to, { engineer, mirror: sq.side === 1 });
+    // Skirmish maps: long routes are planned on the coarse grid (see coarsePath).
+    const far = map.skirmish && Math.hypot(to.x - from.x, to.y - from.y) > 500;
+    sq.path = (far && coarsePath(map, from, to)) || findPath(map, from, to, { engineer, mirror: sq.side === 1 });
     sq.pathTo = { x: to.x, y: to.y };
     sq.pathTick = state.tick;
   }

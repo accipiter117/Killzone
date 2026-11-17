@@ -20,7 +20,7 @@ export const CONFIG = {
   world: { width: 3000, height: 1200, cell: 10 },
   // Each map's size: the trench line is long and thin; the built-up maps are
   // deeper (the view can be turned to suit).
-  mapSizes: { trenches: { width: 3000, height: 1200 }, industrial: { width: 2600, height: 1500 }, city: { width: 2400, height: 1700 } },
+  mapSizes: { trenches: { width: 3000, height: 1200 }, industrial: { width: 2600, height: 1500 }, city: { width: 2400, height: 1700 }, random: { width: 6000, height: 4000 } },
 
   map: {
     trenchX: [300, 360], // ISA trench centre line (Helghast is mirrored)
@@ -149,6 +149,10 @@ export const CONFIG = {
     haze: { speed: 1, tank: 1, cost: 1, hide: 0.45, blockLen: 70 },
     deck: { speed: 1.25, tank: 1.45, cost: 0.75 },
   },
+  // Random skirmish maps (src/sim/maps/random.js): find and take the enemy
+  // HQ. Supply points pay score and order points; ground is explored in
+  // coarse cells as troops see it.
+  skirmish: { durationSec: 1500, supplyRegen: 0.18, exploreCell: 50, exploreSight: 300, homeKnown: 520, hqSec: 60, reserves: 2 },
   // Blood (src/render/blood.js): picture only, never read by the rules.
   // Sizes in world units (a standing soldier is about 34 tall), times in
   // seconds. The pixel is the size of one hard-edged square, to match the
@@ -193,6 +197,10 @@ export const CONFIG = {
   // at once. Aircraft and other support will join this list.
   callins: {
     tank: { label: 'Tank', cost: 3, max: 1, site: 'depot' },
+    // Skirmish: a fresh platoon from the reserve, arriving at your HQ. The
+    // more supply points you hold, the more of the reserve you can bring up
+    // (needSupply[k] for the k-th platoon called in).
+    platoon: { label: 'Platoon', cost: 5, site: 'hq', needSupply: [2, 4] },
   },
   // Digging in (src/sim/digging.js): a squad holding still this long starts
   // to dig (a Dig in order starts at once and digs faster). Levels at these
@@ -330,7 +338,8 @@ export const CONFIG = {
 
   ai: {
     thinkSec: 4,
-    siteValue: { objective: 10, comms: 6, mg: 3, arc: 3, lever: 1.5, depot: 2 },
+    siteValue: { objective: 10, comms: 6, mg: 3, arc: 3, lever: 1.5, depot: 2, supply: 7, hq: 25, scout: 4 },
+    scoutGrowSec: 90, // skirmish: a scouting target's worth grows by its base every this many seconds while the enemy HQ is unfound
     threatRadius: 320, // enemies seen this close to a site count as massing on it
     threatValue: 0.6, // extra value per enemy soldier massing on a site
     reinforceBelow: 0.65, tankRetreatHp: 0.35, tankRetreatX: 200, tankBehind: 90, tankReorderDist: 120, focusRange: 380, focusEverySec: 30, // the AI reinforces a platoon below this strength
@@ -461,4 +470,4 @@ export const SITE_RULES = {
 };
 
 export const SIDE_NAMES = ['ISA', 'Helghast'];
-export const PLATOON_NAMES = ['1st Platoon', '2nd Platoon', '3rd Platoon'];
+export const PLATOON_NAMES = ['1st Platoon', '2nd Platoon', '3rd Platoon', '4th Platoon', '5th Platoon'];

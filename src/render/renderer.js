@@ -17,6 +17,7 @@ import { drawRubbleSprite } from './ground-sprites.js';
 import { drawHaze, drawGates } from './map-live.js';
 import { SPRITES, FLAGS, drawUnit, dirFromAngle, tankScale } from './unit-sprites.js';
 import { fx } from './fx-random.js';
+import { isExplored } from '../sim/battle.js';
 
 // In the tilted view, anything standing on raised ground is drawn higher up
 // the screen. LY gives the screen y for a ground point (unchanged when flat).
@@ -81,7 +82,7 @@ export function drawFrame(g, r, state, cam, opts) {
   setWorld(g);
 
   LY = opts.tilt ? (x, y) => y - liftAt(state.map, x, y) : (x, y) => y;
-  g.drawImage(terrain.canvas, 0, 0);
+  g.drawImage(terrain.canvas, 0, 0, state.map.width, state.map.height);
   if (opts.blood) drawPools(g, opts.blood, terrain, now);
   drawWire(g, r, state, cam);
   drawWalls(g, state, cam, opts);
@@ -101,13 +102,14 @@ export function drawFrame(g, r, state, cam, opts) {
   drawStrikes(g, state, now, px, opts);
   drawDeployZone(g, state, opts, px);
   drawMarker(g, opts, now, px);
+  drawShroud(g, r, state, opts, now);
 
   // Screen space: icons, badges and text stay the same size at any zoom.
   drawFog(g, r, state, cam, opts);
   if (opts.weatherFx !== false) { g.setTransform(dpr, 0, 0, dpr, 0, 0); drawWeatherScreen(g, state, now, cam.vw, cam.vh, fxs); }
   g.setTransform(dpr, 0, 0, dpr, sh.x * dpr, sh.y * dpr);
   drawLastSeen(g, r, state, cam, opts, now);
-  drawSiteIcons(g, state, cam, now);
+  drawSiteIcons(g, state, cam, now, opts);
   r.badges = drawBadges(g, state, cam, opts);
   drawSquadLabels(g, state, cam, opts);
   drawFacing(g, state, cam, opts);
@@ -116,6 +118,34 @@ export function drawFrame(g, r, state, cam, opts) {
   drawFocus(g, state, cam, opts);
   drawIncoming(g, state, cam, opts);
   r.edges = drawEdgeAlerts(g, state, cam, opts);
+}
+
+// Skirmish shroud (as in StarCraft): ground your side has never seen is
+// black. Built small from the explored grid (one pixel per cell) and drawn
+// stretched over the map, so its edges come out soft.
+const siteKnown = (state, s, opts) => opts.reveal || s.owner === opts.playerSide || isExplored(state, opts.playerSide, s.x, s.y);
+function shroudCanvas(r, state, opts, now) {
+  const e = state.explored;
+  if (!e || opts.reveal) return null;
+  if (!r.shroud || r.shroud.width !== e.cols || r.shroud.height !== e.rows) {
+    r.shroud = document.createElement('canvas'); r.shroud.width = e.cols; r.shroud.height = e.rows; r.shroudAt = -1;
+  }
+  if (now - r.shroudAt > 0.4 || r.shroudSide !== opts.playerSide) {
+    r.shroudAt = now; r.shroudSide = opts.playerSide;
+    const f = r.shroud.getContext('2d'), img = f.createImageData(e.cols, e.rows), grid = e.grid[opts.playerSide];
+    for (let i = 0; i < grid.length; i++) { img.data[i * 4] = 8; img.data[i * 4 + 1] = 8; img.data[i * 4 + 2] = 10; img.data[i * 4 + 3] = grid[i] ? 0 : 255; }
+    f.putImageData(img, 0, 0);
+  }
+  return r.shroud;
+}
+function drawShroud(g, r, state, opts, now) {
+  const c = shroudCanvas(r, state, opts, now);
+  if (!c) return;
+  const e = state.explored;
+  g.save();
+  g.imageSmoothingEnabled = true;
+  g.drawImage(c, 0, 0, e.cols * e.cell, e.rows * e.cell);
+  g.restore();
 }
 
 // Fog of war: everywhere your troops cannot see is dimmed. Drawn small and
@@ -1156,8 +1186,9 @@ function drawFlagPole(g, s, i, now) {
   g.drawImage(FLAGS.img, fr.x, fr.y, fr.w, fr.h, 1 - fr.ax * k, y - fr.ay * k, fr.w * k, fr.h * k);
 }
 
-function drawSiteIcons(g, state, cam, now = 0) {
+function drawSiteIcons(g, state, cam, now = 0, opts = {}) {
   for (const [i, s] of state.sites.entries()) {
+    if (state.explored && !siteKnown(state, s, opts)) continue;
     const p = toScreen(cam, s.x, LY(s.x, s.y));
     if (p.x < -60 || p.y < -40 || p.x > cam.vw + 40 || p.y > cam.vh + 100) continue;
     const col = ownerColour(s.owner);
@@ -1210,6 +1241,18 @@ function drawSiteIcons(g, state, cam, now = 0) {
         g.fillRect(-8, 0, 16, 6);
         g.fillRect(-4, -4, 8, 5);
         g.fillRect(3, -3, 7, 2);
+      } else if (s.kind === 'supply') {
+        // A supply crate.
+        g.strokeRect(-6, -5, 12, 10);
+        g.beginPath(); g.moveTo(-6, -5); g.lineTo(6, 5); g.moveTo(6, -5); g.lineTo(-6, 5); g.stroke();
+      } else if (s.kind === 'hq') {
+        // Headquarters: a bigger ring and the letters.
+        g.lineWidth = 3;
+        g.beginPath(); g.arc(0, 0, 17, 0, Math.PI * 2); g.stroke();
+        g.font = 'bold 12px system-ui, sans-serif';
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillText('HQ', 0, 1);
       }
     }
     g.restore();
@@ -1298,10 +1341,13 @@ export function drawMinimap(g, r, state, cam, opts) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.fillStyle = 'rgba(0,0,0,0.25)';
   g.fillRect(0, 0, cw, ch);
+  const sh = shroudCanvas(r, state, opts, opts.now);
+  if (sh) { g.imageSmoothingEnabled = true; g.drawImage(sh, 0, 0, state.explored.cols * state.explored.cell * sx, state.explored.rows * state.explored.cell * sy); }
   for (const s of state.sites) {
+    if (state.explored && !siteKnown(state, s, opts)) continue;
     g.fillStyle = ownerColour(s.owner);
     g.beginPath();
-    g.arc(s.x * sx, s.y * sy, s.kind === 'objective' ? 4 : 2.5, 0, Math.PI * 2);
+    g.arc(s.x * sx, s.y * sy, s.kind === 'objective' || s.kind === 'hq' ? 4 : 2.5, 0, Math.PI * 2);
     g.fill();
   }
   for (const s of state.soldiers) {

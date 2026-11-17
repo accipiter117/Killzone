@@ -22,7 +22,7 @@ export function updateSites(state, dt) {
     }
     site.counts = counts;
     site.contested = counts[0] > 0 && counts[1] > 0;
-    const secs = site.kind === 'objective' ? cap.objectiveSec : cap.featureSec;
+    const secs = site.kind === 'hq' ? state.cfg.skirmish.hqSec : site.kind === 'objective' || site.kind === 'supply' ? cap.objectiveSec : cap.featureSec;
     if (site.contested) continue;
     const present = counts[0] > 0 ? 0 : counts[1] > 0 ? 1 : null;
     if (present === null || present === site.owner) {
