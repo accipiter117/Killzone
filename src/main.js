@@ -18,6 +18,7 @@ import { loadUnitSprites, loadFlags } from './render/unit-sprites.js';
 import { createHelghanGlobe } from './ui/helghan-globe.js';
 import { loadPropArt } from './render/props.js';
 import { loadGroundSprites } from './render/ground-sprites.js';
+import { createBlood, ingestBlood, rebakeBlood } from './render/blood.js';
 import { callinBlocked } from './sim/callins.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
 import { createAudio, unlockAudio, newFrame, playEvents, uiClick, setMix } from './render/audio.js';
@@ -47,7 +48,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), battleMode: 'rt', side: store.get('side2', 1) === 0 ? 0 : 1, route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), mapChoice: store.get('mapType', 'trenches'), weatherChoice: store.get('weather', 'random'), mapType: 'trenches', lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), battleMode: 'rt', side: store.get('side2', 1) === 0 ? 0 : 1, route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), bloodOn: store.get('blood', true), mapChoice: store.get('mapType', 'trenches'), weatherChoice: store.get('weather', 'random'), mapType: 'trenches', lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, scope: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -168,6 +169,8 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
   const st = game.match.state;
   game.renderer = createRenderer(st.map);
   game.fxs = createEffects();
+  game.blood = createBlood();
+  game.blood.on = game.bloodOn;
   paintTerrain();
   game.fxs.reduced = reduceMotion.matches;
   game.cam = createCamera(st.map.width, st.map.height);
@@ -242,6 +245,7 @@ function paintTerrain() {
   game.terrain = (game.tilt ? buildTiltTerrain : buildTerrain)(st.map, seedFrom(game.seed));
   game.fxs.terrain = game.terrain;
   game.fxs.ly = game.tilt ? (x, y) => y - liftAt(st.map, x, y) : null;
+  if (game.blood) rebakeBlood(game.blood, game.terrain);
   if (game.renderer) game.renderer.thumb = null;
 }
 
@@ -624,6 +628,7 @@ function openMenu() {
   document.getElementById('view-select').value = game.view;
   document.getElementById('map-select').value = game.mapChoice;
   document.getElementById('weather-select').value = game.weatherChoice;
+  document.getElementById('blood-toggle').checked = game.bloodOn;
   document.getElementById('tilt-toggle').checked = game.tilt;
   document.getElementById('slowmo-toggle').checked = game.slowMo;
   document.getElementById('sound-toggle').checked = audio.enabled;
@@ -670,6 +675,17 @@ document.getElementById('slowmo-toggle').addEventListener('change', (e) => {
 document.getElementById('map-select').addEventListener('change', (e) => {
   game.mapChoice = e.target.value;
   store.set('mapType', game.mapChoice);
+});
+document.getElementById('blood-toggle').addEventListener('change', (e) => {
+  game.bloodOn = e.target.checked;
+  store.set('blood', game.bloodOn);
+  if (game.blood) {
+    game.blood.on = game.bloodOn;
+    // Pools are painted into the battlefield picture: repaint it without them,
+    // and forget them, if blood is switched off.
+    if (!game.bloodOn) { game.blood = createBlood(); game.blood.on = false; }
+    if (game.match) paintTerrain();
+  }
 });
 document.getElementById('weather-select').addEventListener('change', (e) => {
   game.weatherChoice = e.target.value;
@@ -972,6 +988,7 @@ function frame(t) {
     while (game.acc >= tickDt && n < 16) {
       advance(m);
       ingest(game.fxs, st.events, now);
+      ingestBlood(game.blood, game.fxs, st.events, now);
       playEvents(audio, st.events, game.cam, PLAYER);
       game.acc -= tickDt;
       n++;
@@ -1007,7 +1024,7 @@ function frame(t) {
   prune(game.fxs, now);
   const shake = shakeOffset(game.fxs, dt);
   const reveal = game.watch || game.replay;
-  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, scope: game.scope, vehicleSelected: game.vehicle, escortPick: !!game.escortPick, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, tilt: game.tilt, routeDraft: game.route, deploying: game.planning && st.tick === 0 && !st.tb && game.selected !== null, facing: !st.tb && !game.watch && !game.replay && (game.selected !== null || game.vehicle), grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null) };
+  const view = { dpr: game.dpr, now, fxs: game.fxs, terrain: game.terrain, shake, selected: game.selected, scope: game.scope, vehicleSelected: game.vehicle, escortPick: !!game.escortPick, blood: game.blood, playerSide: PLAYER, reveal, marker: game.marker, labelsAll: game.labelsAll, view: game.view, tilt: game.tilt, routeDraft: game.route, deploying: game.planning && st.tick === 0 && !st.tb && game.selected !== null, facing: !st.tb && !game.watch && !game.replay && (game.selected !== null || game.vehicle), grid: game.grid && !game.watch && !game.replay && (game.selected !== null || game.vehicle || game.armed !== null) };
   drawFrame(g, game.renderer, st, game.cam, view);
   if (st.tb) tacticsUI.draw(g, game.cam, game.dpr, now);
   // Planning and timing controls.
