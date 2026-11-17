@@ -43,7 +43,11 @@ TANK = [
     ('anim', 5, ['move1', 'move2', 'fire', 'damaged', 'wreck'], ('w', 2.4)),
 ]
 UNITS = {
-    'hgh-rifle': {'sheets': RIFLE},
+    # The fine pixel Helghast set (Nov 2026): ChatGPT drew the lying soldier
+    # stubbier than the standing one, so prone is sized to match the helmets.
+    'hgh-rifle': {'sheets': [('prone', 2, ['prone1', 'prone2'], ('w', 0.73)) if s[0] == 'prone' else ('die', 3, ['hit', 'fall', 'dead'], ('h', 0.93)) if s[0] == 'die' else s for s in RIFLE],
+                  # The dead (lying) half is sized by its length, like prone.
+                  'parts': {'die-2': ('w', 0.62)}},
     # The ISA dying sheet came from its own request, so it is sized by its
     # own first frame (jolted back, a little shorter than standing).
     'isa-rifle': {'sheets': [s if s[0] != 'die' else ('die', 3, ['hit', 'fall', 'dead'], ('h', 0.93)) for s in RIFLE], 'tint': 'isa-rifle-blue'},
@@ -93,7 +97,7 @@ def load(path):
                 for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
                     if 0 <= ny < white.shape[0] and 0 <= nx < Wd and white[ny, nx] and (ny, nx) not in seen:
                         seen.add((ny, nx)); stack.append((ny, nx))
-            if len(comp) > 250:
+            if len(comp) > 40:
                 for y, x in comp:
                     bg[y, x] = True
         # The soft edge where the soldier was blended into the white: pale,
@@ -144,7 +148,10 @@ def figure(cell):
             cx0 = min(x for x, _ in comp); cx1 = max(x for x, _ in comp)
             cy0 = min(y for _, y in comp); cy1 = max(y for _, y in comp)
             near = cx1 >= mx0 - mw * 0.35 and cx0 <= mx1 + mw * 0.35 and cy1 >= my0 - mh * 0.2 and cy0 <= my1 + mh * 0.35
-            if len(comp) < max(30, total * 0.012) or not near:
+            # A piece cut off at the cell's side is a long stride or rifle from
+            # the next soldier poking over the line, not part of this one.
+            edge = cx0 == 0 or cx1 == w - 1
+            if len(comp) < max(30, total * 0.012) or not near or edge:
                 for x, y in comp:
                     px[x, y] = 0
     return hard.getbbox(), hard
@@ -165,8 +172,47 @@ def blue(img):
     return Image.fromarray((out * 255).round().astype(np.uint8))
 
 
+def split(unit, spec):
+    """A sheet may come in parts (ChatGPT squashes the soldier when asked for
+    many rows in one image): <unit>-<sheet>-1.png, -2.png and so on, each
+    holding the next rows. Each part is sized by its own first frame."""
+    out = []
+    for name, rows, fnames, sc in spec['sheets']:
+        parts = []
+        i = 1
+        while os.path.exists(os.path.join(SRC, f'{unit}-{name}-{i}.png')):
+            parts.append(f'{name}-{i}')
+            i += 1
+        if not parts or spec.get('file'):
+            out.append((name, rows, fnames, sc))
+            continue
+        per = -(-rows // len(parts))
+        for j, part in enumerate(parts):
+            fn = fnames[j * per:(j + 1) * per]
+            out.append((part, len(fn), fn, spec.get('parts', {}).get(part, sc)))
+    return out
+
+
+def keep_glow(pre, rgb, alpha, w, h):
+    """Small glowing details (Helghast eyes, flashes) are only a few pixels
+    wide, so averaging a big shrink fades them into the dark helmet. Where
+    the full picture had glowing orange, the shrunk pixel takes the glow
+    colour instead, so the eyes still read when zoomed out."""
+    a = np.asarray(pre).astype(np.float32)
+    r, g, b, al = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
+    glow = (al > 0) & (r > 190) & (r - b > 110) & (g > 60) & (g < 215)
+    if not glow.any():
+        return rgb
+    cover = np.asarray(Image.fromarray((glow * 255).astype(np.uint8)).resize((w, h), Image.BOX)).astype(np.float32) / 255
+    hot = (cover > 0.12) & (alpha > 0)
+    colour = a[glow][:, :3].mean(axis=0)
+    rgb = rgb.copy()
+    rgb[hot] = np.maximum(rgb[hot], colour)
+    return rgb
+
+
 def build(unit, spec):
-    sheets = spec['sheets']
+    sheets = split(unit, spec)
     files = {s[0]: os.path.join(SRC, spec.get('file') or f'{unit}-{s[0]}.png') for s in sheets}
     have = [s for s in sheets if os.path.exists(files[s[0]])]
     missing = [s[0] for s in sheets if s not in have]
@@ -183,7 +229,7 @@ def build(unit, spec):
             scale[name] = H * f / (b[2] - b[0])
     for name, _, _, (kind, f) in have:
         if kind == 'as':
-            scale[name] = scale.get(f) or scale['stand']
+            scale[name] = scale.get(f) or scale.get(f + '-1') or scale['stand']
     # Never blow a sheet up past the size ChatGPT drew it: that adds no
     # detail, only file size and memory. If any sheet would be enlarged,
     # the whole unit comes out smaller (relative sizes kept) and its height
@@ -217,12 +263,14 @@ def build(unit, spec):
                     al = arr[..., 3:4]
                     rgb = np.where(al > 0, np.clip(arr[..., :3] * 255 / np.maximum(al, 1), 0, 255), 0)
                     alpha = np.where(arr[..., 3] > 120, 255, 0)
+                    if f > 1:
+                        rgb = keep_glow(pre, rgb, alpha, w, h)
                     out = Image.fromarray(np.dstack([rgb, alpha]).round().astype(np.uint8), 'RGBA')
                     # Feet: the bottom of the figure; across, the middle of its
                     # lowest part (so a rifle or flash sticking out does not shift
                     # him), or of the whole figure when lying down.
                     m = np.asarray(out)[..., 3] > 0
-                    ys, xs = np.nonzero(m[h - max(1, h // 5):] if name not in ('prone', 'die') else m)
+                    ys, xs = np.nonzero(m[h - max(1, h // 5):] if name.split('-')[0] not in ('prone', 'die') else m)
                     fx = round(xs.mean()) if len(xs) else w // 2
                     tiles[f].append((f'{fname}:{d}', out, fx, h))
 
