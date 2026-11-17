@@ -16,7 +16,7 @@ const SHADOW = 'rgba(14,12,9,0.42)';
 // from it, at its width and the picture's own proportions; until then (or
 // if it fails) the code-drawn art below stands in.
 const PAINTED = ['dropship', 'tankwreck-isa', 'tankwreck-hgh', 'container-orange', 'container-teal', 'container-mustard', 'container-grey',
-  'traincar-red', 'traincar-green', 'traincar-grey', 'tanker', 'pillbox'];
+  'traincar-red', 'traincar-green', 'traincar-grey', 'tanker', 'pillbox', 'apc', 'bus', 'truck', 'statue', 'bridge-down', 'bridge-up'];
 // Which picture a prop uses: by kind, and for containers and freight cars
 // by the colour the map builder gave it (anything else falls to a near one).
 const BY_COL = {
@@ -34,7 +34,9 @@ function pictureOf(p) {
 // thin props whose pictures are stockier than their footprint).
 const STRETCH = { container: [1, 1.45], traincar: [1, 1.6], tanker: [1, 1.7], pillbox: [1.2, 1.2] };
 const PROP_IMG = {};
-const PAINT_SCALE = { tankwreck: 1.3 };
+// For other painters (the lift bridge in map-live.js): a loaded picture or null.
+export const propImage = (name) => PROP_IMG[name] || null;
+const PAINT_SCALE = { tankwreck: 1.3, apc: 1.15, bus: 1.1, truck: 1.15 };
 export function loadPropArt(base = 'assets/sprites/props/') {
   for (const name of PAINTED) {
     const img = new Image();
