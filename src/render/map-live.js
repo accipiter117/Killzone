@@ -4,6 +4,7 @@
 // the slow drift of petrusite vent haze.
 
 import { gateCentre } from '../sim/gates.js';
+import { propImage } from './props.js';
 
 export function drawGates(g, state, now, px, opts) {
   const map = state.map;
@@ -48,6 +49,8 @@ export function drawGates(g, state, now, px, opts) {
 // it shortens and darkens, and the gap in the middle shows the water.
 function bridge(g, x0, y0, x1, y1, up, gate) {
   const across = x1 - x0 > y1 - y0; // the deck runs left to right
+  const down = propImage('bridge-down'), raised = propImage('bridge-up');
+  if (down && raised) { paintedBridge(g, x0, y0, x1, y1, up, across, down, raised); return; }
   const len = across ? x1 - x0 : y1 - y0;
   const half = len / 2;
   const leaf = half * (1 - up * 0.82);
@@ -77,6 +80,31 @@ function bridge(g, x0, y0, x1, y1, up, gate) {
     if (across) { g.moveTo(x0, (y0 + y1) / 2); g.lineTo(x1, (y0 + y1) / 2); } else { g.moveTo((x0 + x1) / 2, y0); g.lineTo((x0 + x1) / 2, y1); }
     g.stroke(); g.setLineDash([]);
   }
+}
+
+// The owner's painted lift bridge: each leaf is the picture (hinge housing
+// at the bank end), shortening towards its hinge as it lifts; past half way
+// the raised picture (underside and girders) takes over. The far leaf is the
+// same picture mirrored. Works for a deck running either way.
+function paintedBridge(g, x0, y0, x1, y1, up, across, down, raised) {
+  const len = across ? x1 - x0 : y1 - y0, wid = across ? y1 - y0 : x1 - x0;
+  const hinge = 16; // the housing sits on the bank, past the deck's end
+  const leaf = (len / 2) * (1 - up * 0.82) + hinge;
+  const img = up < 0.5 ? down : raised;
+  const h = wid + 14;
+  g.save();
+  g.translate((x0 + x1) / 2, (y0 + y1) / 2);
+  if (!across) g.rotate(Math.PI / 2);
+  g.imageSmoothingEnabled = true;
+  for (const s of [-1, 1]) {
+    g.save();
+    g.scale(s, 1); // the far leaf mirrored
+    const x = -len / 2 - hinge;
+    g.fillStyle = 'rgba(12,10,8,0.4)'; g.fillRect(x + 4 + up * 10, -h / 2 + 5 + up * 6, leaf, h);
+    g.drawImage(img, x, -h / 2, leaf, h);
+    g.restore();
+  }
+  g.restore();
 }
 
 // Vent haze: soft amber-grey puffs drifting over the haze patches.
