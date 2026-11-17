@@ -47,7 +47,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), battleMode: 'rt', side: store.get('side2', 1) === 0 ? 0 : 1, route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), mapChoice: store.get('mapType', 'trenches'), mapType: 'trenches', lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), battleMode: 'rt', side: store.get('side2', 1) === 0 ? 0 : 1, route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), mapChoice: store.get('mapType', 'trenches'), weatherChoice: store.get('weather', 'random'), mapType: 'trenches', lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, scope: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -158,7 +158,7 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
     game.mapType = choice === 'random' ? MAP_KINDS[Math.floor(Math.random() * MAP_KINDS.length)] : MAP_KINDS.includes(choice) ? choice : 'trenches';
   }
   const size = CONFIG.mapSizes[game.mapType];
-  game.options = replayLog ? replayLog.options : campaign ? battleOptions(campaign.rec) : { config: { battle: { durationSec: game.lengthSec }, map: { type: game.mapType }, world: { width: size.width, height: size.height } } };
+  game.options = replayLog ? replayLog.options : campaign ? battleOptions(campaign.rec) : { config: { battle: { durationSec: game.lengthSec }, map: { type: game.mapType, weather: game.weatherChoice }, world: { width: size.width, height: size.height } } };
   game.replay = !!replayLog;
   game.match = createMatch({ seed, options: game.options, controllers: replayLog || turnBased ? [] : controllersFor(game.watch), replayLog });
   if (turnBased) createTactics(game.match.state);
@@ -198,6 +198,7 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
   clampCamera(game.cam);
   centreOn(game.cam, PLAYER === 0 ? 260 : st.map.width - 260, st.map.height / 2);
   keepAwake(true);
+  showForecast(st);
   if (!store.get('seenHelp', false) && !replayLog) {
     pausedBeforeMenu = game.paused; // stay in planning after the help closes
     game.paused = true;
@@ -205,6 +206,26 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
   }
   if (campaign) return;
   try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}&map=${game.mapType}`); } catch { /* file:// */ }
+}
+
+// The weather forecast: a toast as the battle opens, and a chip by the
+// score for the rest of it (tap or hover for what it does).
+const WEATHER_INFO = {
+  clear: ['\u2601', 'Grey skies, dust in the air. No effect on the fight.'],
+  storm: ['\u26C8', 'Rain cuts sight by up to a quarter, tanks bog down off the roads, arc towers hit harder and further, and lightning strikes tall metal (pylons, stacks, masts, the arc tower): keep clear of it.'],
+  dust: ['\u{1F32A}', 'Gusts of ash and dust cut sight by up to two fifths. Ambushes and close fighting rule while it blows.'],
+  haze: ['\u{1F32B}', 'An amber petrusite pall and acid drizzle cut sight a little.'],
+};
+function showForecast(st) {
+  const w = st.weather, chip = document.getElementById('weather-chip');
+  if (!w) { chip.hidden = true; return; }
+  const [icon, text] = WEATHER_INFO[w.kind];
+  const label = st.cfg.weather.kinds[w.kind].label;
+  chip.hidden = false;
+  chip.textContent = icon;
+  chip.title = `${label}: ${text}`;
+  chip.onclick = () => toast(ui, label, text);
+  if (!game.replay) toast(ui, `Weather: ${label}`, text);
 }
 
 // The tilted look only works with north up, so it locks turning.
@@ -602,6 +623,7 @@ function openMenu() {
   document.getElementById('labels-toggle').checked = game.labelsAll;
   document.getElementById('view-select').value = game.view;
   document.getElementById('map-select').value = game.mapChoice;
+  document.getElementById('weather-select').value = game.weatherChoice;
   document.getElementById('tilt-toggle').checked = game.tilt;
   document.getElementById('slowmo-toggle').checked = game.slowMo;
   document.getElementById('sound-toggle').checked = audio.enabled;
@@ -648,6 +670,10 @@ document.getElementById('slowmo-toggle').addEventListener('change', (e) => {
 document.getElementById('map-select').addEventListener('change', (e) => {
   game.mapChoice = e.target.value;
   store.set('mapType', game.mapChoice);
+});
+document.getElementById('weather-select').addEventListener('change', (e) => {
+  game.weatherChoice = e.target.value;
+  store.set('weather', game.weatherChoice);
 });
 document.getElementById('tilt-toggle').addEventListener('change', (e) => {
   game.tilt = e.target.checked;

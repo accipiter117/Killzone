@@ -1,5 +1,6 @@
 // Objectives and capturable features, petrusite tanks, artillery and smoke.
 
+import { arcMult } from './weather.js';
 import { next } from './rng.js';
 import { T, terrainAt, paintCircle, forCells } from './map.js';
 import { isActive, dist, feed, sideName, siteLabel, nearObjective, coverAt } from './util.js';
@@ -69,22 +70,23 @@ export function updateEmplacements(state, dt) {
     site.fireCd -= dt;
     if (site.fireCd > 0) continue;
     const w = f[site.kind];
-    const targets = nearestEnemies(state, site, site.owner, w.range, site.kind === 'arc' ? w.targets : 1);
-    if (!targets.length && !(site.kind === 'arc' && state.vehicles.some((o) => o.alive && o.side !== site.owner && dist(o, site) <= w.range && o.spotted[site.owner]))) { site.fireCd = 0.3; continue; }
+    const boost = site.kind === 'arc' ? arcMult(state) : 1, range = w.range * boost;
+    const targets = nearestEnemies(state, site, site.owner, range, site.kind === 'arc' ? w.targets : 1);
+    if (!targets.length && !(site.kind === 'arc' && state.vehicles.some((o) => o.alive && o.side !== site.owner && dist(o, site) <= range && o.spotted[site.owner]))) { site.fireCd = 0.3; continue; }
     if (site.kind === 'mg') {
       fireShot(state, { x: site.x, y: site.y, side: site.owner }, targets[0], w, w.range, false, 'mg');
       site.lastShotTick = state.tick;
       site.fireCd = w.fireInterval * (1 + (f.mgSilence.fireMult * (site.supp || 0)) / 100);
     } else {
       for (const t of targets) {
-        damageSoldier(state, t, w.damage, 'arc');
+        damageSoldier(state, t, w.damage * boost, 'arc');
         suppress(state, state.squads[t.squad], w.suppress * coverAt(state, t.x, t.y).supp, 'arc', site);
         state.events.push({ type: 'zap', x1: site.x, y1: site.y - 30, x2: t.x, y2: t.y, side: site.owner });
       }
       // The arc also jumps to an enemy tank close enough.
-      const v = state.vehicles.find((o) => o.alive && o.side !== site.owner && dist(o, site) <= w.range && o.spotted[site.owner]);
+      const v = state.vehicles.find((o) => o.alive && o.side !== site.owner && dist(o, site) <= range && o.spotted[site.owner]);
       if (v) {
-        damageVehicle(state, v, w.damage * state.cfg.tank.damageFrom.arc, 'arc');
+        damageVehicle(state, v, w.damage * boost * state.cfg.tank.damageFrom.arc, 'arc');
         state.events.push({ type: 'zap', x1: site.x, y1: site.y - 30, x2: v.x, y2: v.y - 16, side: site.owner });
       }
       site.fireCd = w.intervalSec;

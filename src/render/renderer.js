@@ -11,6 +11,7 @@ import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './pixel-troopers.js';
 import { getTank, TANK_W, TANK_H, TANK_FOOT } from './tanks.js';
 import { liftAt } from './terrain-tilt.js';
 import { drawProps, propImage } from './props.js';
+import { drawWeatherWorld, drawWeatherScreen } from './weather-fx.js';
 import { drawRubbleSprite } from './ground-sprites.js';
 import { drawHaze, drawGates } from './map-live.js';
 import { SPRITES, FLAGS, drawUnit, dirFromAngle, tankScale } from './unit-sprites.js';
@@ -93,12 +94,14 @@ export function drawFrame(g, r, state, cam, opts) {
   drawHaze(g, state, now, viewBounds(cam));
   drawSmoke(g, fxs, state.smokes, now, state.tick, state.cfg.tickRate);
   drawEffects(g, fxs, now, px);
+  if (opts.weatherFx !== false) drawWeatherWorld(g, state, now, viewBounds(cam), fxs);
   drawStrikes(g, state, now, px, opts);
   drawDeployZone(g, state, opts, px);
   drawMarker(g, opts, now, px);
 
   // Screen space: icons, badges and text stay the same size at any zoom.
   drawFog(g, r, state, cam, opts);
+  if (opts.weatherFx !== false) { g.setTransform(dpr, 0, 0, dpr, 0, 0); drawWeatherScreen(g, state, now, cam.vw, cam.vh, fxs); }
   g.setTransform(dpr, 0, 0, dpr, sh.x * dpr, sh.y * dpr);
   drawLastSeen(g, r, state, cam, opts, now);
   drawSiteIcons(g, state, cam, now);

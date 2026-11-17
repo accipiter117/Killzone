@@ -183,6 +183,12 @@ export function playEvents(a, events, cam, playerSide) {
         SOUNDS.boom(a, g, false);
         a.budget -= 2;
         break;
+      case 'lightning':
+        // Thunder: a crack, then a long low roll.
+        noiseBurst(a, 0.9, { type: 'highpass', freq: 1200, decay: 0.12 });
+        noiseBurst(a, 1.2, { type: 'lowpass', freq: 160, q: 0.6, attack: 0.05, decay: 2.4 });
+        a.budget -= 2;
+        break;
       case 'vehicleDestroyed':
         SOUNDS.boom(a, Math.max(0.4, nearness(cam, e.x, e.y)), true);
         SOUNDS.horn(a, 1, e.side !== playerSide);

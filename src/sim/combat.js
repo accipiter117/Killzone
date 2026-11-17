@@ -2,6 +2,7 @@
 
 import { next } from './rng.js';
 import { T, S, surfAt } from './map.js';
+import { sightMult } from './weather.js';
 import { terrainAt, heightAt, cellIndex } from './map.js';
 import { coverAt, isActive, dist, feed, sideName } from './util.js';
 import { explodeTank } from './features.js';
@@ -65,7 +66,7 @@ export function weaponRange(state, s) {
 }
 
 function sightOf(state, s) {
-  const r = state.cfg.roles[s.role].sight * lift(state, s);
+  const r = state.cfg.roles[s.role].sight * lift(state, s) * sightMult(state);
   return inBuilding(state, s) ? r * state.cfg.cover.building.rangeMult : r;
 }
 
