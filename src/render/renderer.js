@@ -11,6 +11,7 @@ import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './pixel-troopers.js';
 import { getTank, TANK_W, TANK_H, TANK_FOOT } from './tanks.js';
 import { liftAt } from './terrain-tilt.js';
 import { drawProps, propImage } from './props.js';
+import { drawPools, drawSpray } from './blood.js';
 import { drawWeatherWorld, drawWeatherScreen } from './weather-fx.js';
 import { drawRubbleSprite } from './ground-sprites.js';
 import { drawHaze, drawGates } from './map-live.js';
@@ -81,6 +82,7 @@ export function drawFrame(g, r, state, cam, opts) {
 
   LY = opts.tilt ? (x, y) => y - liftAt(state.map, x, y) : (x, y) => y;
   g.drawImage(terrain.canvas, 0, 0);
+  if (opts.blood) drawPools(g, opts.blood, terrain, now);
   drawWire(g, r, state, cam);
   drawWalls(g, state, cam, opts);
   drawGates(g, state, now, px, opts);
@@ -94,6 +96,7 @@ export function drawFrame(g, r, state, cam, opts) {
   drawHaze(g, state, now, viewBounds(cam));
   drawSmoke(g, fxs, state.smokes, now, state.tick, state.cfg.tickRate);
   drawEffects(g, fxs, now, px);
+  if (opts.blood) drawSpray(g, opts.blood, now);
   if (opts.weatherFx !== false) drawWeatherWorld(g, state, now, viewBounds(cam), fxs);
   drawStrikes(g, state, now, px, opts);
   drawDeployZone(g, state, opts, px);

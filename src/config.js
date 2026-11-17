@@ -149,6 +149,19 @@ export const CONFIG = {
     haze: { speed: 1, tank: 1, cost: 1, hide: 0.45, blockLen: 70 },
     deck: { speed: 1.25, tank: 1.45, cost: 0.75 },
   },
+  // Blood (src/render/blood.js): picture only, never read by the rules.
+  // Sizes in world units (a standing soldier is about 34 tall), times in
+  // seconds. The pixel is the size of one hard-edged square, to match the
+  // pixel art sprites.
+  blood: {
+    pixel: 1.4,
+    colours: ['#701012', '#961414', '#b4281e'], // spray shades, dark to bright
+    spray: { count: 30, spread: 17, cone: 0.65, back: 0.15, life: 0.5, woundUp: 15, sizes: [1, 2] },
+    blast: { count: 64, spread: 26, life: 0.55 },
+    pool: { size: 22, blastSize: 30, downedShare: 0.5, growSec: 3, rim: '#46080a', centre: '#701012', shine: 'rgba(210,120,110,0.55)', blobs: [4, 6], flatten: 0.62 },
+    maxPools: 150, // kept for repainting the battlefield; older ones fade from memory
+    maxDrops: 900, // spray squares alive at once
+  },
   // Helghan weather (src/sim/weather.js). Each battle rolls a kind, weighted
   // by map, unless the menu sets one (map.weather). Strength rises and falls
   // in waves (base, swing, waveSec); sightCut is the share of sight lost at
