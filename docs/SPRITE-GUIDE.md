@@ -142,3 +142,27 @@ and `.json` (each frame's rectangle and hoist corner). In the game a pole
 stands on each objective marker: the holder's flag waves at the top; an
 enemy capture lowers it over the first half and raises theirs over the
 second (an unheld objective raises the taker's flag over the whole capture).
+
+## Fine pixel briefs (from the Helghast set, Nov 2026)
+The Helghast rifleman was redone as fine, detailed pixel art from the
+owner's Killzone 2 reference picture. What worked:
+- Standing sheet first, from one clean full-body reference picture (more
+  pictures blend into a muddle). Describe the kit piece by piece, ask for
+  "fine, highly detailed modern pixel art with small pixels, NOT chunky",
+  about 200 art pixels tall, and strong contrast (lighter pouches, gaiters
+  and mask, edge highlights) so he reads against dark ground.
+- Every later sheet: a fresh chat with the standing sheet attached, and
+  "same size, same proportions, same head size; do not make him shorter,
+  squatter or cuter".
+- At most 2 rows per image (8 columns by 2 rows fits ChatGPT's landscape
+  shape with tall cells). Asked for 4 rows, ChatGPT squashed the soldier
+  into a big-headed chibi. Longer sheets come as parts:
+  `<unit>-<sheet>-1.png`, `-2.png`, holding the next rows in order; the
+  script joins them and sizes each part by its own first frame. A part
+  with a lying pose is sized by length (`parts` in build_atlas.py).
+- Check the facing-viewer and facing-away columns: ChatGPT tends to aim
+  and throw sideways there. Ask again for those two columns only.
+- ChatGPT's "transparent" background is often a drawn chequer or white;
+  the script cuts both away.
+- The script keeps glowing orange (eyes, flashes) visible in the smaller
+  zoomed-out copies.
