@@ -10,7 +10,7 @@ import { getSprite25, W25, H25, ANCHOR_X, ANCHOR_Y } from './sprites25d.js';
 import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './pixel-troopers.js';
 import { getTank, TANK_W, TANK_H, TANK_FOOT } from './tanks.js';
 import { liftAt } from './terrain-tilt.js';
-import { drawProps } from './props.js';
+import { drawProps, propImage } from './props.js';
 import { drawHaze, drawGates } from './map-live.js';
 import { SPRITES, FLAGS, drawUnit, dirFromAngle, tankScale } from './unit-sprites.js';
 import { fx } from './fx-random.js';
@@ -488,6 +488,8 @@ function drawWire(g, r, state, cam) {
   }
 }
 
+const POST_ART = { arc: 'arctower', mg: 'mgnest' };
+const POST_SIZE = 72; // world units across
 function drawSitesWorld(g, state, now, px, fxs) {
   for (const s0 of state.sites) {
     const s = lifted(s0);
@@ -513,6 +515,17 @@ function drawSitesWorld(g, state, now, px, fxs) {
       g.stroke();
     }
     g.globalAlpha = 1;
+  }
+  // Posts with painted art (the owner's ChatGPT pictures) stand on their
+  // site: drawn upright in the world, under the marker.
+  for (const s0 of state.sites) {
+    const img = propImage(POST_ART[s0.kind]);
+    if (!img) continue;
+    const s = lifted(s0), w = POST_SIZE, h = (w * img.height) / img.width;
+    g.fillStyle = 'rgba(14,12,9,0.38)';
+    g.beginPath(); g.ellipse(s.x + 4, s.y + 6, w * 0.42, h * 0.32, 0, 0, Math.PI * 2); g.fill();
+    g.imageSmoothingEnabled = true;
+    g.drawImage(img, s.x - w / 2, s.y - h / 2, w, h);
   }
   for (const ring of fxs.rings) {
     const s = lifted(state.sites.find((x) => x.id === ring.site));
@@ -1137,6 +1150,9 @@ function drawSiteIcons(g, state, cam, now = 0) {
     const col = ownerColour(s.owner);
     g.save();
     g.translate(p.x, p.y);
+    // A post with its own picture: its marker sits as a badge at the
+    // picture's lower right, so the picture shows.
+    if (propImage(POST_ART[s.kind])) { const o = Math.max(14, POST_SIZE * 0.36 * cam.z); g.translate(o, o); g.scale(0.8, 0.8); }
     if (s.kind === 'objective') {
       drawFlagPole(g, s, i, now);
       g.fillStyle = 'rgba(20,18,14,0.75)';

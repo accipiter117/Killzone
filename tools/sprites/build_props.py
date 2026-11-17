@@ -18,7 +18,7 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, 'source')
 OUT = os.path.join(HERE, '..', '..', 'assets', 'sprites', 'props')
-WIDTH = {'dropship': 440, 'pillbox': 110, 'statue': 140, 'apc': 150, 'bus': 230, 'truck': 130, 'bridge-down': 240, 'bridge-up': 140}  # pixels wide in the atlas, per prop (default 160)
+WIDTH = {'dropship': 440, 'pillbox': 110, 'statue': 140, 'apc': 150, 'bus': 230, 'truck': 130, 'bridge-down': 240, 'bridge-up': 140, 'arctower': 160}  # pixels wide in the atlas, per prop (default 160)
 # Sheets holding several props side by side: split at the gaps, left to right.
 SPLIT = {
     'tankwrecks': ['tankwreck-isa', 'tankwreck-hgh'],
