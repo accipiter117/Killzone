@@ -28,6 +28,7 @@
           <span data-obj="A">A</span><span data-obj="B">B</span><span data-obj="C">C</span>
         </div>
         <div id="score" aria-label="Score"><span class="isa">0</span><span class="sep">:</span><span class="hgh">0</span></div>
+        <div id="weather-chip" aria-label="Weather" hidden></div>
         <div id="strength" aria-label="Troops left on each side"><i class="s0"></i><i class="s1"></i></div>
       </div>
 
@@ -215,6 +216,7 @@
         <li>Rifles barely scratch a tank. Hurt it with <b>heavies</b>, grenades, artillery, the arc tower, jetpack dives, your own tank, and <b>engineers</b>: with an enemy tank close, their ability becomes a <b>breaching charge</b>. A knocked out tank stays as a wreck you can hide behind.</li>
         <li><b>Maps</b> (menu): three places on Helghan, each side starting in its own surroundings. The <b>Corinth River crossing</b>: the ISA bridgehead on the ash flats against the Helghast bluff and trench line, crossed by a lift bridge and two fords. The <b>Kesh petrusite refinery</b>: the ISA come through the freight yard, the Helghast hold the refinery behind a sludge canal. The <b>Pyrrhus outskirts</b>: a bombed suburb against brutalist blocks, the Autarch's plaza between, a broken highway along the north. <b>Walls</b>, wrecks, containers and freight cars block movement and sight; shells blow holes in them.</li>
         <li><b>Ground:</b> roads are quicker (tanks most of all) but give no cover; fords are slow and exposed; deep water cannot be crossed; mud drags, tanks worst; <b>vent haze</b> hides anyone in it and a thick bank of it blocks sight both ways. Raised ground (bluffs, docks, catwalks, the highway) gives range and accuracy.</li>
+        <li><b>Weather</b> (menu, or Helghan decides by map): an <b>electrical storm</b> cuts sight, bogs tanks down off the roads, supercharges the arc towers and throws lightning at tall metal (pylons, stacks, masts, the arc tower), hurting anyone beside it; an <b>ash and dust storm</b> cuts sight hard in gusts; <b>petrusite haze</b> cuts it a little; <b>clear</b> skies change nothing. The forecast shows as the battle opens; tap the weather icon by the score to see it again.</li>
         <li><b>Gates:</b> hold a <b>lever post</b> (the bridgehouse, the control room, the checkpoint post) and a button appears by the support buttons to raise or lower the lift bridge, or shut or open blast doors and checkpoint barriers (1 point, a few seconds, never on anyone). Shut, they are walls nobody can blast through.</li>
         <li><b>Vehicle depots:</b> each side starts with one (the landing pad, the motor pool...). Hold a depot and lose your tank, and a <b>Call in tank</b> button brings a fresh one out of it for 3 points. One tank at a time. Take the enemy's depot and they cannot.</li>
         <li><b>High ground</b> gives range and accuracy. Cliffs can only be climbed at ramps, so hills make chokepoints.</li>
@@ -242,6 +244,15 @@
           <option value="industrial">Kesh petrusite refinery</option>
           <option value="city">Pyrrhus outskirts</option>
           <option value="random">Random</option>
+        </select>
+      </div>
+      <div class="row"><span>Weather (next battle)</span>
+        <select id="weather-select" aria-label="Weather">
+          <option value="random">Helghan decides</option>
+          <option value="storm">Electrical storm</option>
+          <option value="dust">Ash and dust storm</option>
+          <option value="haze">Petrusite haze and drizzle</option>
+          <option value="clear">Clear, grim</option>
         </select>
       </div>
       <div class="row"><span>Your side (quick battles)</span>

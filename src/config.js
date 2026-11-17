@@ -149,6 +149,28 @@ export const CONFIG = {
     haze: { speed: 1, tank: 1, cost: 1, hide: 0.45, blockLen: 70 },
     deck: { speed: 1.25, tank: 1.45, cost: 0.75 },
   },
+  // Helghan weather (src/sim/weather.js). Each battle rolls a kind, weighted
+  // by map, unless the menu sets one (map.weather). Strength rises and falls
+  // in waves (base, swing, waveSec); sightCut is the share of sight lost at
+  // full strength.
+  weather: {
+    odds: {
+      trenches: [['storm', 35], ['clear', 30], ['dust', 20], ['haze', 15]],
+      industrial: [['haze', 35], ['storm', 25], ['clear', 25], ['dust', 15]],
+      city: [['dust', 30], ['storm', 30], ['clear', 25], ['haze', 15]],
+    },
+    kinds: {
+      clear: { label: 'Clear, grim', base: 0, swing: 0, waveSec: 120, sightCut: 0 },
+      storm: {
+        label: 'Electrical storm', base: 0.35, swing: 1, waveSec: 90, sightCut: 0.25,
+        tankBog: 0.2, // tanks off the roads lose up to this share of speed
+        arcBoost: 1.3, // arc tower damage and reach
+        lightning: { everySec: [14, 30], minStrength: 0.45, radius: 34, damage: 70, suppress: 60 },
+      },
+      dust: { label: 'Ash and dust storm', base: 0.25, swing: 1, waveSec: 60, sightCut: 0.42 },
+      haze: { label: 'Petrusite haze and drizzle', base: 0.5, swing: 0.6, waveSec: 150, sightCut: 0.15 },
+    },
+  },
   // Gates worked from a lever post: lift bridges, blast doors, checkpoint
   // barriers. The side holding the lever can raise or lower (close or open)
   // them; it takes a few seconds and waits for the way to be clear.
@@ -252,7 +274,7 @@ export const CONFIG = {
   causes: {
     rifle: 'rifle fire', heavy: 'heavy machine guns', assault: 'assault squads', engineer: 'engineer fire', recon: 'snipers',
     jump: 'jetpack troopers', infiltrator: 'infiltrators', mg: 'an MG nest', tankmg: 'the tank machine gun', tankgun: 'tank shells',
-    artillery: 'artillery', grenade: 'grenades', petrusite: 'a petrusite explosion', arc: 'the arc tower', dive: 'jetpack landings', charge: 'a breaching charge',
+    artillery: 'artillery', grenade: 'grenades', petrusite: 'a petrusite explosion', arc: 'the arc tower', lightning: 'lightning', dive: 'jetpack landings', charge: 'a breaching charge',
   },
   historyEverySec: 5,
   // Walls (industrial and city maps): how much of a blast's radius knocks

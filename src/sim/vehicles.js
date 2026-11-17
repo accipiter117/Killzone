@@ -8,6 +8,7 @@ import { findPath, straightClear } from './path.js';
 import { isActive, dist, feed, sideName, nearObjective } from './util.js';
 import { fireShot, damageSoldier, suppress, losClear } from './combat.js';
 import { breakWalls } from './features.js';
+import { sightMult, tankGroundMult } from './weather.js';
 
 export function createVehicles(state) {
   const t = state.cfg.tank;
@@ -123,7 +124,7 @@ export function updateVehicles(state, dt) {
       let speed = cfg.speed;
       const here = cellIndex(state.map, v.x, v.y);
       if (here >= 0 && state.map.ramp[here]) speed *= cfg.rampSpeed;
-      speed *= state.cfg.surface[surfName(state.map, v.x, v.y)].tank;
+      speed *= state.cfg.surface[surfName(state.map, v.x, v.y)].tank * tankGroundMult(state, v.x, v.y);
       // Head for the smoothed waypoint; if a cliff edge or ruin is in the
       // way, fall back to the next cell of the route, then to the middle of
       // the current cell, so a tank can never wedge itself for good.
@@ -317,11 +318,11 @@ export function updateVehicleVision(state) {
     const foe = 1 - v.side;
     for (const s of state.soldiers) {
       if (s.side !== foe || !isActive(s)) continue;
-      const sight = state.cfg.roles[s.role].sight * 1.3; // a tank is hard to miss
+      const sight = state.cfg.roles[s.role].sight * 1.3 * sightMult(state); // a tank is hard to miss
       if ((s.x - v.x) ** 2 + (s.y - v.y) ** 2 < sight * sight && losClear(state, s.x, s.y, v.x, v.y)) { v.spotted[foe] = 1; break; }
     }
     const ft = state.vehicles.find((o) => o.side === foe && o.alive);
-    if (!v.spotted[foe] && ft && dist(ft, v) < t.sight) v.spotted[foe] = 1;
+    if (!v.spotted[foe] && ft && dist(ft, v) < t.sight * sightMult(state)) v.spotted[foe] = 1;
   }
   // Tanks spot infantry for their own side.
   for (const v of state.vehicles) {
@@ -331,7 +332,8 @@ export function updateVehicleVision(state) {
       if (e.side === v.side || !isActive(e) || seen[e.id]) continue;
       const r = state.cfg.roles[e.role];
       if (r.hidden && state.tick - e.lastShotTick > r.revealSec * state.cfg.tickRate) continue;
-      if ((e.x - v.x) ** 2 + (e.y - v.y) ** 2 < t.sight * t.sight && losClear(state, v.x, v.y, e.x, e.y)) seen[e.id] = 1;
+      const ts = t.sight * sightMult(state);
+      if ((e.x - v.x) ** 2 + (e.y - v.y) ** 2 < ts * ts && losClear(state, v.x, v.y, e.x, e.y)) seen[e.id] = 1;
     }
   }
 }

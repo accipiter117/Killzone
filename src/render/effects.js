@@ -1,3 +1,4 @@
+import { ingestWeather } from './weather-fx.js';
 // Turns simulation events into short-lived visuals: tracers, muzzle flashes,
 // hit puffs, explosions, arc tower zaps, smoke puffs and fallen soldiers.
 // Purely cosmetic; uses its own random source.
@@ -31,7 +32,7 @@ export function ingest(fxs, events, now) {
     // screen (fxs.ly maps a ground point to its screen y). Craters and
     // sandbags are painted by the terrain itself, so they stay as they are.
     let e = e0;
-    if (fxs.ly && e.type !== 'crater' && e.type !== 'sandbags' && e.type !== 'dug') {
+    if (fxs.ly && e.type !== 'crater' && e.type !== 'sandbags' && e.type !== 'dug' && e.type !== 'lightning') {
       e = { ...e0 };
       if (e.y !== undefined) e.y = fxs.ly(e.x, e.y);
       if (e.y1 !== undefined) e.y1 = fxs.ly(e.x1, e.y1);
@@ -91,6 +92,9 @@ export function ingest(fxs, events, now) {
         break;
       case 'crater':
         if (fxs.terrain) fxs.terrain.addCrater({ x: e.x, y: e.y, r: e.r });
+        break;
+      case 'lightning':
+        ingestWeather(fxs, e, now);
         break;
       case 'zap':
         fxs.zaps.push({ ...e, t0: now, life: 0.3 });

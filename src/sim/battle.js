@@ -8,6 +8,7 @@ import { updateSites, updateEmplacements, updateStrikes, updateSmokes } from './
 import { thinkSquad, moveSoldiers, resetPlans, updateMedics, updateRoutes } from './squads.js';
 import { updateDigging } from './digging.js';
 import { updateGates } from './gates.js';
+import { chooseWeather, updateWeather } from './weather.js';
 import { updateThrows, updateDives } from './abilities.js';
 import { platoonAlive, feed, sideName } from './util.js';
 import { createVehicles, updateVehicles, updateCharges, updateVehicleVision } from './vehicles.js';
@@ -119,6 +120,7 @@ export function createBattle(seed, options = {}) {
   // Squads that start with nobody (a campaign platoon that lost a squad).
   for (const sq of state.squads) if (!sq.soldiers.some((id) => state.soldiers[id].alive)) sq.mode = 'dead';
   state.durationTicks = Math.round(cfg.battle.durationSec * cfg.tickRate);
+  chooseWeather(state, seedInt);
   updateVision(state);
   updateVehicleVision(state);
   return state;
@@ -175,6 +177,7 @@ export function step(state) {
   updateDives(state);
   updateSmokes(state);
   updateGates(state);
+  updateWeather(state);
   updateSuppression(state, dt);
   // Turn-based battles: objectives, morale and the end are the turn rules' job.
   if (!state.tb) { updateSites(state, dt); checkMorale(state); }
