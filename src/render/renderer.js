@@ -11,6 +11,7 @@ import { getPixelTrooper, PT_W, PT_H, PT_FOOT } from './pixel-troopers.js';
 import { getTank, TANK_W, TANK_H, TANK_FOOT } from './tanks.js';
 import { liftAt } from './terrain-tilt.js';
 import { drawProps, propImage } from './props.js';
+import { drawRubbleSprite } from './ground-sprites.js';
 import { drawHaze, drawGates } from './map-live.js';
 import { SPRITES, FLAGS, drawUnit, dirFromAngle, tankScale } from './unit-sprites.js';
 import { fx } from './fx-random.js';
@@ -401,6 +402,8 @@ function drawWalls(g, state, cam, opts) {
     for (const i of vis) {
       if (!map.broken[i]) continue;
       const x = (i % cols) * c, y = LY((i % cols) * c, ((i / cols) | 0) * c);
+      // A painted pile every other cell (brick for brick walls), stones between.
+      if ((i % 2 === 0) && drawRubbleSprite(g, x + c / 2, y + c / 2, wk && wk[i] === 1 ? 'brick' : 'concrete', 15, ((i * 37) % 100) / 100)) continue;
       g.fillRect(x + (i % 3) * 2, y + 2 + (i % 2) * 3, 5, 4);
       g.fillRect(x + 5 - (i % 2) * 3, y + 6, 4, 3);
     }
@@ -525,7 +528,11 @@ function drawSitesWorld(g, state, now, px, fxs) {
     g.fillStyle = 'rgba(14,12,9,0.38)';
     g.beginPath(); g.ellipse(s.x + 4, s.y + 6, w * 0.42, h * 0.32, 0, 0, Math.PI * 2); g.fill();
     g.imageSmoothingEnabled = true;
-    g.drawImage(img, s.x - w / 2, s.y - h / 2, w, h);
+    // MG nests face the far side of the map from where they stand.
+    g.save(); g.translate(s.x, s.y);
+    if (s0.kind === 'mg' && s0.x > state.map.width / 2) g.scale(-1, 1);
+    g.drawImage(img, -w / 2, -h / 2, w, h);
+    g.restore();
   }
   for (const ring of fxs.rings) {
     const s = lifted(state.sites.find((x) => x.id === ring.site));

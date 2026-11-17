@@ -17,6 +17,7 @@ import { createRenderer, drawFrame, drawMinimap } from './render/renderer.js';
 import { loadUnitSprites, loadFlags } from './render/unit-sprites.js';
 import { createHelghanGlobe } from './ui/helghan-globe.js';
 import { loadPropArt } from './render/props.js';
+import { loadGroundSprites } from './render/ground-sprites.js';
 import { callinBlocked } from './sim/callins.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
 import { createAudio, unlockAudio, newFrame, playEvents, uiClick, setMix } from './render/audio.js';
@@ -1028,6 +1029,9 @@ showRotateHint();
 loadUnitSprites();
 loadFlags();
 loadPropArt();
+// Painted craters and rubble are part of the battlefield picture: repaint it
+// once they arrive.
+loadGroundSprites().then(() => { if (game.match) paintTerrain(); });
 const params = new URLSearchParams(location.search);
 const urlSeed = params.get('seed');
 // A link with a seed opens that battle straight away; otherwise the start
