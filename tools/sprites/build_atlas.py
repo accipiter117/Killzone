@@ -50,7 +50,10 @@ UNITS = {
                   'parts': {'die-2': ('w', 0.62)}},
     # The ISA dying sheet came from its own request, so it is sized by its
     # own first frame (jolted back, a little shorter than standing).
-    'isa-rifle': {'sheets': [s if s[0] != 'die' else ('die', 3, ['hit', 'fall', 'dead'], ('h', 0.93)) for s in RIFLE], 'tint': 'isa-rifle-blue'},
+    # The fine pixel ISA set (Nov 2026), drawn in its own olive and khaki (no
+    # blue tint). Prone and dead frames sized to match the standing helmet.
+    'isa-rifle': {'sheets': [('prone', 2, ['prone1', 'prone2'], ('w', 0.73)) if s[0] == 'prone' else ('die', 3, ['hit', 'fall', 'dead'], ('h', 0.93)) if s[0] == 'die' else s for s in RIFLE],
+                  'parts': {'die-2': ('w', 0.74)}},
     # One ISA and one Helghast locked together; 8 directions given as the
     # way the ISA soldier faces; a 4 frame struggling loop.
     'grapple': {'sheets': [('grapple', 4, ['grapple1', 'grapple2', 'grapple3', 'grapple4'], ('h', 0.9))], 'file': 'grapple.png'},
@@ -98,6 +101,18 @@ def load(path):
                     if 0 <= ny < white.shape[0] and 0 <= nx < Wd and white[ny, nx] and (ny, nx) not in seen:
                         seen.add((ny, nx)); stack.append((ny, nx))
             if len(comp) > 40:
+                # The white-hot core of a muzzle flash is ringed by yellow or
+                # orange: keep it. A pocket between limbs is ringed by the
+                # soldier's own (cooler) colours: it goes.
+                ring = []
+                for y, x in comp[::7]:
+                    for ny, nx in ((y + 3, x), (y - 3, x), (y, x + 3), (y, x - 3)):
+                        if 0 <= ny < white.shape[0] and 0 <= nx < Wd and not white[ny, nx]:
+                            ring.append(a[ny, nx, :3])
+                if ring:
+                    rr = np.mean(ring, axis=0)
+                    if rr[0] - rr[2] > 50 and rr[0] > 150:
+                        continue
                 for y, x in comp:
                     bg[y, x] = True
         # The soft edge where the soldier was blended into the white: pale,
@@ -186,7 +201,7 @@ def split(unit, spec):
         if not parts or spec.get('file'):
             out.append((name, rows, fnames, sc))
             continue
-        per = -(-rows // len(parts))
+        per = 2  # parts hold up to 2 rows each (the most ChatGPT draws well)
         for j, part in enumerate(parts):
             fn = fnames[j * per:(j + 1) * per]
             out.append((part, len(fn), fn, spec.get('parts', {}).get(part, sc)))

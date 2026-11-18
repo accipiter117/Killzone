@@ -91,14 +91,14 @@ bottom: [ROWS]. [RULES]"
   fall, dead when killed; throw1 to throw3 for a grenade.
 - Battle size: a standing soldier is about 34 world units tall (about 100
   screen pixels, 200 real pixels on a phone, when fully zoomed in).
-- Atlases in the game (src/render/unit-sprites.js): `isa-rifle-blue` (the ISA
-  set with its grey armour tinted towards ISA blue, the owner's chosen look),
-  `hgh-rifle`, and `grapple`. Jetpack troopers keep the code-drawn look
+- Atlases in the game (src/render/unit-sprites.js): `isa-rifle`, `hgh-rifle`,
+  `grapple` and the two tanks. Jetpack troopers keep the code-drawn look
   until their own set exists.
-- ISA colour: the blue tint is the official ISA look. Any sheet with an ISA
-  soldier in it alongside a Helghast (such as the grapple) cannot be tinted
-  afterwards without tinting the Helghast too, so brief ChatGPT with
-  `docs/sprite-refs/isa-rifle-stand-blue.png` (the blue ISA standing sheet)
+- ISA colours: since the fine pixel ISA set (Nov 2026) the ISA are drawn in
+  their real Killzone 2 colours (olive, khaki, sage, an orange scarf, amber
+  visor), not tinted blue. The old blue tint came from early sheets based on
+  other pixel art and is gone. Brief any sheet with an ISA soldier in it
+  (such as a new grapple) with `tools/sprites/source/isa-rifle-stand.png`
   as the ISA reference.
 - Grapple: one sprite of an ISA and a Helghast soldier wrestling, 8
   directions (the way the ISA soldier faces), 4 frame loop. Shown when
