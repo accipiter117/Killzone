@@ -2,6 +2,7 @@
 // the labels that explain what is going on. Reads the sim state, never writes it.
 
 import { isActive, members, centroid, coverName } from '../sim/util.js';
+import { CONFIG } from '../config.js';
 import { heightAt, T } from '../sim/map.js';
 import { toScreen, worldMatrix, viewBounds } from './camera.js';
 import { sideColours, drawSmoke, drawEffects } from './effects.js';
@@ -916,13 +917,14 @@ function animate(r, state, opts) {
     const stride = r.stride[s.id];
     let frame = 'stand';
     if (sq.pinned && sq.mode !== 'rout') frame = sq.mode === 'crawl' && moved > 0.01 && Math.floor(stride / 3) % 2 ? 'prone2' : 'prone1';
-    else if (opts.now - (lastShot.get(s.id) ?? -9) < 0.09) frame = 'fire';
-    else if (moved > 0.01) frame = top ? WALK[Math.floor(stride / 3.5) % 4] : WALK25[Math.floor(stride / 3) % 4];
+    else if (opts.now - (lastShot.get(s.id) ?? -9) < CONFIG.anim.fireHold) frame = 'fire';
+    else if (moved > 0.01) frame = top ? WALK[Math.floor(stride / 3.5) % 4] : WALK25[Math.floor(stride / CONFIG.anim.stride) % 4];
     if (opts.view === 'pixel' && !frame.startsWith('prone')) {
       // A grenade just thrown: the three throwing frames; standing with a
       // target in sight: the aiming pose rather than at ease.
       const thrown = opts.now - (opts.fxs.lastThrow.get(s.id) ?? -9);
-      if (thrown < 0.9) frame = thrown < 0.3 ? 'throw1' : thrown < 0.6 ? 'throw2' : 'throw3';
+      const ts = CONFIG.anim.throwStep;
+      if (thrown < 3 * ts) frame = thrown < ts ? 'throw1' : thrown < 2 * ts ? 'throw2' : 'throw3';
       else if (frame === 'stand' && s.target >= 0) frame = 'aim';
     }
     // Jetpack troopers fly when moving (or diving): jets on, held aloft.
@@ -1097,7 +1099,7 @@ function drawBodies(g, r, state, fxs, now, px, view) {
       b.dir = dirIndex(b.ang);
     }
     const t = now - b.t0;
-    const frame = t < 0.12 ? 'fall1' : t < 0.26 ? 'fall2' : 'dead';
+    const frame = t < CONFIG.anim.fall[0] ? 'fall1' : t < CONFIG.anim.fall[1] ? 'fall2' : 'dead';
     const sol = state.soldiers[b.id];
     const role = sol.role;
     const age = now - b.t0;
