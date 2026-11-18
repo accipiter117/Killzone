@@ -336,6 +336,14 @@ export const CONFIG = {
   // platoon's three squads take the tile and the ones above and below).
   ui: { slowMo: 0.25, tile: 60 },
 
+  // Soldier animation pacing (picture only), picked by the owner from
+  // side-by-side previews. stride: world units walked per running frame
+  // (the legs keep pace with the ground; 3 was a blur). fireHold: seconds
+  // the muzzle-flash frame stays up after a shot. throwStep: seconds per
+  // grenade-throwing frame. fall: seconds until the falling frame, then
+  // until lying dead.
+  anim: { stride: 5, fireHold: 0.15, throwStep: 0.3, fall: [0.12, 0.26] },
+
   ai: {
     thinkSec: 4,
     siteValue: { objective: 10, comms: 6, mg: 3, arc: 3, lever: 1.5, depot: 2, supply: 7, hq: 25, scout: 4 },
