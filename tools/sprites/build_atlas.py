@@ -45,14 +45,14 @@ TANK = [
 UNITS = {
     # The fine pixel Helghast set (Nov 2026): ChatGPT drew the lying soldier
     # stubbier than the standing one, so prone is sized to match the helmets.
-    'hgh-rifle': {'sheets': [('prone', 2, ['prone1', 'prone2'], ('w', 0.73)) if s[0] == 'prone' else ('die', 3, ['hit', 'fall', 'dead'], ('h', 0.93)) if s[0] == 'die' else s for s in RIFLE],
+    'hgh-rifle': {'anchor': 'head', 'sheets': [('prone', 2, ['prone1', 'prone2'], ('w', 0.73)) if s[0] == 'prone' else ('die', 3, ['hit', 'fall', 'dead'], ('h', 0.93)) if s[0] == 'die' else s for s in RIFLE],
                   # The dead (lying) half is sized by its length, like prone.
                   'parts': {'die-2': ('w', 0.62)}},
     # The ISA dying sheet came from its own request, so it is sized by its
     # own first frame (jolted back, a little shorter than standing).
     # The fine pixel ISA set (Nov 2026), drawn in its own olive and khaki (no
     # blue tint). Prone and dead frames sized to match the standing helmet.
-    'isa-rifle': {'sheets': [('prone', 2, ['prone1', 'prone2'], ('w', 0.73)) if s[0] == 'prone' else ('die', 3, ['hit', 'fall', 'dead'], ('h', 0.93)) if s[0] == 'die' else s for s in RIFLE],
+    'isa-rifle': {'anchor': 'head', 'sheets': [('prone', 2, ['prone1', 'prone2'], ('w', 0.73)) if s[0] == 'prone' else ('die', 3, ['hit', 'fall', 'dead'], ('h', 0.93)) if s[0] == 'die' else s for s in RIFLE],
                   'parts': {'die-2': ('w', 0.74)}},
     # One ISA and one Helghast locked together; 8 directions given as the
     # way the ISA soldier faces; a 4 frame struggling loop.
@@ -285,8 +285,19 @@ def build(unit, spec):
                     # lowest part (so a rifle or flash sticking out does not shift
                     # him), or of the whole figure when lying down.
                     m = np.asarray(out)[..., 3] > 0
-                    ys, xs = np.nonzero(m[h - max(1, h // 5):] if name.split('-')[0] not in ('prone', 'die') else m)
-                    fx = round(xs.mean()) if len(xs) else w // 2
+                    upright = name.split('-')[0] not in ('prone', 'die')
+                    if spec.get('anchor') == 'head' and upright:
+                        # Upright soldiers are pinned under the middle of
+                        # the helmet, not between the feet: a running
+                        # stride swings the feet apart, and pinning by
+                        # them made the upper body lurch from side to side
+                        # every frame (a shaking blur in play).
+                        top = np.nonzero(m.any(axis=1))[0]
+                        band = m[top[0]:top[0] + max(2, h // 8)] if len(top) else m
+                        ys, xs = np.nonzero(band)
+                    else:
+                        ys, xs = np.nonzero(m[h - max(1, h // 5):] if upright else m)
+                    fx = round((xs.min() + xs.max()) / 2) if len(xs) and spec.get('anchor') == 'head' and upright else (round(xs.mean()) if len(xs) else w // 2)
                     tiles[f].append((f'{fname}:{d}', out, fx, h))
 
     def pack(ts, width):
