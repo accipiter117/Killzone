@@ -30,7 +30,7 @@ export function resetPlans(state, pl) {
 // Reset one squad's plans when it is given an order of its own.
 export function resetSquadPlan(state, sq) {
   sq.bound = null; sq.pauseUntil = 0; sq.holdSpot = null; sq.flankDone = false;
-  sq.waitSince = -1; sq.bestD = Infinity; sq.bestTick = state.tick; sq.pushUntil = 0; sq.path = null;
+  sq.waitSince = -1; sq.bestD = Infinity; sq.bestTick = state.tick; sq.pushUntil = 0; sq.path = null; sq.left = undefined;
 }
 
 // A squad follows its platoon's shared goal unless it has been given an
@@ -147,7 +147,10 @@ function soldierRoute(state, s, sq, dest) {
   const r = s.route;
   if (r && Math.hypot(r.tx - dest.x, r.ty - dest.y) < 30 && state.tick - r.tick < 90) {
     while (r.pts.length > 1 && Math.hypot(r.pts[0].x - s.x, r.pts[0].y - s.y) < 12) r.pts.shift();
-    return r.pts;
+    // Still good only while its next point can be walked to from here (a
+    // soldier jostled off a ramp needs a new way, not three more seconds
+    // pushing at a cliff).
+    if (straightClear(state.map, s, r.pts[0], true)) return r.pts;
   }
   let p = findPath(state.map, s, dest, { maxNodes: 12000, mirror: s.side === 1 });
   // No way to the squad's destination from here: rejoin the squad.
@@ -207,6 +210,16 @@ function pinnedText(state, sq, c) {
   return near ? `${what} near ${near.id}` : what;
 }
 
+// How far a squad still has to go to `to`: along its planned route when it
+// has one for that goal, otherwise as the crow flies.
+function routeLeft(sq, c, to) {
+  const p = sq.path;
+  if (!p || !p.length || !sq.pathTo || Math.hypot(sq.pathTo.x - to.x, sq.pathTo.y - to.y) > 60) return dist(c, to);
+  let len = dist(c, p[0]);
+  for (let k = 1; k < p.length; k++) len += Math.hypot(p[k].x - p[k - 1].x, p[k].y - p[k - 1].y);
+  return len;
+}
+
 // Called a few times a second for every squad.
 export function thinkSquad(state, sq) {
   const cfg = state.cfg;
@@ -228,9 +241,13 @@ export function thinkSquad(state, sq) {
   // Stalled and pushing on: lead from the soldier furthest along, so a
   // straggler caught behind a wall or on a heap cannot hold the squad's
   // position (and so its route) back. The others find their own way after.
+  // "Furthest along" means along the squad's route, not as the crow flies:
+  // round a building the soldier nearest the goal in a straight line can be
+  // the one furthest from the way out.
   if (sq.pushUntil > state.tick && sq.lastGoal) {
+    const aim = sq.path && sq.path.length ? sq.path[Math.min(sq.path.length - 1, 5)] : sq.lastGoal;
     let lead = list[0];
-    for (const s of list) if (dist(s, sq.lastGoal) < dist(lead, sq.lastGoal)) lead = s;
+    for (const s of list) if (dist(s, aim) < dist(lead, aim)) lead = s;
     c = { x: lead.x, y: lead.y };
   }
   sq.cx = c.x; sq.cy = c.y;
@@ -520,11 +537,15 @@ function advance(state, sq, pl, list, c, firing, order) {
   // a while (stuck on wire, waiting, or hugging cover under fire), it pushes
   // straight on for a few seconds. This is the safety net that stops units
   // getting parked behind cover for the rest of the battle.
-  if (d < sq.bestD - 10) { sq.bestD = d; sq.bestTick = tick; }
+  // Headway is measured along the squad's route, so going round a building
+  // (for a while further from the goal as the crow flies) is not a stall.
+  const left = routeLeft(sq, c, goal);
+  sq.left = d;
+  if (left < sq.bestD - 10) { sq.bestD = left; sq.bestTick = tick; }
   if (tick >= sq.pushUntil && tick - sq.bestTick > sc.stallSec * cfg.tickRate) {
     sq.pushUntil = tick + Math.round(sc.pushSec * cfg.tickRate);
     sq.bestTick = tick;
-    sq.bestD = d;
+    sq.bestD = left;
   }
   const pushing = tick < sq.pushUntil;
 
@@ -571,7 +592,13 @@ function advance(state, sq, pl, list, c, firing, order) {
   const w = sq.role !== 'engineer' && !cfg.roles[sq.role].flies && !pushing ? wireOnLine(state, c, next, 80) : null;
   if (w) {
     crossing = dist(c, w) < 40;
-    const hasEngineers = pl.squads.some((id) => state.squads[id].role === 'engineer' && members(state, state.squads[id]).length);
+    // Only worth waiting if the platoon's engineers are cutting (or on their
+    // way to cut) wire near this stretch; if their own route takes them
+    // elsewhere, nobody is coming and the squad would wait for nothing.
+    const hasEngineers = pl.squads.some((id) => {
+      const e = state.squads[id];
+      return e.role === 'engineer' && members(state, e).length && (e.mode === 'cut' || e.status === 'Moving to cut wire') && Math.hypot(e.cx - w.x, e.cy - w.y) < 200;
+    });
     if (sq.waitSince < 0) sq.waitSince = tick;
     const waited = (tick - sq.waitSince) / cfg.tickRate;
     if (hasEngineers && pl.stance !== 'aggressive' && waited < 12 && dist(c, w) < 60) {
@@ -603,14 +630,20 @@ function advance(state, sq, pl, list, c, firing, order) {
   // Keep the platoon together: a squad that has got well ahead of the
   // slowest squad in its platoon waits in cover for it to catch up.
   // Squads on orders of their own neither wait nor are waited for.
+  // How far ahead is measured by each squad's distance from its goal (it
+  // used to be east-west position alone, which made squads stop for no
+  // reason whenever the route ran north or south). Straight-line distance
+  // for every squad alike: route lengths differ in how they are counted.
   if (sq.role !== 'recon' && !sq.order && d > 140) {
-    let slowest = Infinity;
+    let slowest = -Infinity;
     for (const id of pl.squads) {
       const o = state.squads[id];
-      if (o === sq || o.order || o.role === 'recon' || o.mode === 'dead' || o.mode === 'arrived' || o.mode === 'rout') continue;
-      slowest = Math.min(slowest, dir * o.cx);
+      // Nobody waits for a mate who is itself waiting (say for wire to be
+      // cut by the very squad waiting for it): that is a deadlock.
+      if (o === sq || o.order || o.role === 'recon' || o.mode === 'dead' || o.mode === 'arrived' || o.mode === 'rout' || o.mode === 'wait' || o.left === undefined) continue;
+      slowest = Math.max(slowest, o.left);
     }
-    if (slowest < Infinity && dir * c.x - slowest > sc.platoonLead) {
+    if (slowest > -Infinity && slowest - d > sc.platoonLead) {
       sq.mode = 'wait';
       sq.status = 'Waiting for the platoon';
       const cv = findCover(state.map, c.x, c.y, 40, (x, y) => -Math.hypot(x - c.x, y - c.y), sq.side === 1);

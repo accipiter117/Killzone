@@ -90,8 +90,14 @@ export function findPath(map, a, b, { engineer = false, maxNodes = 24000, mirror
       const j = ny * cols + nx;
       if (!canStep(map, i, j)) continue;
       if (blocked && blocked(j)) continue;
-      // No cutting corners past a cliff.
-      if (dx && dy && (!canStep(map, i, y * cols + nx) || !canStep(map, i, ny * cols + x))) continue;
+      // No cutting corners past a cliff: a diagonal step brushes both cells
+      // beside it, so the way through each of them must be walkable too
+      // (otherwise a walker slips off the side of a ramp onto low ground it
+      // cannot climb back from).
+      if (dx && dy) {
+        const o1 = y * cols + nx, o2 = ny * cols + x;
+        if (!canStep(map, i, o1) || !canStep(map, o1, j) || !canStep(map, i, o2) || !canStep(map, o2, j)) continue;
+      }
       const cost = g[i] + step * (map.wire[j] > 0 ? wireCost : 1) * (tight && tight(j, nx, ny) ? 5 : 1) * (map.surf ? SURF_COST[map.surf[j]] : 1);
       if (cost >= g[j]) continue;
       g[j] = cost;
@@ -113,18 +119,40 @@ export function findPath(map, a, b, { engineer = false, maxNodes = 24000, mirror
 // Can you walk straight from a to b without meeting a cliff (or, unless
 // allowed, wire)? Used to smooth routes into long straight legs.
 export function straightClear(map, a, b, allowWire = false) {
-  const d = Math.hypot(b.x - a.x, b.y - a.y);
-  const steps = Math.ceil(d / 4);
-  let prev = cellIndex(map, a.x, a.y);
-  for (let k = 1; k <= steps; k++) {
-    const t = k / steps;
-    const i = cellIndex(map, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
-    if (i < 0) return false;
-    if (i !== prev) {
-      if (!canStep(map, prev, i)) return false;
-      if (!allowWire && map.wire[i] > 0) return false;
-      prev = i;
-    }
+  // Walks every cell the line passes through, in order (a grid traversal),
+  // so a line that clips the corner of a wall or cliff cell is caught. The
+  // old check sampled every 4 units and could skip such a cell, sending
+  // soldiers straight into corners they then could not get round.
+  const c = map.cell, cols = map.cols, rows = map.rows;
+  let x = Math.floor(a.x / c), y = Math.floor(a.y / c);
+  const x1 = Math.floor(b.x / c), y1 = Math.floor(b.y / c);
+  if (x1 < 0 || y1 < 0 || x1 >= cols || y1 >= rows) return false;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1;
+  const ddx = dx !== 0 ? c / Math.abs(dx) : Infinity, ddy = dy !== 0 ? c / Math.abs(dy) : Infinity;
+  let tx = dx !== 0 ? ((sx > 0 ? (x + 1) * c : x * c) - a.x) / dx : Infinity;
+  let ty = dy !== 0 ? ((sy > 0 ? (y + 1) * c : y * c) - a.y) / dy : Infinity;
+  const inside = (cx, cy) => cx >= 0 && cy >= 0 && cx < cols && cy < rows;
+  let prev = inside(x, y) ? y * cols + x : -1;
+  const enter = (cx, cy) => {
+    if (!inside(cx, cy)) return false;
+    const i = cy * cols + cx;
+    if (!canStep(map, prev, i) || (!allowWire && map.wire[i] > 0)) return false;
+    prev = i;
+    return true;
+  };
+  for (let n = cols + rows + 4; n > 0 && (x !== x1 || y !== y1); n--) {
+    if (Math.abs(tx - ty) < 1e-9) {
+      // Exactly through a corner: the way through both neighbours must be
+      // walkable.
+      const from = prev;
+      if (!enter(x + sx, y) || !enter(x + sx, y + sy)) return false;
+      prev = from;
+      if (!enter(x, y + sy) || !enter(x + sx, y + sy)) return false;
+      prev = from;
+      x += sx; y += sy; tx += ddx; ty += ddy;
+    } else if (tx < ty) { x += sx; tx += ddx; } else { y += sy; ty += ddy; }
+    if (!enter(x, y)) return false;
   }
   return true;
 }
@@ -236,8 +264,19 @@ export function nextStep(state, sq, from, to) {
   }
   const path = sq.path;
   if (!path || !path.length) return to;
-  // Drop points already reached, then look as far ahead as is walkable.
-  while (path.length > 1 && Math.hypot(path[0].x - from.x, path[0].y - from.y) < 18) path.shift();
+  // Drop points already reached, then look as far ahead as is walkable. A
+  // point counts as reached once any of the squad has stood on it: the
+  // squad's middle can never get close to a doorway its point man is
+  // standing in, with the rest formed up behind him.
+  const reached = (p) => {
+    if (Math.hypot(p.x - from.x, p.y - from.y) < 18) return true;
+    for (const id of sq.soldiers) {
+      const s = state.soldiers[id];
+      if (s.alive && !s.fled && Math.hypot(p.x - s.x, p.y - s.y) < 10) return true;
+    }
+    return false;
+  };
+  while (path.length > 1 && reached(path[0])) path.shift();
   let pick = 0;
   for (let k = Math.min(path.length - 1, 40); k > 0; k -= 2) {
     if (straightClear(map, from, path[k], engineer)) { pick = k; break; }

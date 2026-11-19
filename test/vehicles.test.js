@@ -178,5 +178,7 @@ test('a tank rolls barbed wire flat, opening a lane infantry walk straight throu
   const crushed = crossingTime(true);
   for (let dy = -30; dy <= 30; dy += 10) assert.equal(crushed.s.map.wire[cellIndex(crushed.s.map, 515, 300 + dy)], 0, `lane open at ${dy}`);
   const blocked = crossingTime(false);
-  assert.ok(crushed.sec < blocked.sec / 2, `through the lane ${crushed.sec}s, through wire ${blocked.sec}s`);
+  // Without the lane the rifles wade through the wire (their engineers are
+  // far off, so they no longer wait for a cut that is not coming).
+  assert.ok(crushed.sec < blocked.sec * 0.75, `through the lane ${crushed.sec}s, through wire ${blocked.sec}s`);
 });
