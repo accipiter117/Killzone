@@ -4,6 +4,7 @@
 // callins and handled here. Same rules for the player and the AI.
 
 import { feed, sideName } from './util.js';
+import { tankSpot } from './commands.js';
 
 // The depot a side would use: its own first, then any other it holds.
 export function depotFor(state, side) {
@@ -48,8 +49,12 @@ export function callIn(state, side, what) {
     const t = state.cfg.tank;
     // The old tank's burnt hull stays where it died.
     if (!v.absent && !v.alive) state.map.props.push({ kind: 'tankwreck', x: v.x, y: v.y, w: 64, h: 40, ang: v.facing > 0 ? 0 : Math.PI, side: side === 0 ? 'isa' : 'hgh', col: '#3d3a31', turret: 0.9 });
+    // It rolls out onto open ground beside the depot: some depots are
+    // garages (ruined buildings tanks cannot drive through), and a tank set
+    // down inside one could never leave it.
+    const at = tankSpot(state, { x: depot.x, y: depot.y }, side, true);
     Object.assign(v, {
-      x: depot.x, y: depot.y, hp: t.hp, maxHp: t.hp, alive: true, absent: false,
+      x: at.x, y: at.y, hp: t.hp, maxHp: t.hp, alive: true, absent: false,
       order: { type: 'idle' }, pending: null, path: null, pathTo: null, hullDown: false,
       gunReady: state.tick + Math.round(2 * state.cfg.tickRate), abilityReady: state.tick, smokeReady: state.tick, mgCd: 0,
       status: 'Awaiting orders', spotted: [0, 0], facing: side === 0 ? 1 : -1,

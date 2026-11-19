@@ -3,7 +3,7 @@
 // AI's decisions both arrive here, so they follow exactly the same rules.
 
 import { clamp, isActive } from './util.js';
-import { T, cellIndex, terrainAt } from './map.js';
+import { T, S, cellIndex, terrainAt } from './map.js';
 import { resetPlans, resetSquadPlan, thinkSquad } from './squads.js';
 import { callArtillery, dropSmoke } from './features.js';
 import { useAbility } from './abilities.js';
@@ -316,12 +316,14 @@ function tankOrder(state, v, order) {
 
 // A tank cannot park inside a ruin: move its goal to the nearest open spot
 // with a little room round it (searched in rings, always in the same order).
-function tankSpot(state, pt, side) {
+// strict (where a new tank is set down): walls and deep water count too.
+export function tankSpot(state, pt, side, strict = false) {
   const map = state.map, B = T.building;
   const roomy = (x, y) => {
     for (const [dx, dy] of [[0, 0], [12, 0], [-12, 0], [0, 12], [0, -12]]) {
       const i = cellIndex(map, x + dx, y + dy);
       if (i < 0 || map.grid[i] === B) return false;
+      if (strict && (map.grid[i] === T.wall || (map.surf && map.surf[i] === S.deep))) return false;
     }
     return true;
   };
