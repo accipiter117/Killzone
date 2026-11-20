@@ -18,6 +18,7 @@ import { drawRubbleSprite } from './ground-sprites.js';
 import { drawHaze, drawGates } from './map-live.js';
 import { SPRITES, FLAGS, drawUnit, dirFromAngle, tankScale } from './unit-sprites.js';
 import { fx } from './fx-random.js';
+import { drawAircraft } from './aircraft-art.js';
 import { isExplored } from '../sim/battle.js';
 
 // In the tilted view, anything standing on raised ground is drawn higher up
@@ -98,6 +99,7 @@ export function drawFrame(g, r, state, cam, opts) {
   drawHaze(g, state, now, viewBounds(cam));
   drawSmoke(g, fxs, state.smokes, now, state.tick, state.cfg.tickRate);
   drawEffects(g, fxs, now, px);
+  drawAircraft(g, state, now, opts.tilt);
   if (opts.blood) drawSpray(g, opts.blood, now);
   if (opts.weatherFx !== false) drawWeatherWorld(g, state, now, viewBounds(cam), fxs);
   drawStrikes(g, state, now, px, opts);

@@ -483,6 +483,14 @@ function onTap(sx, sy) {
     if (game.armed) {
       const type = game.armed;
       game.armed = null;
+      // Aircraft are call-ins sent to the tapped point.
+      if (type === 'gunship' || type === 'dropship') {
+        if (order('callin', { what: type, x: Math.round(w.x), y: Math.round(w.y) })) {
+          game.marker = { x: w.x, y: w.y, t0: performance.now() / 1000, colour: type === 'gunship' ? '#ffb347' : '#9fd0ff' };
+          toast(ui, type === 'gunship' ? 'Gunship inbound' : 'Dropship inbound', type === 'gunship' ? 'It flies in from your depot and rakes a strip of ground through that point with cannon fire, then flies on. It only fires on the enemy it finds there.' : 'It lands there and puts fresh soldiers down for your most depleted platoon, then flies home.');
+        }
+        return;
+      }
       if (order(type, { x: w.x, y: w.y, delay: type === 'artillery' ? game.artDelay : 0 })) game.marker = { x: w.x, y: w.y, t0: performance.now() / 1000, colour: type === 'artillery' ? '#ff4a3a' : '#e0e0e0' };
       return;
     }
@@ -926,6 +934,8 @@ function hintText() {
   if (game.planning && game.selected !== null && game.match.state.tick === 0) return 'Tap inside the shaded zone to set this platoon up there, or beyond it to give an order.';
   if (game.armed === 'artillery') return 'Tap where the shells should land. They hit everyone, yours too.';
   if (game.armed === 'smoke') return 'Tap where to drop smoke. It blocks sight for a while.';
+  if (game.armed === 'gunship') return 'Tap where the gunship should strafe. It flies in from your depot and rakes a strip of ground through that point.';
+  if (game.armed === 'dropship') return 'Tap where the dropship should land with fresh soldiers.';
   if (game.selected !== null) return `${game.match.state.platoons[game.selected].name}: tap an objective to take it, or ground to move (slowed while you decide)`;
   if (game.vehicle) return 'Tank: tap the ground to drive there (it cannot enter ruins), or use Route, Escort or Hull down.';
   // The general tip only for the opening of a battle; after that the map is left clear.
@@ -953,6 +963,13 @@ function extraItems(st) {
     items.push({ key: 'c:platoon', label: 'Call in platoon', sub: why && why.startsWith('Hold') ? `need ${why.match(/\d+/)[0]} supply` : `${c.cost} pts`, off: !!why || st.sides[PLAYER].op < c.cost, run: () => { if (order('callin', { what: 'platoon' })) toast(ui, 'Platoon called in', 'A fresh platoon marches out of your HQ. Hold more supply points to bring up the next.'); } });
   }
   if (st.sites.some((s) => s.kind === 'depot' && s.owner === PLAYER)) {
+    // Aircraft: tap the pill, then the map (the pill stays lit while armed).
+    for (const what of ['gunship', 'dropship']) {
+      const c = CONFIG.callins[what];
+      const why = callinBlocked(st, PLAYER, what);
+      const busy = why && /refuelling|still out|full strength/.test(why);
+      items.push({ key: `a:${what}`, label: game.armed === what ? 'Tap the map' : c.label, sub: busy ? (why.match(/\((\d+s)\)/)?.[1] || (/still out/.test(why) ? 'in the air' : 'not needed')) : `${c.cost} pts`, off: !!why || st.sides[PLAYER].op < c.cost, run: () => { game.armed = game.armed === what ? null : what; game.selected = null; game.vehicle = false; } });
+    }
     const v = st.vehicles.find((o) => o.side === PLAYER);
     const why = callinBlocked(st, PLAYER, 'tank');
     if (v && !(v.alive && !v.absent)) items.push({ key: 'c:tank', label: 'Call in tank', sub: `${CONFIG.callins.tank.cost} pts`, off: !!why || st.sides[PLAYER].op < CONFIG.callins.tank.cost, run: () => { if (order('callin', { what: 'tank' })) toast(ui, 'Tank called in', 'A fresh tank rolls out of your depot. One at a time: lose it and you can call another.'); } });

@@ -140,6 +140,31 @@ function decide(state, side, prof, memory) {
     }
   }
 
+  // Aircraft from a depot we hold. The gunship rakes the densest group of
+  // enemies we can see, clear of our own troops; the dropship tops up a
+  // platoon that has lost at least a squad's worth, landing beside it.
+  const gun = cfg.callins.gunship, drop = cfg.callins.dropship;
+  if (op >= gun.cost + prof.reserve && seenFoes.length && !callinBlocked(state, side, 'gunship')) {
+    let best = null, bestN = 0;
+    for (const e of seenFoes) {
+      const n = seenFoes.filter((o) => dist(o, e) < cfg.aircraft.gunship.runLength / 2).length;
+      if (n <= bestN) continue;
+      if (!state.soldiers.some((s) => s.side === side && isActive(s) && dist(s, e) < ai.artillerySafeDist)) { best = e; bestN = n; }
+    }
+    if (best && bestN >= ai.gunshipMinCluster) {
+      cmds.push({ side, type: 'callin', params: { what: 'gunship', x: Math.round(best.x), y: Math.round(best.y) } });
+      op -= gun.cost;
+    }
+  }
+  if (op >= drop.cost + prof.reserve && !callinBlocked(state, side, 'dropship')) {
+    const weak = mine.filter((p) => !p.broken && platoonAlive(state, p) <= p.size - cfg.aircraft.dropship.soldiers).sort((a, b) => platoonAlive(state, a) - platoonAlive(state, b) || a.id - b.id)[0];
+    const c = weak && centres.get(weak.id);
+    if (c) {
+      cmds.push({ side, type: 'callin', params: { what: 'dropship', x: Math.round(c.x), y: Math.round(c.y) } });
+      op -= drop.cost;
+    }
+  }
+
   // Reinforce the weakest platoon still in the fight when there are points
   // to spare.
   if (op >= cost.reinforce + prof.reserve) {
