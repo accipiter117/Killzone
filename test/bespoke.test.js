@@ -52,17 +52,17 @@ test('the lift bridge rises for whoever holds the bridgehouse, and not on anyone
 test('closed blast doors are a wall nobody can see or shoot through, or blast down', () => {
   const s = make('industrial');
   const gate = s.map.gates.find((g) => g.kind === 'door');
-  assert.ok(gate.closed, 'the refinery hall starts sealed');
+  assert.ok(!gate.closed, 'the refinery hall starts open (the Helghast way out towards B)');
   const i = gate.cells[Math.floor(gate.cells.length / 2)];
   const x = (i % s.map.cols) * s.map.cell + 5, y = ((i / s.map.cols) | 0) * s.map.cell + 5;
-  assert.equal(s.map.grid[i], T.wall);
-  assert.equal(losClear(s, x - 60, y, x + 60, y), false);
-  s.sites.find((o) => o.id === gate.lever).owner = 1;
-
+  assert.notEqual(s.map.grid[i], T.wall);
+  // Whoever holds the control room can shut them.
+  s.sites.find((o) => o.id === gate.lever).owner = 0;
   s.tick = 1;
-  assert.ok(cmd(s, 'gate', { gate: gate.id }, 1).ok);
+  assert.ok(cmd(s, 'gate', { gate: gate.id }, 0).ok);
   sec(s, CONFIG.gates.moveSec + 0.5);
-  assert.notEqual(s.map.grid[i], T.wall, 'open');
+  assert.equal(s.map.grid[i], T.wall, 'shut');
+  assert.equal(losClear(s, x - 60, y, x + 60, y), false);
 });
 
 test('vent haze hides troops in it and a thick bank of it blocks sight', () => {
