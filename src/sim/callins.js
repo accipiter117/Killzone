@@ -5,6 +5,7 @@
 
 import { feed, sideName } from './util.js';
 import { tankSpot } from './commands.js';
+import { launchAircraft, dropshipPlatoon } from './aircraft.js';
 
 // The depot a side would use: its own first, then any other it holds.
 export function depotFor(state, side) {
@@ -33,6 +34,13 @@ export function callinBlocked(state, side, what) {
     return null;
   }
   if (!depotFor(state, side)) return 'Hold a vehicle depot first';
+  if (what === 'gunship' || what === 'dropship') {
+    const ready = state.sides[side].airReady?.[what] || 0;
+    if (state.tick < ready) return `The ${c.label.toLowerCase()} is refuelling (${Math.ceil((ready - state.tick) / state.cfg.tickRate)}s)`;
+    if (state.aircraft.some((a) => a.side === side && a.kind === what)) return `Your ${c.label.toLowerCase()} is still out`;
+    if (what === 'dropship' && !dropshipPlatoon(state, side, 0, 0)) return 'Every platoon is at full strength';
+    return null;
+  }
   if (what === 'tank') {
     if (state.sides[side].noTank) return 'No tank works to send one (war map)';
     const out = state.vehicles.filter((v) => v.side === side && v.alive && !v.absent).length;
@@ -41,8 +49,16 @@ export function callinBlocked(state, side, what) {
   return null;
 }
 
-export function callIn(state, side, what) {
+export function callIn(state, side, what, at = null) {
   if (what === 'platoon') return callInPlatoon(state, side);
+  if (what === 'gunship' || what === 'dropship') {
+    const sd = state.sides[side];
+    sd.airReady = sd.airReady || {};
+    sd.airReady[what] = state.tick + Math.round(state.cfg.callins[what].cooldownSec * state.cfg.tickRate);
+    sd.callins = (sd.callins || 0) + 1;
+    launchAircraft(state, side, what, depotFor(state, side), at);
+    return;
+  }
   const depot = depotFor(state, side);
   if (what === 'tank') {
     const v = state.vehicles.find((o) => o.side === side);

@@ -116,6 +116,8 @@ button.primary { background: var(--accent); color: #fff; border-color: transpare
 #hint { position: absolute; left: calc(var(--hud-l) + 262px); right: calc(var(--hud-r) + 132px); bottom: calc(var(--hud-b) + 12px); text-align: center; pointer-events: none; z-index: 2; }
 #hint span { display: inline-block; max-width: 100%; background: rgba(15, 14, 12, 0.72); color: #f2ede0; padding: 6px 12px; border-radius: 14px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 #hint:empty, #stage.tray-open #hint { display: none; }
+/* With call-in buttons beside the support buttons, the hint sits above them. */
+#stage:has(#extra-sup button) #hint { right: var(--hud-r); bottom: calc(var(--hud-b) + 70px); }
 #toast { position: absolute; left: 50%; bottom: calc(var(--hud-b) + 74px); transform: translateX(-50%); width: min(92%, 380px); background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 13px; z-index: 5; pointer-events: none; }
 #stage.tray-open #toast { bottom: auto; top: calc(var(--hud-t) + 56px); }
 #toast b { display: block; margin-bottom: 2px; }

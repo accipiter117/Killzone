@@ -48,6 +48,18 @@ export function ingest(fxs, events, now) {
         }
         break;
       }
+      case 'strafe':
+        // Gunship cannon: a heavy tracer down from the aircraft and a kick of dirt.
+        if (fxs.tracers.length < MAX) fxs.tracers.push({ x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2, side: e.side, t0: now, life: 0.1, heavy: true });
+        if (fxs.puffs.length < MAX) fxs.puffs.push({ x: e.x2 + fx.range(-3, 3), y: e.y2 + fx.range(-3, 3), t0: now, life: 0.45, r: 6, colour: '90,80,64' });
+        break;
+      case 'landed':
+        // Downwash: a ring of dust as the dropship settles.
+        for (let k = 0; k < 8 && fxs.puffs.length < MAX; k++) {
+          const a = (k / 8) * Math.PI * 2;
+          fxs.puffs.push({ x: e.x + Math.cos(a) * 30, y: e.y + Math.sin(a) * 22, t0: now, life: 0.9, r: 14, colour: '110,100,82' });
+        }
+        break;
       case 'hit':
         if (e.id !== undefined) fxs.lastHit.set(e.id, now);
         if (fxs.puffs.length < MAX) fxs.puffs.push({ x: e.x + fx.range(-3, 3), y: e.y + fx.range(-3, 3), t0: now, life: 0.35, r: 4, colour: '120,30,20' });

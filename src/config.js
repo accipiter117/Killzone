@@ -152,6 +152,12 @@ export const CONFIG = {
   // Random skirmish maps (src/sim/maps/random.js): find and take the enemy
   // HQ. Supply points pay score and order points; ground is explored in
   // coarse cells as troops see it.
+  // Skirmish map sizes (menu); battles on bigger maps run longer.
+  skirmishSizes: {
+    small: { label: 'Small', width: 4200, height: 2800, durationSec: 1080 },
+    medium: { label: 'Medium', width: 6000, height: 4000, durationSec: 1500 },
+    large: { label: 'Large', width: 7800, height: 5200, durationSec: 1920 },
+  },
   skirmish: { durationSec: 1500, supplyRegen: 0.18, exploreCell: 50, exploreSight: 300, homeKnown: 520, hqSec: 60, reserves: 2 },
   // Blood (src/render/blood.js): picture only, never read by the rules.
   // Sizes in world units (a standing soldier is about 34 tall), times in
@@ -201,6 +207,16 @@ export const CONFIG = {
     // more supply points you hold, the more of the reserve you can bring up
     // (needSupply[k] for the k-th platoon called in).
     platoon: { label: 'Platoon', cost: 5, site: 'hq', needSupply: [2, 4] },
+    // Aircraft from a vehicle depot you hold, sent to a point you tap.
+    gunship: { label: 'Gunship', cost: 4, cooldownSec: 60, site: 'depot' },
+    dropship: { label: 'Dropship', cost: 4, cooldownSec: 75, site: 'depot' },
+  },
+  // How the aircraft fly and fight (src/sim/aircraft.js). Speeds in world
+  // units a second. The gunship rakes a strip runLength long and width
+  // either side of its track, centred on the point it was sent to.
+  aircraft: {
+    gunship: { label: 'Gunship', speed: 330, strafeSpeed: 150, climbSec: 1.5, runLength: 380, width: 40, leadDist: 30, reach: 170, exitDist: 500, shotsPerSec: 9, hitChance: 0.45, damage: 24, suppress: 9, tankDamage: 6 },
+    dropship: { label: 'Dropship', speed: 260, climbSec: 1.5, landSec: 2, landedAlt: 0.12, holdSec: 2.5, soldiers: 5 },
   },
   // Digging in (src/sim/digging.js): a squad holding still this long starts
   // to dig (a Dig in order starts at once and digs faster). Levels at these
@@ -295,7 +311,7 @@ export const CONFIG = {
   causes: {
     rifle: 'rifle fire', heavy: 'heavy machine guns', assault: 'assault squads', engineer: 'engineer fire', recon: 'snipers',
     jump: 'jetpack troopers', infiltrator: 'infiltrators', mg: 'an MG nest', tankmg: 'the tank machine gun', tankgun: 'tank shells',
-    artillery: 'artillery', grenade: 'grenades', petrusite: 'a petrusite explosion', arc: 'the arc tower', lightning: 'lightning', dive: 'jetpack landings', charge: 'a breaching charge',
+    artillery: 'artillery', grenade: 'grenades', petrusite: 'a petrusite explosion', arc: 'the arc tower', lightning: 'lightning', dive: 'jetpack landings', charge: 'a breaching charge', gunship: 'gunship fire',
   },
   historyEverySec: 5,
   // Walls (industrial and city maps): how much of a blast's radius knocks
@@ -308,7 +324,7 @@ export const CONFIG = {
   // instead of dying; one soldier in every squad is a medic who can get
   // a downed platoon mate within reach back up on part of their health.
   // Blasts and shells kill outright (and finish off the downed).
-  medic: { bleedSec: 25, reviveSec: 3, reach: 220, reviveHp: 0.35, maxSupp: 40, killOutright: ['artillery', 'grenade', 'petrusite', 'tankgun', 'dive', 'charge'] },
+  medic: { bleedSec: 25, reviveSec: 3, reach: 220, reviveHp: 0.35, maxSupp: 40, killOutright: ['artillery', 'grenade', 'petrusite', 'tankgun', 'dive', 'charge', 'gunship'] },
 
   // Engineers' ability becomes a field repair when their own tank is damaged
   // (and no enemy tank is close enough to breach).
@@ -334,7 +350,12 @@ export const CONFIG = {
   // being aimed (slow motion, as in Bad North).
   // grid: tile size for move orders (orders snap to tile centres; a
   // platoon's three squads take the tile and the ones above and below).
-  ui: { slowMo: 0.25, tile: 60 },
+  ui: {
+    // Automatic drawing resolution (src/main.js autoQuality): steps of
+    // `step` down to minScale when frames average over slowMs, back up
+    // after upAfterSec under fastMs.
+    autoQuality: { checkSec: 2, slowMs: 28, fastMs: 17, upAfterSec: 8, step: 0.15, minScale: 0.5 },
+    slowMo: 0.25, tile: 60 },
 
   // Soldier animation pacing (picture only), picked by the owner from
   // side-by-side previews. stride: world units walked per running frame
@@ -347,6 +368,8 @@ export const CONFIG = {
   ai: {
     thinkSec: 4,
     siteValue: { objective: 10, comms: 6, mg: 3, arc: 3, lever: 1.5, depot: 2, supply: 7, hq: 25, scout: 4 },
+    hqDefendRadius: 700, hqDefendMin: 3, // skirmish: this many enemy seen this close to our HQ and platoons go back to hold it
+    gunshipMinCluster: 6, // the AI sends its gunship at a group at least this big
     scoutGrowSec: 90, // skirmish: a scouting target's worth grows by its base every this many seconds while the enemy HQ is unfound
     threatRadius: 320, // enemies seen this close to a site count as massing on it
     threatValue: 0.6, // extra value per enemy soldier massing on a site

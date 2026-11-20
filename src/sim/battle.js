@@ -8,6 +8,7 @@ import { updateSites, updateEmplacements, updateStrikes, updateSmokes } from './
 import { thinkSquad, moveSoldiers, resetPlans, updateMedics, updateRoutes } from './squads.js';
 import { updateDigging } from './digging.js';
 import { updateGates } from './gates.js';
+import { updateAircraft } from './aircraft.js';
 import { chooseWeather, updateWeather } from './weather.js';
 import { updateThrows, updateDives } from './abilities.js';
 import { platoonAlive, feed, sideName } from './util.js';
@@ -35,7 +36,7 @@ export function createBattle(seed, options = {}) {
     tanks: map.tanks,
     sides: SIDE_NAMES.map((name, id) => ({ id, name, op: cfg.orders.start, score: 0, casualties: 0, fled: 0, artReadyTick: 0, spotted: null, captures: 0, abilities: 0, rallies: 0, reinforceReadyTick: 0, reinforcements: 0, revived: 0, lossBy: {} })),
     platoons: [], squads: [], soldiers: [],
-    strikes: [], smokes: [], throws: [], charges: [], vehicles: [],
+    strikes: [], smokes: [], throws: [], charges: [], vehicles: [], aircraft: [],
     events: [], feed: [], history: [],
     result: null,
   };
@@ -127,7 +128,8 @@ export function createBattle(seed, options = {}) {
   // Squads that start with nobody (a campaign platoon that lost a squad).
   for (const sq of state.squads) if (!sq.soldiers.some((id) => state.soldiers[id].alive)) sq.mode = 'dead';
   // Skirmish maps are twice the size: the hunt for the enemy HQ gets longer.
-  state.durationTicks = Math.round((map.skirmish ? cfg.skirmish.durationSec : cfg.battle.durationSec) * cfg.tickRate);
+  const size = map.skirmish && Object.values(cfg.skirmishSizes).find((z) => z.width === map.width && z.height === map.height);
+  state.durationTicks = Math.round((map.skirmish ? (size ? size.durationSec : cfg.skirmish.durationSec) : cfg.battle.durationSec) * cfg.tickRate);
   chooseWeather(state, seedInt);
   if (map.skirmish) {
     const c = cfg.skirmish.exploreCell, cols = Math.ceil(map.width / c), rows = Math.ceil(map.height / c);
@@ -195,6 +197,7 @@ export function step(state) {
   updateCharges(state);
   updateEmplacements(state, dt);
   updateStrikes(state);
+  updateAircraft(state, dt);
   updateThrows(state);
   updateDives(state);
   updateSmokes(state);

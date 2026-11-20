@@ -7,6 +7,7 @@ import { createMatch, issue, advance } from './sim/match.js';
 import { amendWindow, squadFreeWindow, followUpWindow } from './sim/commands.js';
 import { createAI } from './sim/ai.js';
 import { fingerprint } from './sim/battle.js';
+import { encodeReplay, decodeReplay, replayLink } from './ui/replay-code.js';
 import { seedFrom } from './sim/rng.js';
 import { wireAt, heightAt } from './sim/map.js';
 import { isActive, coverName, dist } from './sim/util.js';
@@ -21,7 +22,7 @@ import { loadGroundSprites } from './render/ground-sprites.js';
 import { createBlood, ingestBlood, rebakeBlood } from './render/blood.js';
 import { callinBlocked, nextReserve } from './sim/callins.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
-import { createAudio, unlockAudio, newFrame, playEvents, uiClick, setMix } from './render/audio.js';
+import { createAudio, unlockAudio, newFrame, playEvents, uiClick, setMix, updateAmbient } from './render/audio.js';
 import { attachMapInput, attachMinimapInput } from './ui/input.js';
 import { createUI, updateUI, toast, flashOrderPoints, openOverlay, closeOverlay, showEnd, resetFeed } from './ui/ui.js';
 import { createCampaignUI } from './ui/campaign.js';
@@ -48,7 +49,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), battleMode: 'rt', side: store.get('side2', 1) === 0 ? 0 : 1, route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), bloodOn: store.get('blood', true), mapChoice: store.get('mapType', 'trenches'), weatherChoice: store.get('weather', 'random'), mapType: 'trenches', lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), battleMode: 'rt', side: store.get('side2', 1) === 0 ? 0 : 1, route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), bloodOn: store.get('blood', true), mapChoice: store.get('mapType', 'trenches'), skirmishSize: store.get('skirmishSize', 'medium'), weatherChoice: store.get('weather', 'random'), mapType: 'trenches', lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, scope: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -161,8 +162,9 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
     // 'skirmish' is the generated map (type 'random'): fog of war and an HQ to find.
     game.mapType = choice === 'skirmish' ? 'random' : choice === 'random' ? MAP_KINDS[Math.floor(Math.random() * MAP_KINDS.length)] : MAP_KINDS.includes(choice) ? choice : 'trenches';
   }
-  const size = CONFIG.mapSizes[game.mapType];
-  game.options = replayLog ? replayLog.options : campaign ? battleOptions(campaign.rec) : { config: { battle: { durationSec: game.mapType === 'random' ? CONFIG.skirmish.durationSec : game.lengthSec }, map: { type: game.mapType, weather: game.weatherChoice }, world: { width: size.width, height: size.height } } };
+  // Skirmish maps come in three sizes (menu, or &size= in the address).
+  const size = game.mapType === 'random' ? CONFIG.skirmishSizes[game.skirmishSize] || CONFIG.skirmishSizes.medium : CONFIG.mapSizes[game.mapType];
+  game.options = replayLog ? replayLog.options : campaign ? battleOptions(campaign.rec) : { config: { battle: { durationSec: game.mapType === 'random' ? size.durationSec : game.lengthSec }, map: { type: game.mapType, weather: game.weatherChoice }, world: { width: size.width, height: size.height } } };
   game.replay = !!replayLog;
   game.match = createMatch({ seed, options: game.options, controllers: replayLog || turnBased ? [] : controllersFor(game.watch), replayLog });
   if (turnBased) createTactics(game.match.state);
@@ -213,8 +215,9 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
     game.paused = true;
     openOverlay('overlay-help');
   }
-  if (campaign) return;
-  try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}&map=${game.mapType === 'random' ? 'skirmish' : game.mapType}`); } catch { /* file:// */ }
+  // (A replay keeps its own link, so reloading watches it again.)
+  if (campaign || replayLog) return;
+  try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}&map=${game.mapType === 'random' ? `skirmish&size=${game.skirmishSize}` : game.mapType}`); } catch { /* file:// */ }
 }
 
 // The weather forecast: a toast as the battle opens, and a chip by the
@@ -271,7 +274,10 @@ function tapToGround(sx, sy) {
 function resize() {
   const stage = mapCanvas.parentElement;
   const w = stage.clientWidth, h = stage.clientHeight;
-  game.dpr = Math.min(2, window.devicePixelRatio || 1);
+  // Drawing resolution: the screen's own (at most 2x), times the automatic
+  // quality step (see autoQuality), and never below three quarters of a
+  // device pixel per screen point.
+  game.dpr = Math.max(0.75, Math.min(2, window.devicePixelRatio || 1) * (game.resScale || 1));
   mapCanvas.width = Math.round(w * game.dpr);
   mapCanvas.height = Math.round(h * game.dpr);
   miniCanvas.width = Math.round(miniCanvas.clientWidth * game.dpr);
@@ -483,6 +489,14 @@ function onTap(sx, sy) {
     if (game.armed) {
       const type = game.armed;
       game.armed = null;
+      // Aircraft are call-ins sent to the tapped point.
+      if (type === 'gunship' || type === 'dropship') {
+        if (order('callin', { what: type, x: Math.round(w.x), y: Math.round(w.y) })) {
+          game.marker = { x: w.x, y: w.y, t0: performance.now() / 1000, colour: type === 'gunship' ? '#ffb347' : '#9fd0ff' };
+          toast(ui, type === 'gunship' ? 'Gunship inbound' : 'Dropship inbound', type === 'gunship' ? 'It flies in from your depot and rakes a strip of ground through that point with cannon fire, then flies on. It only fires on the enemy it finds there.' : 'It lands there and puts fresh soldiers down for your most depleted platoon, then flies home.');
+        }
+        return;
+      }
       if (order(type, { x: w.x, y: w.y, delay: type === 'artillery' ? game.artDelay : 0 })) game.marker = { x: w.x, y: w.y, t0: performance.now() / 1000, colour: type === 'artillery' ? '#ff4a3a' : '#e0e0e0' };
       return;
     }
@@ -633,6 +647,7 @@ function openMenu() {
   document.getElementById('labels-toggle').checked = game.labelsAll;
   document.getElementById('view-select').value = game.view;
   document.getElementById('map-select').value = game.mapChoice;
+  document.getElementById('size-select').value = game.skirmishSize;
   document.getElementById('weather-select').value = game.weatherChoice;
   document.getElementById('blood-toggle').checked = game.bloodOn;
   document.getElementById('tilt-toggle').checked = game.tilt;
@@ -678,6 +693,10 @@ document.getElementById('slowmo-toggle').addEventListener('change', (e) => {
   game.slowMo = e.target.checked;
   store.set('slowMo', game.slowMo);
 });
+document.getElementById('size-select').addEventListener('change', (e) => {
+  game.skirmishSize = e.target.value;
+  store.set('skirmishSize', game.skirmishSize);
+});
 document.getElementById('map-select').addEventListener('change', (e) => {
   game.mapChoice = e.target.value;
   store.set('mapType', game.mapChoice);
@@ -715,6 +734,49 @@ const menuSeed = () => document.getElementById('seed-input').value.trim() || new
 document.getElementById('btn-new').addEventListener('click', () => { closeOverlay('overlay-menu'); startBattle(newSeed()); });
 document.getElementById('btn-restart').addEventListener('click', () => { closeOverlay('overlay-menu'); startBattle(menuSeed(), { mapType: game.mapType === 'random' ? 'skirmish' : game.mapType }); });
 document.getElementById('btn-help').addEventListener('click', () => { closeOverlay('overlay-menu'); openOverlay('overlay-help'); });
+// ---- Replay codes ------------------------------------------------------------
+// Share a finished battle as a code or a link; paste one (or open a link) to
+// watch it. The replay check at the end says whether it came out identical.
+function watchReplay(rep) {
+  game.original = { log: rep.log, print: rep.print };
+  game.mapType = rep.log.options?.config?.map?.type || game.mapType;
+  closeOverlay('overlay-share');
+  closeOverlay('overlay-start');
+  closeOverlay('overlay-end');
+  startBattle(rep.log.seed, { replayLog: JSON.parse(JSON.stringify(rep.log)) });
+}
+function openShare(mode) {
+  const $ = (id) => document.getElementById(id);
+  $('share-title').textContent = mode === 'share' ? 'Share this battle' : 'Watch a replay';
+  $('share-text').textContent = mode === 'share'
+    ? 'Send the link (or the code) to anyone: it opens this battle as a replay, every order exactly as it was given. The code can also be pasted into "Watch a replay from a code" on the start screen.'
+    : 'Paste a replay code or link someone sent you.';
+  $('share-box').readOnly = mode === 'share';
+  $('share-box').value = '';
+  $('share-msg').textContent = '';
+  $('share-link').hidden = mode !== 'share';
+  $('share-code').hidden = mode !== 'share';
+  $('share-watch').hidden = mode === 'share';
+  openOverlay('overlay-share');
+}
+async function copyText(text) {
+  const msg = document.getElementById('share-msg');
+  try { await navigator.clipboard.writeText(text); msg.textContent = 'Copied.'; } catch { document.getElementById('share-box').select(); msg.textContent = 'Select it and copy.'; }
+}
+document.getElementById('btn-share').addEventListener('click', async () => {
+  const src = game.replay && game.original ? game.original : { log: game.match.log, print: fingerprint(game.match.state) };
+  openShare('share');
+  document.getElementById('share-box').value = 'Working...';
+  game.shareCode = await encodeReplay(src.log, src.print);
+  document.getElementById('share-box').value = game.shareCode;
+});
+document.getElementById('share-link').addEventListener('click', () => game.shareCode && copyText(replayLink(game.shareCode)));
+document.getElementById('share-code').addEventListener('click', () => game.shareCode && copyText(game.shareCode));
+document.getElementById('st-watch').addEventListener('click', () => openShare('watch'));
+document.getElementById('share-watch').addEventListener('click', async () => {
+  try { watchReplay(await decodeReplay(document.getElementById('share-box').value)); } catch (e) { document.getElementById('share-msg').textContent = e.message || 'That code could not be read.'; }
+});
+
 document.getElementById('btn-replay').addEventListener('click', () => {
   const src = game.replay ? game.original : { log: game.match.log, print: fingerprint(game.match.state) };
   game.original = src;
@@ -748,9 +810,9 @@ window.__kzCampaign = campaignUI; // for browser tests
 // On a campaign battle's end screen, the only way on is back to the war map.
 function endButtons() {
   const c = !!game.campaign;
-  for (const id of ['btn-replay', 'btn-end-restart', 'btn-end-new']) document.getElementById(id).hidden = c;
+  for (const id of ['btn-replay', 'btn-share', 'btn-end-restart', 'btn-end-new']) document.getElementById(id).hidden = c;
   // Turn-based battles are not replayed (their results come from the turn rules, not the recorded orders).
-  if (game.match && game.match.state.tb) document.getElementById('btn-replay').hidden = true;
+  if (game.match && game.match.state.tb) { document.getElementById('btn-replay').hidden = true; document.getElementById('btn-share').hidden = true; }
   document.getElementById('btn-end-campaign').hidden = !c;
 }
 
@@ -926,6 +988,8 @@ function hintText() {
   if (game.planning && game.selected !== null && game.match.state.tick === 0) return 'Tap inside the shaded zone to set this platoon up there, or beyond it to give an order.';
   if (game.armed === 'artillery') return 'Tap where the shells should land. They hit everyone, yours too.';
   if (game.armed === 'smoke') return 'Tap where to drop smoke. It blocks sight for a while.';
+  if (game.armed === 'gunship') return 'Tap where the gunship should strafe. It flies in from your depot and rakes a strip of ground through that point.';
+  if (game.armed === 'dropship') return 'Tap where the dropship should land with fresh soldiers.';
   if (game.selected !== null) return `${game.match.state.platoons[game.selected].name}: tap an objective to take it, or ground to move (slowed while you decide)`;
   if (game.vehicle) return 'Tank: tap the ground to drive there (it cannot enter ruins), or use Route, Escort or Hull down.';
   // The general tip only for the opening of a battle; after that the map is left clear.
@@ -953,6 +1017,13 @@ function extraItems(st) {
     items.push({ key: 'c:platoon', label: 'Call in platoon', sub: why && why.startsWith('Hold') ? `need ${why.match(/\d+/)[0]} supply` : `${c.cost} pts`, off: !!why || st.sides[PLAYER].op < c.cost, run: () => { if (order('callin', { what: 'platoon' })) toast(ui, 'Platoon called in', 'A fresh platoon marches out of your HQ. Hold more supply points to bring up the next.'); } });
   }
   if (st.sites.some((s) => s.kind === 'depot' && s.owner === PLAYER)) {
+    // Aircraft: tap the pill, then the map (the pill stays lit while armed).
+    for (const what of ['gunship', 'dropship']) {
+      const c = CONFIG.callins[what];
+      const why = callinBlocked(st, PLAYER, what);
+      const busy = why && /refuelling|still out|full strength/.test(why);
+      items.push({ key: `a:${what}`, label: game.armed === what ? 'Tap the map' : c.label, sub: busy ? (why.match(/\((\d+s)\)/)?.[1] || (/still out/.test(why) ? 'in the air' : 'not needed')) : `${c.cost} pts`, off: !!why || st.sides[PLAYER].op < c.cost, run: () => { game.armed = game.armed === what ? null : what; game.selected = null; game.vehicle = false; } });
+    }
     const v = st.vehicles.find((o) => o.side === PLAYER);
     const why = callinBlocked(st, PLAYER, 'tank');
     if (v && !(v.alive && !v.absent)) items.push({ key: 'c:tank', label: 'Call in tank', sub: `${CONFIG.callins.tank.cost} pts`, off: !!why || st.sides[PLAYER].op < CONFIG.callins.tank.cost, run: () => { if (order('callin', { what: 'tank' })) toast(ui, 'Tank called in', 'A fresh tank rolls out of your depot. One at a time: lose it and you can call another.'); } });
@@ -982,19 +1053,47 @@ function updateExtraSupport(st) {
   });
 }
 
+// Automatic quality: if frames stay slow (an average under about 36 a
+// second for two seconds), draw at a lower resolution, a step at a time;
+// step back up after a good stretch. Most of the cost on a phone is pixels
+// painted (paused or not), so this keeps big battles smooth on slower
+// phones while those that cope keep full sharpness. A hidden tab's long
+// gaps do not count.
+const QUALITY = CONFIG.ui.autoQuality;
+function autoQuality(dt, now) {
+  if (!QUALITY || dt <= 0 || dt >= 0.2) return;
+  game.ftAvg = game.ftAvg === undefined ? dt : game.ftAvg * 0.95 + dt * 0.05;
+  if (now - (game.qualityAt || 0) < QUALITY.checkSec) return;
+  const scale = game.resScale || 1;
+  if (game.ftAvg > QUALITY.slowMs / 1000 && scale > QUALITY.minScale + 1e-6) {
+    game.resScale = Math.max(QUALITY.minScale, scale - QUALITY.step);
+    game.qualityAt = now; game.goodSince = now;
+    resize();
+  } else if (game.ftAvg < QUALITY.fastMs / 1000 && scale < 1) {
+    if (now - (game.goodSince || now) > QUALITY.upAfterSec) { game.resScale = Math.min(1, scale + QUALITY.step); game.qualityAt = now; game.goodSince = now; resize(); }
+  } else {
+    game.goodSince = now;
+    game.qualityAt = now;
+  }
+}
+
 function frame(t) {
   const now = t / 1000;
   const dt = Math.min(0.25, now - game.last / 1000);
   game.last = t;
   // The war map (or the start menu) is up: no battle to run or draw.
   if (campaignUI.visible() && campaignUI.cm) keyPan(campaignUI.debug.cam, dt);
-  if (campaignUI.draw(now) || !game.match) { requestAnimationFrame(frame); return; }
+  if (campaignUI.draw(now) || !game.match) { updateAmbient(audio, null, null, true); requestAnimationFrame(frame); return; }
   keyPan(game.cam, dt);
+  autoQuality(dt, now);
   const m = game.match;
   const st = m.state;
   const tickDt = 1 / st.cfg.tickRate;
   // Slow motion while giving orders, so there is time to think on a phone.
   newFrame(audio);
+  // Engines, aircraft, arc tower hum and the weather bed (quiet when paused,
+  // over, or when the start screen is up over a battle).
+  updateAmbient(audio, st, game.cam, game.paused || !!st.result || !document.getElementById('overlay-start').hidden);
   const slow = game.slowMo && !game.watch && !game.replay && !game.release && (game.selected !== null || game.vehicle || game.armed !== null);
   document.getElementById('stage').classList.toggle('slowmo', slow && !game.paused);
   if (!game.paused && !st.result) {
@@ -1094,6 +1193,9 @@ const params = new URLSearchParams(location.search);
 const urlSeed = params.get('seed');
 // A link with a seed opens that battle straight away; otherwise the start
 // menu (campaign or quick battle).
-if (urlSeed) startBattle(urlSeed, { mapType: params.get('map') });
+if (params.get('size') && CONFIG.skirmishSizes[params.get('size')]) game.skirmishSize = params.get('size');
+// A shared replay link opens straight into the replay.
+if (params.get('replay')) decodeReplay(params.get('replay')).then(watchReplay).catch((e) => toast(ui, 'Replay link not readable', e.message || 'The code in the link could not be read.', true));
+else if (urlSeed) startBattle(urlSeed, { mapType: params.get('map') });
 else showStart();
 requestAnimationFrame((t) => { game.last = t; requestAnimationFrame(frame); });

@@ -18,6 +18,7 @@ import { drawRubbleSprite } from './ground-sprites.js';
 import { drawHaze, drawGates } from './map-live.js';
 import { SPRITES, FLAGS, drawUnit, dirFromAngle, tankScale } from './unit-sprites.js';
 import { fx } from './fx-random.js';
+import { drawAircraft } from './aircraft-art.js';
 import { isExplored } from '../sim/battle.js';
 
 // In the tilted view, anything standing on raised ground is drawn higher up
@@ -98,12 +99,12 @@ export function drawFrame(g, r, state, cam, opts) {
   drawHaze(g, state, now, viewBounds(cam));
   drawSmoke(g, fxs, state.smokes, now, state.tick, state.cfg.tickRate);
   drawEffects(g, fxs, now, px);
+  drawAircraft(g, state, now, opts.tilt);
   if (opts.blood) drawSpray(g, opts.blood, now);
   if (opts.weatherFx !== false) drawWeatherWorld(g, state, now, viewBounds(cam), fxs);
   drawStrikes(g, state, now, px, opts);
   drawDeployZone(g, state, opts, px);
   drawMarker(g, opts, now, px);
-  drawShroud(g, r, state, opts, now);
 
   // Screen space: icons, badges and text stay the same size at any zoom.
   drawFog(g, r, state, cam, opts);
@@ -139,18 +140,10 @@ function shroudCanvas(r, state, opts, now) {
   }
   return r.shroud;
 }
-function drawShroud(g, r, state, opts, now) {
-  const c = shroudCanvas(r, state, opts, now);
-  if (!c) return;
-  const e = state.explored;
-  g.save();
-  g.imageSmoothingEnabled = true;
-  g.drawImage(c, 0, 0, e.cols * e.cell, e.rows * e.cell);
-  g.restore();
-}
-
 // Fog of war: everywhere your troops cannot see is dimmed. Drawn small and
 // scaled up (soft edges come free), from each squad's and tank's sight.
+// On a skirmish map the black shroud over unexplored ground goes into the
+// same small canvas (one full-screen pass on a phone instead of two).
 function drawFog(g, r, state, cam, opts) {
   if (opts.reveal || opts.fog === false) return;
   const W = Math.ceil(g.canvas.width / 4), H = Math.ceil(g.canvas.height / 4);
@@ -180,6 +173,15 @@ function drawFog(g, r, state, cam, opts) {
     clear(c.x, c.y, state.cfg.roles[sq.role].sight);
   }
   for (const v of state.vehicles || []) if (v.side === opts.playerSide && v.alive && !v.absent) clear(v.x, v.y, state.cfg.tank.sight);
+  const sh = shroudCanvas(r, state, opts, opts.now);
+  if (sh) {
+    const m = VIEW.m, e = state.explored;
+    f.globalCompositeOperation = 'source-over';
+    f.imageSmoothingEnabled = true;
+    f.setTransform(k * m[0], k * m[1], k * m[2], k * m[3], k * (m[4] + VIEW.sh.x), k * (m[5] + VIEW.sh.y));
+    f.drawImage(sh, 0, 0, e.cols * e.cell, e.rows * e.cell);
+    f.setTransform(1, 0, 0, 1, 0, 0);
+  }
   g.save();
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.imageSmoothingEnabled = true;
@@ -1351,6 +1353,16 @@ export function drawMinimap(g, r, state, cam, opts) {
     g.beginPath();
     g.arc(s.x * sx, s.y * sy, s.kind === 'objective' || s.kind === 'hq' ? 4 : 2.5, 0, Math.PI * 2);
     g.fill();
+  }
+  // Where enemy squads were last seen (the main view's fading "?" rings).
+  if (!opts.reveal) {
+    for (const [, m] of r.lastSeen) {
+      const age = opts.now - m.t;
+      if (age > 25 || age < 0) continue;
+      g.strokeStyle = `rgba(255,138,82,${0.9 * (1 - age / 25)})`;
+      g.lineWidth = 1.4;
+      g.beginPath(); g.arc(m.x * sx, m.y * sy, 4, 0, Math.PI * 2); g.stroke();
+    }
   }
   for (const s of state.soldiers) {
     if (!isActive(s) || !visible(state, s, opts)) continue;

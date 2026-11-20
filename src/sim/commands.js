@@ -252,7 +252,11 @@ function applyInner(state, cmd) {
       if (why) return fail(why);
       cost = cfg.callins[p.what].cost;
       if (sd.op + 1e-9 < cost) return fail('Not enough order points');
-      callIn(state, side, p.what);
+      // Aircraft go where they are sent.
+      const air = p.what === 'gunship' || p.what === 'dropship';
+      const at = air ? point() : null;
+      if (air && !at) return fail('Tap where to send it');
+      callIn(state, side, p.what, at);
       break;
     }
     case 'gate': {

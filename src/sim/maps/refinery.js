@@ -92,7 +92,9 @@ export function refineryMap(seedInt, cfg) {
   t.building(1980, 560, 2300, 860, [['e', 0.5, 50], ['n', 0.7, 40]], WK.concrete);
   t.prop('pipes', 2140, 650, 180, 26, 0, { solid: true, n: 2, col: '#7b7d78' });
   t.prop('crates', 2120, 780, 50, 30, 0, { low: true });
-  const doors = t.gate({ id: 'doors', kind: 'door', name: 'blast doors', x: 1985, y: 710, w: 10, h: 90, lever: 'control', closed: true });
+  // The blast doors start open (the Helghast's quick way out of the hall
+  // towards B); whoever takes the control room can shut them.
+  const doors = t.gate({ id: 'doors', kind: 'door', name: 'blast doors', x: 1985, y: 710, w: 10, h: 90, lever: 'control', closed: false });
   t.hazard(1960, 660, 1975, 760);
   t.building(2320, 860, 2440, 960, [['w', 0.5, 30], ['n', 0.5, 30]], WK.concrete);
   // A gantry over the north yard with the arc tower on it.
@@ -136,7 +138,10 @@ export function refineryMap(seedInt, cfg) {
   doors.lever = 'control';
 
   t.deploy(0, [[230, 200], [210, 760], [240, 1240]], [140, 1180]);
-  t.deploy(1, [[2240, 180], [2200, 760], [2160, 1150]], [2500, 1260]);
+  // The Helghast tank starts in the garage yard's north end, so its drive to
+  // B (about 1220) matches the ISA tank's (about 1270); from the far corner
+  // it was 1630 and the ISA tank always reached the fight at B first.
+  t.deploy(1, [[2240, 180], [2200, 760], [2160, 1150]], [2460, 1180]);
   t.lane(0, [1300, 400], 'C');
   t.lane(1, [1300, 1180], 'A');
   return t.map;

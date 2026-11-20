@@ -24,7 +24,8 @@ src/sim/                  pure simulation (no DOM, no Math.random)
   maps/                   the bespoke Helghan maps (river.js, refinery.js, pyrrhus.js) built with kit.js; flip.js mirrors one east to west for testing; random.js generates skirmish maps (map type 'random': HQs, fog of war over unexplored ground in state.explored, reserve platoons; the ISA always take the western HQ)
   maps.js                 the old mirrored generators (kept for the mechanics tests: map type 'mirror-trenches' and the old kits)
   gates.js                lift bridges, blast doors and barriers worked from lever sites
-  callins.js              call-ins from a held vehicle depot (a tank now; aircraft later via config callins)
+  callins.js              call-ins from a held vehicle depot (tank, gunship, dropship) and skirmish reserve platoons
+  aircraft.js             gunship strafing runs and dropship landings (drawn in src/render/aircraft-art.js)
   digging.js              squads that hold still dig foxholes, sandbags, then trenches
   battle.js               createBattle, step (one tick), scoring, end of battle
   squads.js               squad behaviour by role, stances, platoon orders
