@@ -7,6 +7,7 @@ import { createMatch, issue, advance } from './sim/match.js';
 import { amendWindow, squadFreeWindow, followUpWindow } from './sim/commands.js';
 import { createAI } from './sim/ai.js';
 import { fingerprint } from './sim/battle.js';
+import { encodeReplay, decodeReplay, replayLink } from './ui/replay-code.js';
 import { seedFrom } from './sim/rng.js';
 import { wireAt, heightAt } from './sim/map.js';
 import { isActive, coverName, dist } from './sim/util.js';
@@ -214,7 +215,8 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
     game.paused = true;
     openOverlay('overlay-help');
   }
-  if (campaign) return;
+  // (A replay keeps its own link, so reloading watches it again.)
+  if (campaign || replayLog) return;
   try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}&map=${game.mapType === 'random' ? `skirmish&size=${game.skirmishSize}` : game.mapType}`); } catch { /* file:// */ }
 }
 
@@ -732,6 +734,49 @@ const menuSeed = () => document.getElementById('seed-input').value.trim() || new
 document.getElementById('btn-new').addEventListener('click', () => { closeOverlay('overlay-menu'); startBattle(newSeed()); });
 document.getElementById('btn-restart').addEventListener('click', () => { closeOverlay('overlay-menu'); startBattle(menuSeed(), { mapType: game.mapType === 'random' ? 'skirmish' : game.mapType }); });
 document.getElementById('btn-help').addEventListener('click', () => { closeOverlay('overlay-menu'); openOverlay('overlay-help'); });
+// ---- Replay codes ------------------------------------------------------------
+// Share a finished battle as a code or a link; paste one (or open a link) to
+// watch it. The replay check at the end says whether it came out identical.
+function watchReplay(rep) {
+  game.original = { log: rep.log, print: rep.print };
+  game.mapType = rep.log.options?.config?.map?.type || game.mapType;
+  closeOverlay('overlay-share');
+  closeOverlay('overlay-start');
+  closeOverlay('overlay-end');
+  startBattle(rep.log.seed, { replayLog: JSON.parse(JSON.stringify(rep.log)) });
+}
+function openShare(mode) {
+  const $ = (id) => document.getElementById(id);
+  $('share-title').textContent = mode === 'share' ? 'Share this battle' : 'Watch a replay';
+  $('share-text').textContent = mode === 'share'
+    ? 'Send the link (or the code) to anyone: it opens this battle as a replay, every order exactly as it was given. The code can also be pasted into "Watch a replay from a code" on the start screen.'
+    : 'Paste a replay code or link someone sent you.';
+  $('share-box').readOnly = mode === 'share';
+  $('share-box').value = '';
+  $('share-msg').textContent = '';
+  $('share-link').hidden = mode !== 'share';
+  $('share-code').hidden = mode !== 'share';
+  $('share-watch').hidden = mode === 'share';
+  openOverlay('overlay-share');
+}
+async function copyText(text) {
+  const msg = document.getElementById('share-msg');
+  try { await navigator.clipboard.writeText(text); msg.textContent = 'Copied.'; } catch { document.getElementById('share-box').select(); msg.textContent = 'Select it and copy.'; }
+}
+document.getElementById('btn-share').addEventListener('click', async () => {
+  const src = game.replay && game.original ? game.original : { log: game.match.log, print: fingerprint(game.match.state) };
+  openShare('share');
+  document.getElementById('share-box').value = 'Working...';
+  game.shareCode = await encodeReplay(src.log, src.print);
+  document.getElementById('share-box').value = game.shareCode;
+});
+document.getElementById('share-link').addEventListener('click', () => game.shareCode && copyText(replayLink(game.shareCode)));
+document.getElementById('share-code').addEventListener('click', () => game.shareCode && copyText(game.shareCode));
+document.getElementById('st-watch').addEventListener('click', () => openShare('watch'));
+document.getElementById('share-watch').addEventListener('click', async () => {
+  try { watchReplay(await decodeReplay(document.getElementById('share-box').value)); } catch (e) { document.getElementById('share-msg').textContent = e.message || 'That code could not be read.'; }
+});
+
 document.getElementById('btn-replay').addEventListener('click', () => {
   const src = game.replay ? game.original : { log: game.match.log, print: fingerprint(game.match.state) };
   game.original = src;
@@ -765,9 +810,9 @@ window.__kzCampaign = campaignUI; // for browser tests
 // On a campaign battle's end screen, the only way on is back to the war map.
 function endButtons() {
   const c = !!game.campaign;
-  for (const id of ['btn-replay', 'btn-end-restart', 'btn-end-new']) document.getElementById(id).hidden = c;
+  for (const id of ['btn-replay', 'btn-share', 'btn-end-restart', 'btn-end-new']) document.getElementById(id).hidden = c;
   // Turn-based battles are not replayed (their results come from the turn rules, not the recorded orders).
-  if (game.match && game.match.state.tb) document.getElementById('btn-replay').hidden = true;
+  if (game.match && game.match.state.tb) { document.getElementById('btn-replay').hidden = true; document.getElementById('btn-share').hidden = true; }
   document.getElementById('btn-end-campaign').hidden = !c;
 }
 
@@ -1149,6 +1194,8 @@ const urlSeed = params.get('seed');
 // A link with a seed opens that battle straight away; otherwise the start
 // menu (campaign or quick battle).
 if (params.get('size') && CONFIG.skirmishSizes[params.get('size')]) game.skirmishSize = params.get('size');
-if (urlSeed) startBattle(urlSeed, { mapType: params.get('map') });
+// A shared replay link opens straight into the replay.
+if (params.get('replay')) decodeReplay(params.get('replay')).then(watchReplay).catch((e) => toast(ui, 'Replay link not readable', e.message || 'The code in the link could not be read.', true));
+else if (urlSeed) startBattle(urlSeed, { mapType: params.get('map') });
 else showStart();
 requestAnimationFrame((t) => { game.last = t; requestAnimationFrame(frame); });
