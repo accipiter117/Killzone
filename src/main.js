@@ -272,7 +272,10 @@ function tapToGround(sx, sy) {
 function resize() {
   const stage = mapCanvas.parentElement;
   const w = stage.clientWidth, h = stage.clientHeight;
-  game.dpr = Math.min(2, window.devicePixelRatio || 1);
+  // Drawing resolution: the screen's own (at most 2x), times the automatic
+  // quality step (see autoQuality), and never below three quarters of a
+  // device pixel per screen point.
+  game.dpr = Math.max(0.75, Math.min(2, window.devicePixelRatio || 1) * (game.resScale || 1));
   mapCanvas.width = Math.round(w * game.dpr);
   mapCanvas.height = Math.round(h * game.dpr);
   miniCanvas.width = Math.round(miniCanvas.clientWidth * game.dpr);
@@ -1005,6 +1008,30 @@ function updateExtraSupport(st) {
   });
 }
 
+// Automatic quality: if frames stay slow (an average under about 36 a
+// second for two seconds), draw at a lower resolution, a step at a time;
+// step back up after a good stretch. Most of the cost on a phone is pixels
+// painted (paused or not), so this keeps big battles smooth on slower
+// phones while those that cope keep full sharpness. A hidden tab's long
+// gaps do not count.
+const QUALITY = CONFIG.ui.autoQuality;
+function autoQuality(dt, now) {
+  if (!QUALITY || dt <= 0 || dt >= 0.2) return;
+  game.ftAvg = game.ftAvg === undefined ? dt : game.ftAvg * 0.95 + dt * 0.05;
+  if (now - (game.qualityAt || 0) < QUALITY.checkSec) return;
+  const scale = game.resScale || 1;
+  if (game.ftAvg > QUALITY.slowMs / 1000 && scale > QUALITY.minScale + 1e-6) {
+    game.resScale = Math.max(QUALITY.minScale, scale - QUALITY.step);
+    game.qualityAt = now; game.goodSince = now;
+    resize();
+  } else if (game.ftAvg < QUALITY.fastMs / 1000 && scale < 1) {
+    if (now - (game.goodSince || now) > QUALITY.upAfterSec) { game.resScale = Math.min(1, scale + QUALITY.step); game.qualityAt = now; game.goodSince = now; resize(); }
+  } else {
+    game.goodSince = now;
+    game.qualityAt = now;
+  }
+}
+
 function frame(t) {
   const now = t / 1000;
   const dt = Math.min(0.25, now - game.last / 1000);
@@ -1013,6 +1040,7 @@ function frame(t) {
   if (campaignUI.visible() && campaignUI.cm) keyPan(campaignUI.debug.cam, dt);
   if (campaignUI.draw(now) || !game.match) { requestAnimationFrame(frame); return; }
   keyPan(game.cam, dt);
+  autoQuality(dt, now);
   const m = game.match;
   const st = m.state;
   const tickDt = 1 / st.cfg.tickRate;

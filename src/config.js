@@ -350,7 +350,12 @@ export const CONFIG = {
   // being aimed (slow motion, as in Bad North).
   // grid: tile size for move orders (orders snap to tile centres; a
   // platoon's three squads take the tile and the ones above and below).
-  ui: { slowMo: 0.25, tile: 60 },
+  ui: {
+    // Automatic drawing resolution (src/main.js autoQuality): steps of
+    // `step` down to minScale when frames average over slowMs, back up
+    // after upAfterSec under fastMs.
+    autoQuality: { checkSec: 2, slowMs: 28, fastMs: 17, upAfterSec: 8, step: 0.15, minScale: 0.5 },
+    slowMo: 0.25, tile: 60 },
 
   // Soldier animation pacing (picture only), picked by the owner from
   // side-by-side previews. stride: world units walked per running frame
