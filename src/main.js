@@ -21,7 +21,7 @@ import { loadGroundSprites } from './render/ground-sprites.js';
 import { createBlood, ingestBlood, rebakeBlood } from './render/blood.js';
 import { callinBlocked, nextReserve } from './sim/callins.js';
 import { createEffects, ingest, prune, shakeOffset } from './render/effects.js';
-import { createAudio, unlockAudio, newFrame, playEvents, uiClick, setMix } from './render/audio.js';
+import { createAudio, unlockAudio, newFrame, playEvents, uiClick, setMix, updateAmbient } from './render/audio.js';
 import { attachMapInput, attachMinimapInput } from './ui/input.js';
 import { createUI, updateUI, toast, flashOrderPoints, openOverlay, closeOverlay, showEnd, resetFeed } from './ui/ui.js';
 import { createCampaignUI } from './ui/campaign.js';
@@ -1038,7 +1038,7 @@ function frame(t) {
   game.last = t;
   // The war map (or the start menu) is up: no battle to run or draw.
   if (campaignUI.visible() && campaignUI.cm) keyPan(campaignUI.debug.cam, dt);
-  if (campaignUI.draw(now) || !game.match) { requestAnimationFrame(frame); return; }
+  if (campaignUI.draw(now) || !game.match) { updateAmbient(audio, null, null, true); requestAnimationFrame(frame); return; }
   keyPan(game.cam, dt);
   autoQuality(dt, now);
   const m = game.match;
@@ -1046,6 +1046,9 @@ function frame(t) {
   const tickDt = 1 / st.cfg.tickRate;
   // Slow motion while giving orders, so there is time to think on a phone.
   newFrame(audio);
+  // Engines, aircraft, arc tower hum and the weather bed (quiet when paused,
+  // over, or when the start screen is up over a battle).
+  updateAmbient(audio, st, game.cam, game.paused || !!st.result || !document.getElementById('overlay-start').hidden);
   const slow = game.slowMo && !game.watch && !game.replay && !game.release && (game.selected !== null || game.vehicle || game.armed !== null);
   document.getElementById('stage').classList.toggle('slowmo', slow && !game.paused);
   if (!game.paused && !st.result) {
