@@ -128,7 +128,8 @@ export function createBattle(seed, options = {}) {
   // Squads that start with nobody (a campaign platoon that lost a squad).
   for (const sq of state.squads) if (!sq.soldiers.some((id) => state.soldiers[id].alive)) sq.mode = 'dead';
   // Skirmish maps are twice the size: the hunt for the enemy HQ gets longer.
-  state.durationTicks = Math.round((map.skirmish ? cfg.skirmish.durationSec : cfg.battle.durationSec) * cfg.tickRate);
+  const size = map.skirmish && Object.values(cfg.skirmishSizes).find((z) => z.width === map.width && z.height === map.height);
+  state.durationTicks = Math.round((map.skirmish ? (size ? size.durationSec : cfg.skirmish.durationSec) : cfg.battle.durationSec) * cfg.tickRate);
   chooseWeather(state, seedInt);
   if (map.skirmish) {
     const c = cfg.skirmish.exploreCell, cols = Math.ceil(map.width / c), rows = Math.ceil(map.height / c);

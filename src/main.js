@@ -48,7 +48,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const game = {
   match: null, seed: null, options: null, terrain: null, renderer: null, fxs: null, cam: null,
-  watch: store.get('watch', false), battleMode: 'rt', side: store.get('side2', 1) === 0 ? 0 : 1, route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), bloodOn: store.get('blood', true), mapChoice: store.get('mapType', 'trenches'), weatherChoice: store.get('weather', 'random'), mapType: 'trenches', lengthSec: store.get('length', 600),
+  watch: store.get('watch', false), battleMode: 'rt', side: store.get('side2', 1) === 0 ? 0 : 1, route: null, signal: false, artDelay: 0, labelsAll: store.get('labels', false), grid: store.get('grid', true), slowMo: store.get('slowMo', true), view: store.get('soldierStyle', 'pixel'), tilt: store.get('tiltView', false), bloodOn: store.get('blood', true), mapChoice: store.get('mapType', 'trenches'), skirmishSize: store.get('skirmishSize', 'medium'), weatherChoice: store.get('weather', 'random'), mapType: 'trenches', lengthSec: store.get('length', 600),
   replay: false, original: null, paused: false, speed: 1, selected: null, scope: null, vehicle: false, armed: null, release: null, minimap: store.get('minimap', false), marker: null, endShown: false,
   acc: 0, last: performance.now(), dpr: 1,
 };
@@ -161,8 +161,9 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
     // 'skirmish' is the generated map (type 'random'): fog of war and an HQ to find.
     game.mapType = choice === 'skirmish' ? 'random' : choice === 'random' ? MAP_KINDS[Math.floor(Math.random() * MAP_KINDS.length)] : MAP_KINDS.includes(choice) ? choice : 'trenches';
   }
-  const size = CONFIG.mapSizes[game.mapType];
-  game.options = replayLog ? replayLog.options : campaign ? battleOptions(campaign.rec) : { config: { battle: { durationSec: game.mapType === 'random' ? CONFIG.skirmish.durationSec : game.lengthSec }, map: { type: game.mapType, weather: game.weatherChoice }, world: { width: size.width, height: size.height } } };
+  // Skirmish maps come in three sizes (menu, or &size= in the address).
+  const size = game.mapType === 'random' ? CONFIG.skirmishSizes[game.skirmishSize] || CONFIG.skirmishSizes.medium : CONFIG.mapSizes[game.mapType];
+  game.options = replayLog ? replayLog.options : campaign ? battleOptions(campaign.rec) : { config: { battle: { durationSec: game.mapType === 'random' ? size.durationSec : game.lengthSec }, map: { type: game.mapType, weather: game.weatherChoice }, world: { width: size.width, height: size.height } } };
   game.replay = !!replayLog;
   game.match = createMatch({ seed, options: game.options, controllers: replayLog || turnBased ? [] : controllersFor(game.watch), replayLog });
   if (turnBased) createTactics(game.match.state);
@@ -214,7 +215,7 @@ function startBattle(seed, { replayLog = null, mapType = null, campaign = null, 
     openOverlay('overlay-help');
   }
   if (campaign) return;
-  try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}&map=${game.mapType === 'random' ? 'skirmish' : game.mapType}`); } catch { /* file:// */ }
+  try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}&map=${game.mapType === 'random' ? `skirmish&size=${game.skirmishSize}` : game.mapType}`); } catch { /* file:// */ }
 }
 
 // The weather forecast: a toast as the battle opens, and a chip by the
@@ -641,6 +642,7 @@ function openMenu() {
   document.getElementById('labels-toggle').checked = game.labelsAll;
   document.getElementById('view-select').value = game.view;
   document.getElementById('map-select').value = game.mapChoice;
+  document.getElementById('size-select').value = game.skirmishSize;
   document.getElementById('weather-select').value = game.weatherChoice;
   document.getElementById('blood-toggle').checked = game.bloodOn;
   document.getElementById('tilt-toggle').checked = game.tilt;
@@ -685,6 +687,10 @@ document.getElementById('sound-toggle').addEventListener('change', (e) => {
 document.getElementById('slowmo-toggle').addEventListener('change', (e) => {
   game.slowMo = e.target.checked;
   store.set('slowMo', game.slowMo);
+});
+document.getElementById('size-select').addEventListener('change', (e) => {
+  game.skirmishSize = e.target.value;
+  store.set('skirmishSize', game.skirmishSize);
 });
 document.getElementById('map-select').addEventListener('change', (e) => {
   game.mapChoice = e.target.value;
@@ -1111,6 +1117,7 @@ const params = new URLSearchParams(location.search);
 const urlSeed = params.get('seed');
 // A link with a seed opens that battle straight away; otherwise the start
 // menu (campaign or quick battle).
+if (params.get('size') && CONFIG.skirmishSizes[params.get('size')]) game.skirmishSize = params.get('size');
 if (urlSeed) startBattle(urlSeed, { mapType: params.get('map') });
 else showStart();
 requestAnimationFrame((t) => { game.last = t; requestAnimationFrame(frame); });

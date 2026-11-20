@@ -1354,6 +1354,16 @@ export function drawMinimap(g, r, state, cam, opts) {
     g.arc(s.x * sx, s.y * sy, s.kind === 'objective' || s.kind === 'hq' ? 4 : 2.5, 0, Math.PI * 2);
     g.fill();
   }
+  // Where enemy squads were last seen (the main view's fading "?" rings).
+  if (!opts.reveal) {
+    for (const [, m] of r.lastSeen) {
+      const age = opts.now - m.t;
+      if (age > 25 || age < 0) continue;
+      g.strokeStyle = `rgba(255,138,82,${0.9 * (1 - age / 25)})`;
+      g.lineWidth = 1.4;
+      g.beginPath(); g.arc(m.x * sx, m.y * sy, 4, 0, Math.PI * 2); g.stroke();
+    }
+  }
   for (const s of state.soldiers) {
     if (!isActive(s) || !visible(state, s, opts)) continue;
     g.fillStyle = s.side === 0 ? '#bcd9ff' : '#ff7a3a';

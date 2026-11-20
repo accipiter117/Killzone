@@ -91,3 +91,26 @@ test('reserve platoons wait off the field until enough supply is held, then marc
   run(s, 60);
   assert.ok(!pl.broken, 'a fresh platoon is not broken');
 });
+
+test('the AI sends platoons back to its HQ when it sees enemy close to it', () => {
+  const s = skirmish(6);
+  run(s, 60);
+  const hq = s.sites.find((x) => x.kind === 'hq' && x.home === 1);
+  // Move the Helghast out towards the middle and an ISA platoon next to their HQ.
+  for (const q of s.squads) if (q.side === 1) place(s, q.id, (hq.x + 3000) / 2, (hq.y + 2000) / 2);
+  const raid = s.platoons.find((p) => p.side === 0);
+  for (const id of raid.squads) place(s, id, hq.x + (hq.x < 3000 ? 250 : -250), hq.y);
+  for (const m of s.soldiers) if (m.side === 0) s.sides[1].spotted[m.id] = 1;
+  s.sides[1].op = 6;
+  const cmds = createAI(1).think(s) || [];
+  assert.ok(cmds.some((c) => c.type === 'take' && c.params.site === hq.id), 'someone goes back to hold the HQ');
+});
+
+test('skirmish maps come in three sizes, each with its own battle length', () => {
+  for (const z of Object.values(CONFIG.skirmishSizes)) {
+    const s = createBattle(2, { config: { map: { type: 'random', weather: 'clear' }, world: { width: z.width, height: z.height } } });
+    assert.equal(s.map.width, z.width);
+    assert.equal(s.durationTicks, z.durationSec * CONFIG.tickRate);
+    assert.equal(s.sites.filter((x) => x.kind === 'hq').length, 2);
+  }
+});

@@ -152,6 +152,12 @@ export const CONFIG = {
   // Random skirmish maps (src/sim/maps/random.js): find and take the enemy
   // HQ. Supply points pay score and order points; ground is explored in
   // coarse cells as troops see it.
+  // Skirmish map sizes (menu); battles on bigger maps run longer.
+  skirmishSizes: {
+    small: { label: 'Small', width: 4200, height: 2800, durationSec: 1080 },
+    medium: { label: 'Medium', width: 6000, height: 4000, durationSec: 1500 },
+    large: { label: 'Large', width: 7800, height: 5200, durationSec: 1920 },
+  },
   skirmish: { durationSec: 1500, supplyRegen: 0.18, exploreCell: 50, exploreSight: 300, homeKnown: 520, hqSec: 60, reserves: 2 },
   // Blood (src/render/blood.js): picture only, never read by the rules.
   // Sizes in world units (a standing soldier is about 34 tall), times in
@@ -357,6 +363,7 @@ export const CONFIG = {
   ai: {
     thinkSec: 4,
     siteValue: { objective: 10, comms: 6, mg: 3, arc: 3, lever: 1.5, depot: 2, supply: 7, hq: 25, scout: 4 },
+    hqDefendRadius: 700, hqDefendMin: 3, // skirmish: this many enemy seen this close to our HQ and platoons go back to hold it
     gunshipMinCluster: 6, // the AI sends its gunship at a group at least this big
     scoutGrowSec: 90, // skirmish: a scouting target's worth grows by its base every this many seconds while the enemy HQ is unfound
     threatRadius: 320, // enemies seen this close to a site count as massing on it

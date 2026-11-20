@@ -30,7 +30,12 @@ export function randomMap(seedInt, cfg) {
 }
 
 function build(seed, cfg, opts = {}) {
-  const { width: W, height: H } = RANDOM_SIZE;
+  // Size from the battle's world (small, medium or large in the menu);
+  // medium is RANDOM_SIZE. Counts scale with the area and spacings with the
+  // side, so every size is about as busy.
+  const W = cfg.world.width || RANDOM_SIZE.width, H = cfg.world.height || RANDOM_SIZE.height;
+  const area = (W * H) / (RANDOM_SIZE.width * RANDOM_SIZE.height), sk = Math.sqrt(area);
+  const many = (n, min = 1) => Math.max(min, Math.round(n * area));
   const t = kit(W, H, cfg.world.cell, 'trenches', seed, 0x6a09e667);
   const { map, rand, g } = t;
   map.skirmish = true;
@@ -72,10 +77,10 @@ function build(seed, cfg, opts = {}) {
 
   // ---- Places: spread across the map, away from the HQs and the river. ------
   const places = [];
-  for (let tries = 0; tries < 900 && places.length < 13; tries++) {
+  for (let tries = 0; tries < 900 && places.length < many(13, 9); tries++) {
     const p = { x: rand(420, W - 420), y: rand(380, H - 380) };
-    if (hq.some((h) => near(p, h, 820))) continue;
-    if (places.some((q) => near(p, q, 760))) continue;
+    if (hq.some((h) => near(p, h, 820 * sk))) continue;
+    if (places.some((q) => near(p, q, 760 * sk))) continue;
     if (riverDist(p) < 230) continue;
     places.push(p);
   }
@@ -95,9 +100,9 @@ function build(seed, cfg, opts = {}) {
 
   // ---- Raised ground: ridges and plateaus in the open. --------------------------
   const hills = [];
-  for (let tries = 0; tries < 400 && hills.length < 9; tries++) {
+  for (let tries = 0; tries < 400 && hills.length < many(9, 5); tries++) {
     const p = { x: rand(300, W - 300), y: rand(300, H - 300) };
-    if (hq.some((h) => near(p, h, 650)) || places.some((q) => near(p, q, 420)) || hills.some((q) => near(p, q, 520)) || riverDist(p) < 260) continue;
+    if (hq.some((h) => near(p, h, 650 * sk)) || places.some((q) => near(p, q, 420 * sk)) || hills.some((q) => near(p, q, 520 * sk)) || riverDist(p) < 260) continue;
     hills.push(p);
   }
   for (const p of hills) {
@@ -176,7 +181,7 @@ function build(seed, cfg, opts = {}) {
 
   // ---- Scatter. --------------------------------------------------------------------------
   const free = (p, d = 160) => !hq.some((h) => near(p, h, 380)) && !places.some((q) => near(p, q, d + 80)) && riverDist(p) > 90;
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < many(18); i++) {
     const p = { x: rand(200, W - 200), y: rand(200, H - 200) };
     if (!free(p)) continue;
     const kind = pick(['tankwreck', 'tankwreck', 'apc', 'truck', 'bus']);
@@ -184,11 +189,11 @@ function build(seed, cfg, opts = {}) {
     t.prop(kind, p.x, p.y, size[0], size[1], rand(0, 6.28), { solid: true, side: rand(0, 1) < 0.5 ? 'isa' : 'hgh' });
     t.scorch(p.x, p.y, 50);
   }
-  for (let i = 0; i < 60; i++) { const p = { x: rand(100, W - 100), y: rand(100, H - 100) }; if (free(p, 60)) t.prop('deadtree', p.x, p.y, 28, 28); }
-  for (let i = 0; i < 8; i++) { const p = { x: rand(300, W - 300), y: rand(300, H - 300) }; if (free(p)) t.mud(p.x, p.y, rand(80, 160), rand(60, 110)); }
-  for (let i = 0; i < 4; i++) { const p = { x: rand(300, W - 300), y: rand(300, H - 300) }; if (free(p)) t.haze(p.x, p.y, rand(110, 180), rand(80, 120)); }
-  for (let i = 0; i < 6; i++) { const p = { x: rand(300, W - 300), y: rand(300, H - 300) }; if (free(p)) t.ash(p.x, p.y, rand(200, 400), rand(150, 260)); }
-  t.craters(150, 100, 100, W - 100, H - 100, 10, 26);
+  for (let i = 0; i < many(60); i++) { const p = { x: rand(100, W - 100), y: rand(100, H - 100) }; if (free(p, 60)) t.prop('deadtree', p.x, p.y, 28, 28); }
+  for (let i = 0; i < many(8); i++) { const p = { x: rand(300, W - 300), y: rand(300, H - 300) }; if (free(p)) t.mud(p.x, p.y, rand(80, 160), rand(60, 110)); }
+  for (let i = 0; i < many(4); i++) { const p = { x: rand(300, W - 300), y: rand(300, H - 300) }; if (free(p)) t.haze(p.x, p.y, rand(110, 180), rand(80, 120)); }
+  for (let i = 0; i < many(6); i++) { const p = { x: rand(300, W - 300), y: rand(300, H - 300) }; if (free(p)) t.ash(p.x, p.y, rand(200, 400), rand(150, 260)); }
+  t.craters(many(150), 100, 100, W - 100, H - 100, 10, 26);
   t.debris(0, 0, W, H, 0.012);
   // Petrusite tanks by the industry and fuel dumps (stray fire sets them off).
   const tanks = [];
