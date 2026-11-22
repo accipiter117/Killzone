@@ -277,7 +277,13 @@ function resize() {
   // Drawing resolution: the screen's own (at most 2x), times the automatic
   // quality step (see autoQuality), and never below three quarters of a
   // device pixel per screen point.
-  game.dpr = Math.max(0.75, Math.min(2, window.devicePixelRatio || 1) * (game.resScale || 1));
+  // Draw at the screen's full sharpness (an iPhone is 3 real pixels per
+  // point). Capping at 2 left the browser stretching a smaller picture over
+  // the screen, which softened the detailed soldier sprites into a blur when
+  // they moved. Automatic quality may still step down on a struggling
+  // phone, but never below 2 real pixels per point (see autoQuality).
+  const native = Math.min(3, window.devicePixelRatio || 1);
+  game.dpr = Math.max(Math.min(2, native), native * (game.resScale || 1));
   mapCanvas.width = Math.round(w * game.dpr);
   mapCanvas.height = Math.round(h * game.dpr);
   miniCanvas.width = Math.round(miniCanvas.clientWidth * game.dpr);
